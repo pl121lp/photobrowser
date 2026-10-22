@@ -3,6 +3,8 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -34,6 +36,12 @@ struct GpuEnvironment {
 };
 GpuEnvironment gpuEnvironment(GpuPreference preference, bool nvidiaDriver);
 
+// [background.<preset>] colours; unset ones fall back (see backgroundColors()).
+struct PresetColors {
+  std::optional<Rgb8> color, color2;
+  friend bool operator==(const PresetColors&, const PresetColors&) = default;
+};
+
 // User settings from config.ini (see defaultConfigText() for documentation).
 struct Config {
   std::filesystem::path photoFolder = "photos";
@@ -48,6 +56,7 @@ struct Config {
   std::filesystem::path backgroundShader;
   double backgroundSpeed = 1.0;    // time scale for animated backgrounds (0..10)
   double backgroundDensity = 1.0;  // star/light count multiplier (0.1..4): warp, starfield, bokeh
+  std::map<std::string, PresetColors> presetColors;  // by preset name
   GpuPreference gpu = GpuPreference::Auto;
   bool screensaver = false;      // start in screensaver mode (F5 toggles)
   double screensaverHold = 30;   // seconds on each photo (1..3600)

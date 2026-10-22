@@ -89,6 +89,10 @@ color = #6fa8dc            # main colour (presets use both colours)
 color2 = #0b1020
 speed = 1                  # animation speed: 0.5 = half, 2 = double, 0 = frozen
 density = 1                # stars/lights in warp, starfield, bokeh (0.1 to 4)
+
+[background.aurora]        # optional: colours for one preset when F6 shows it
+color = #3fd6a0            # (each preset has its own built-in colours otherwise)
+color2 = #0b1020
 ```
 
 `gpu = discrete` runs on the dedicated GPU (NVIDIA PRIME offload, or `DRI_PRIME=1`

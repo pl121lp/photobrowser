@@ -199,7 +199,8 @@ int App::run(const Options& options) {
       } else {
         std::fprintf(stderr, "photobrowse: background shader '%s' is not a preset or a readable file\n", name.c_str());
       }
-      if (!background.init(toLinear(config.backgroundColor), toLinear(config.backgroundColor2), source, animated)) {
+      const auto [color, color2] = backgroundColors(config, name);
+      if (!background.init(toLinear(color), toLinear(color2), source, animated)) {
         std::fprintf(stderr, "photobrowse: background shader failed to compile (details above); using solid color\n");
         what = "solid color";
         animated = false;
@@ -272,7 +273,6 @@ int App::run(const Options& options) {
       indexer->start();
     }
 
-    const float clear[3] = {background.clearColor()[0], background.clearColor()[1], background.clearColor()[2]};
     std::vector<TileDraw> draws;
     std::vector<std::pair<uint64_t, TileInstance>> keyed;
     std::vector<TileInstance> batch;
@@ -392,6 +392,7 @@ int App::run(const Options& options) {
 
       // --- Draw ------------------------------------------------------------------
       const uint64_t tPre = SDL_GetTicksNS();
+      const float clear[3] = {background.clearColor()[0], background.clearColor()[1], background.clearColor()[2]};
       renderer.beginFrame(camera.viewport, clear);
       if (auto gpuMs = background.takeGpuMs(); gpuMs && bench) backgroundGpu.add(*gpuMs);
       background.draw(camera.viewport, seconds(now - start));

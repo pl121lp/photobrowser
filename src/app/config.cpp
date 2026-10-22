@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <optional>
 
+#include "app/background_presets.h"
 #include "app/options.h"
 #include "platform/paths.h"
 
@@ -111,6 +112,9 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
         continue;
       }
       section = lower(trim(line.substr(1, line.size() - 2)));
+      if (section.starts_with("background.") && !isPresetName(section.substr(11))) {
+        warn("unknown background preset '" + section.substr(11) + "'");
+      }
       continue;
     }
     const size_t eq = line.find('=');
@@ -210,6 +214,17 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number of seconds");
       }
+    } else if (section.starts_with("background.") && (key.ends_with(".color") || key.ends_with(".color2"))) {
+      const std::string preset = section.substr(11);
+      if (!isPresetName(preset)) continue;  // warned at the section header
+      if (auto col = parseColor(value)) {
+        PresetColors& pc = c.presetColors[preset];
+        (key.ends_with(".color") ? pc.color : pc.color2) = *col;
+      } else {
+        bad("a colour like #1a2b3c");
+      }
+    } else if (section.starts_with("background.") && !isPresetName(section.substr(11))) {
+      continue;  // warned at the section header
     } else if (key == "background.shader") {
       c.backgroundShader = value.empty() ? fs::path{} : expandPath(value);
     } else {
@@ -288,6 +303,13 @@ std::string defaultConfigText() {
 #   uniform float uDensity;    // density
 # (uTime already includes speed.) The presets in the source tree's shaders/backgrounds/ folder are good starting points.
 # shader = ~/.config/photobrowse/my-background.frag
+#
+# Colours: the background chosen above, solid and a shader file use color and color2.
+# Every preset has its own built-in colours for when F6 switches to it; change them
+# per preset with a section named after it, e.g.:
+# [background.aurora]
+# color = #3fd6a0
+# color2 = #0b1020
 )";
 }
 
