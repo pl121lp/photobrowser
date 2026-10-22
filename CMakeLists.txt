@@ -52,7 +52,8 @@ find_package(Threads REQUIRED)
 
 # --- pb_core: pure logic, no SDL / GL / codec dependencies -------------------
 add_library(pb_core STATIC
-  src/core/geom.cpp
+  src/layout/content.cpp
+  src/layout/square_grid.cpp
 )
 target_include_directories(pb_core PUBLIC src)
 target_link_libraries(pb_core PUBLIC Threads::Threads)
@@ -62,6 +63,7 @@ enable_testing()
 add_executable(pb_tests
   tests/test_main.cpp
   tests/test_geom.cpp
+  tests/test_layout.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
