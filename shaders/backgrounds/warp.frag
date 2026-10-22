@@ -47,7 +47,7 @@ void main() {
     float speed = 0.22 + 0.3 * fract(h * 7.13);       // laps per second
     float z = fract(h + uTime * speed);              // 0 = far away, 1 = passing by
     float head = 0.02 + 1.3 * z * z * z;             // perspective: accelerates outward
-    float len = 0.003 + 0.2 * z * z;                 // faster stars leave longer streaks
+    float len = 0.002 + 0.09 * z * z;                // faster stars leave longer streaks
     if (r < head - len || r > head + 2.0 * px) continue;  // most pixels: not on this streak
     float along = smoothstep(head - len, head, r) * (1.0 - smoothstep(head, head + 2.0 * px, r));
     float halfWidth = (0.5 + 1.5 * z) * px;          // nearer stars are thicker
