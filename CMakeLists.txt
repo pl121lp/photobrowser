@@ -63,6 +63,7 @@ add_library(pb_core STATIC
   src/stream/job_system.cpp
   src/stream/slot_allocator.cpp
   src/stream/residency.cpp
+  src/app/options.cpp
   src/layout/square_grid.cpp
 )
 target_include_directories(pb_core PUBLIC src)
@@ -82,6 +83,7 @@ add_executable(pb_tests
   tests/test_scanner.cpp
   tests/test_jobs.cpp
   tests/test_residency.cpp
+  tests/test_options.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
@@ -104,4 +106,26 @@ if(PB_HAVE_TURBOJPEG)
     tests/test_indexer.cpp
   )
   target_link_libraries(pb_tests PRIVATE pb_imaging)
+endif()
+
+# --- pb_gfx + photobrowse executable ------------------------------------------
+if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
+  add_library(pb_gfx STATIC
+    src/gfx/gl.cpp
+    src/gfx/shader.cpp
+    src/gfx/paged_texture.cpp
+    src/gfx/tile_renderer.cpp
+  )
+  target_include_directories(pb_gfx PUBLIC third_party/khronos)
+  target_link_libraries(pb_gfx PUBLIC pb_imaging)
+  pb_embed_shaders(pb_gfx "${CMAKE_CURRENT_BINARY_DIR}/generated/shaders_embedded.h"
+    "${CMAKE_SOURCE_DIR}/shaders/tile.vert"
+    "${CMAKE_SOURCE_DIR}/shaders/tile.frag"
+  )
+
+  add_executable(photobrowse
+    src/main.cpp
+    src/app/app.cpp
+  )
+  target_link_libraries(photobrowse PRIVATE pb_gfx pb_imaging SDL3::SDL3)
 endif()
