@@ -1,0 +1,5 @@
+{
+  "name": "photobrowse",
+  "version-string": "0.1.0",
+  "dependencies": ["sdl3", "libjpeg-turbo"]
+}
