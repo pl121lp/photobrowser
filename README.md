@@ -78,6 +78,10 @@ graph = false              # frame-time graph in the fullscreen panel
 fullscreen = true          # start fullscreen (--windowed starts in a window)
 gpu = auto                 # auto | integrated | discrete (laptops with two GPUs, Linux)
 
+[screensaver]
+enabled = off              # on = start in screensaver mode (F5 toggles)
+hold = 30                  # seconds on each photo
+
 [background]
 mode = shader              # solid | gradient | vignette | shader
 shader = aurora            # a built-in preset name, or a path to your own .frag
@@ -121,6 +125,7 @@ mistakes in the settings file are reported with the line number.
 | `Esc` | leave whole-photo view, then fullscreen |
 | `F2` | photo info (name, size, date taken, file size) while a photo is open in whole-photo view |
 | `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
+| `F5` | screensaver: tours random photos, flying between them (any click, scroll or key stops it) |
 | `Q` | quit |
 
 ## Performance testing

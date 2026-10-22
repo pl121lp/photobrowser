@@ -217,3 +217,23 @@ TEST_CASE("config: background speed and density") {
   CHECK(text.find("speed = 1") != std::string::npos);
   CHECK(text.find("density = 1") != std::string::npos);
 }
+
+TEST_CASE("config: screensaver") {
+  CHECK_FALSE(pb::Config{}.screensaver);
+  CHECK(pb::Config{}.screensaverHold == doctest::Approx(30));
+  auto r = pb::parseConfig("[screensaver]\nenabled = on\nhold = 12.5\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.screensaver);
+  CHECK(r.config.screensaverHold == doctest::Approx(12.5));
+  auto clamped = pb::parseConfig("[screensaver]\nhold = 0\n");
+  CHECK(clamped.config.screensaverHold == doctest::Approx(1));
+  CHECK(hasWarning(clamped, "line 2"));
+  auto bad = pb::parseConfig("[screensaver]\nenabled = perhaps\nhold = long\n");
+  CHECK_FALSE(bad.config.screensaver);
+  CHECK(bad.config.screensaverHold == doctest::Approx(30));
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(hasWarning(bad, "line 3"));
+  const std::string text = pb::defaultConfigText();
+  CHECK(text.find("[screensaver]") != std::string::npos);
+  CHECK(text.find("hold = 30") != std::string::npos);
+}

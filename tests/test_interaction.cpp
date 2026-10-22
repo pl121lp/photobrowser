@@ -356,3 +356,48 @@ TEST_CASE("interaction: camera stays within the library bounds") {
   f.ui.onPointerMove({500, 5000}, f.t + 0.5);
   CHECK(f.cam.center.y >= f.layout.bounds().y0 - 1e-9);
 }
+
+TEST_CASE("interaction: flyTo zooms out mid-flight and lands on the target at max grid zoom") {
+  Fixture f(400);  // 20x20 grid
+  const uint32_t target = 399;
+  const pb::Vec2d dest = f.layout.place(target).cell.center();
+  f.ui.flyTo(target, f.t);
+  CHECK(f.ui.flying());
+  const double startScale = f.cam.scale;
+  double lowest = f.cam.scale;
+  while (f.ui.flying()) {
+    f.run(1.0 / 60);
+    lowest = std::min(lowest, f.cam.scale);
+    REQUIRE(f.t < 20);
+  }
+  CHECK(lowest < startScale * 0.5);  // pulled back for the journey
+  CHECK(lowest >= f.ui.minScale() * 0.999);
+  CHECK(f.cam.center.x == doctest::Approx(dest.x));
+  CHECK(f.cam.center.y == doctest::Approx(dest.y));
+  CHECK(f.cam.scale == doctest::Approx(f.ui.maxScale()));
+  CHECK(f.ui.idle());
+}
+
+TEST_CASE("interaction: flyTo duration grows with distance") {
+  Fixture near(400), far(400);
+  const uint32_t from = near.layout.centerPosition();
+  near.ui.flyTo(from + 1, near.t);
+  far.ui.flyTo(0, far.t);
+  while (near.ui.flying()) near.run(0.01);
+  while (far.ui.flying()) far.run(0.01);
+  CHECK(near.t >= 2);
+  CHECK(far.t > near.t + 1);
+  CHECK(far.t <= 6.1);
+}
+
+TEST_CASE("interaction: openPhoto and closePhoto drive the whole-photo view") {
+  Fixture f;
+  f.ui.openPhoto(7, f.t);
+  f.run(0.5);
+  REQUIRE(f.ui.focused());
+  CHECK(*f.ui.focused() == 7);
+  CHECK(f.ui.focusProgress() == doctest::Approx(1));
+  f.ui.closePhoto();
+  f.run(0.5);
+  CHECK_FALSE(f.ui.focused());
+}

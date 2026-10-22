@@ -49,6 +49,8 @@ struct Config {
   double backgroundSpeed = 1.0;    // time scale for animated backgrounds (0..10)
   double backgroundDensity = 1.0;  // star/light count multiplier (0.1..4): warp, starfield, bokeh
   GpuPreference gpu = GpuPreference::Auto;
+  bool screensaver = false;      // start in screensaver mode (F5 toggles)
+  double screensaverHold = 30;   // seconds on each photo (1..3600)
   friend bool operator==(const Config&, const Config&) = default;
 };
 

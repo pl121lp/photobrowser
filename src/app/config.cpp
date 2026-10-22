@@ -197,6 +197,19 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "screensaver.enabled") {
+      if (auto b = parseBool(value)) {
+        c.screensaver = *b;
+      } else {
+        bad("on/off");
+      }
+    } else if (key == "screensaver.hold") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 1 || *d > 3600) warn(key + " must be between 1 and 3600 seconds; clamped");
+        c.screensaverHold = std::clamp(*d, 1.0, 3600.0);
+      } else {
+        bad("a number of seconds");
+      }
     } else if (key == "background.shader") {
       c.backgroundShader = value.empty() ? fs::path{} : expandPath(value);
     } else {
@@ -238,6 +251,13 @@ std::string defaultConfigText() {
 #   discrete   : the dedicated GPU (more headroom: high-refresh monitors, heavy shaders)
 # Linux only; on Windows use Settings > System > Display > Graphics.
 # gpu = auto
+
+[screensaver]
+# Screensaver mode (F5 toggles; any click, scroll or key stops it): flies to a random
+# photo, shows it whole, then travels on to the next. on = start in this mode.
+# enabled = off
+# Seconds to stay on each photo.
+# hold = 30
 
 [background]
 # mode = solid     : just color

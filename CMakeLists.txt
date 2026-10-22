@@ -57,6 +57,7 @@ add_library(pb_core STATIC
   src/view/motion.cpp
   src/view/interaction.cpp
   src/view/bench_script.cpp
+  src/view/screensaver.cpp
   src/view/overlay.cpp
   src/library/exif.cpp
   src/library/catalog.cpp
@@ -84,6 +85,7 @@ add_executable(pb_tests
   tests/test_camera.cpp
   tests/test_motion.cpp
   tests/test_interaction.cpp
+  tests/test_screensaver.cpp
   tests/test_exif.cpp
   tests/test_catalog.cpp
   tests/test_scanner.cpp

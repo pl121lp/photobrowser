@@ -31,6 +31,7 @@ src/
   view/       Camera       center (double world coords) + zoom; screen<->world
               Motion       momentum (exponential friction), eased tweens, smooth zoom
               Input        drag/click/double-click detection -> Camera commands
+              Screensaver  random photo tour: flyTo (pull-back arc) -> open -> hold -> next
   layout/     Layout       interface: cell rect + content placement per photo index
               SquareGrid   v1 implementation (square-crop)
   library/    Catalog      ordered vector<PhotoRecord>; persisted to cache

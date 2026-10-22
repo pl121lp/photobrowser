@@ -33,6 +33,13 @@ class Interaction {
   Rect focusDisplayRect() const;
   void update(double t, double dt);
 
+  // Scripted moves (screensaver). flyTo: eased journey to `pos` that pulls back to show
+  // the way and zooms in to the max grid zoom on arrival; longer distances take longer.
+  void flyTo(uint32_t pos, double t);
+  void openPhoto(uint32_t pos, double t) { focus(pos, t); }  // whole-photo view
+  void closePhoto() { unfocus(); }
+  bool flying() const { return tween_.active; }  // an eased camera move is running
+
   std::optional<uint32_t> focused() const;
   double focusProgress() const { return focusProgress_; }  // 0 grid .. 1 whole photo
   double focusZoom() const;
@@ -45,6 +52,7 @@ class Interaction {
   struct CameraTween {
     bool active = false;
     Tween x, y, logScale;
+    double pullback = 0;  // log-scale dip at mid-move (<= 0): zoom out, then in
   };
 
   double startScale() const;

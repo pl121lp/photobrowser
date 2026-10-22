@@ -25,6 +25,7 @@
 #include "view/camera.h"
 #include "view/bench_script.h"
 #include "view/interaction.h"
+#include "view/screensaver.h"
 
 namespace pb {
 
@@ -217,6 +218,18 @@ int App::run(const Options& options) {
     SDL_GetWindowSizeInPixels(window, &pw, &ph);
     camera.viewport = {double(pw), double(ph)};
     Interaction ui(camera, *layout, config.maxPhotoZoom);
+    Screensaver screensaver(config.screensaverHold);
+    auto setScreensaver = [&](bool on) {
+      if (on == screensaver.active()) return;
+      if (on) {
+        screensaver.start();
+        SDL_HideCursor();
+      } else {
+        screensaver.stop();
+        SDL_ShowCursor();
+      }
+    };
+    if (config.screensaver && !options.bench && !options.snapshot) setScreensaver(true);
 
     size_t prewarmPages = 0;
     auto startSession = [&](LibraryState lib) {
@@ -284,6 +297,7 @@ int App::run(const Options& options) {
             ui.setViewport({double(ev.window.data1), double(ev.window.data2)});
             break;
           case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            setScreensaver(false);  // any click, scroll or key (except the F-key toggles) stops it
             if (ev.button.button == SDL_BUTTON_LEFT) ui.onPointerDown(px(ev.button.x, ev.button.y), t);
             if (ev.button.button == SDL_BUTTON_RIGHT) ui.onSecondaryClick();
             break;
@@ -292,6 +306,7 @@ int App::run(const Options& options) {
             break;
           case SDL_EVENT_MOUSE_MOTION: ui.onPointerMove(px(ev.motion.x, ev.motion.y), t); break;
           case SDL_EVENT_MOUSE_WHEEL: {
+            setScreensaver(false);
             const float dy = ev.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -ev.wheel.y : ev.wheel.y;
             ui.onWheel(px(ev.wheel.mouse_x, ev.wheel.mouse_y), dy);
             break;
@@ -300,6 +315,8 @@ int App::run(const Options& options) {
             const SDL_Keycode k = ev.key.key;
             if (k == SDLK_Q) {
               running = false;
+            } else if (k == SDLK_F5) {
+              setScreensaver(!screensaver.active());
             } else if (k == SDLK_F2) {
               showInfo = !showInfo;
             } else if (k == SDLK_F3) {
@@ -313,6 +330,7 @@ int App::run(const Options& options) {
               SDL_SetWindowFullscreenMode(window, nullptr);  // borderless desktop
               SDL_SetWindowFullscreen(window, !fs);
             } else if (auto key = mapKey(k)) {
+              setScreensaver(false);
               if (!ui.onKey(*key, t) && *key == Key::Escape) SDL_SetWindowFullscreen(window, false);
             }
             break;
@@ -361,6 +379,7 @@ int App::run(const Options& options) {
       }
       if (bench) bench->drive(ui, camera.viewport, seconds(now));
       ui.update(seconds(now), dt);
+      screensaver.update(ui, layout->count(), seconds(now));  // after: reacts to a move ending this frame
 
       // --- Draw ------------------------------------------------------------------
       const uint64_t tPre = SDL_GetTicksNS();

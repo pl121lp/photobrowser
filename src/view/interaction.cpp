@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numbers>
 #include <vector>
 
 namespace pb {
@@ -14,6 +15,7 @@ constexpr double kGlideS = 0.4;
 constexpr double kFocusS = 0.35;
 constexpr double kWheelFactor = 1.25;
 constexpr double kFitMargin = 0.95;
+constexpr double kFlyMinS = 2, kFlyMaxS = 6;  // flyTo duration: 1.5 s + 0.8 s per doubling of distance
 }  // namespace
 
 Interaction::Interaction(Camera& camera, const Layout& layout, double maxPhotoZoom)
@@ -77,6 +79,20 @@ void Interaction::glideTo(Vec2d center, double scale, double t) {
   tween_.x = {cam_.center.x, center.x, t, kGlideS};
   tween_.y = {cam_.center.y, center.y, t, kGlideS};
   tween_.logScale = {std::log(cam_.scale), std::log(scale), t, kGlideS};
+  tween_.pullback = 0;
+}
+
+void Interaction::flyTo(uint32_t pos, double t) {
+  if (pos >= layout_.count()) return;
+  const Vec2d dest = layout_.place(pos).cell.center();
+  const double dist = length(dest - cam_.center);  // world units = cells
+  const double duration = std::clamp(1.5 + 0.8 * std::log2(1 + dist), kFlyMinS, kFlyMaxS);
+  glideTo(dest, maxScale_, t);
+  tween_.x.duration = tween_.y.duration = tween_.logScale.duration = duration;
+  // At mid-flight, pull back far enough to see both ends (never past the whole-grid fit).
+  const double mid = 0.5 * (tween_.logScale.from + tween_.logScale.to);
+  const double wide = std::clamp(std::min(cam_.viewport.x, cam_.viewport.y) / (dist + 2), minScale_, maxScale_);
+  tween_.pullback = std::min(0.0, std::log(wide) - mid);
 }
 
 void Interaction::focus(uint32_t pos, double t) {
@@ -317,7 +333,8 @@ void Interaction::update(double t, double dt) {
   const Vec2d before = cam_.center;
   if (tween_.active) {
     cam_.center = {tween_.x.value(t), tween_.y.value(t)};
-    cam_.scale = std::exp(tween_.logScale.value(t));
+    const double u = std::clamp((t - tween_.x.t0) / tween_.x.duration, 0.0, 1.0);
+    cam_.scale = std::exp(tween_.logScale.value(t) + tween_.pullback * std::sin(std::numbers::pi * u));
     if (tween_.x.done(t)) {
       tween_.active = false;
       logZoom_.current = logZoom_.target = std::log(cam_.scale);
