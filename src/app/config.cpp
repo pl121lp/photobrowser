@@ -148,6 +148,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("true/false");
       }
+    } else if (key == "display.fullscreen") {
+      if (auto b = parseBool(value)) {
+        c.fullscreen = *b;
+      } else {
+        bad("true/false");
+      }
     } else if (key == "background.mode") {
       const std::string m = lower(value);
       if (m == "solid") {
@@ -223,6 +229,8 @@ std::string defaultConfigText() {
 # graph = false
 
 [display]
+# Start in fullscreen (F11 or F toggles; the --windowed option starts in a window).
+# fullscreen = true
 # Which graphics chip draws on laptops with two (e.g. Intel + NVIDIA):
 #   auto       : the system's default (usually the power-saving integrated one);
 #                launchers such as switcherooctl or prime-run still work
@@ -318,6 +326,7 @@ GpuEnvironment gpuEnvironment(GpuPreference preference, bool nvidiaDriver) {
 void applyOptions(Config& config, const Options& options) {
   if (options.photoDir) config.photoFolder = *options.photoDir;
   if (options.stats) config.stats = true;
+  if (options.windowed) config.fullscreen = false;
 }
 
 }  // namespace pb

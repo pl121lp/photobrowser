@@ -23,6 +23,7 @@ TEST_CASE("config: defaults") {
   CHECK(c.gap == doctest::Approx(0.03));
   CHECK_FALSE(c.stats);
   CHECK_FALSE(c.statsGraph);
+  CHECK(c.fullscreen);
   CHECK(c.background == BackgroundMode::Solid);
   CHECK(c.backgroundColor == pb::Rgb8{0x17, 0x17, 0x1a});
 }
@@ -98,7 +99,7 @@ TEST_CASE("config: focused photo zoom limit is configurable and validated") {
 
 TEST_CASE("config: the generated default file documents every option and parses to the defaults") {
   const std::string text = pb::defaultConfigText();
-  for (auto key : {"folder", "gap", "max_photo_zoom", "enabled", "graph", "mode", "color", "color2", "shader"}) {
+  for (auto key : {"folder", "gap", "max_photo_zoom", "enabled", "graph", "fullscreen", "mode", "color", "color2", "shader"}) {
     CHECK(text.find(key) != std::string::npos);
   }
   auto r = pb::parseConfig(text);
@@ -131,6 +132,18 @@ TEST_CASE("config: command line overrides the file") {
   pb::applyOptions(c, o);
   CHECK(c.photoFolder == "/from/cli");
   CHECK(c.stats);
+  CHECK(c.fullscreen);
+  o.windowed = true;
+  pb::applyOptions(c, o);
+  CHECK_FALSE(c.fullscreen);
+}
+
+TEST_CASE("config: display fullscreen") {
+  CHECK_FALSE(pb::parseConfig("[display]\nfullscreen = false\n").config.fullscreen);
+  CHECK(pb::parseConfig("[display]\nfullscreen = yes\n").config.fullscreen);
+  auto bad = pb::parseConfig("[display]\nfullscreen = sometimes\n");
+  CHECK(bad.config.fullscreen);
+  CHECK(hasWarning(bad, "fullscreen"));
 }
 
 TEST_CASE("config: default location") {

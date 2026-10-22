@@ -66,6 +66,11 @@ TEST_CASE("options: stats starts with the F3 display on") {
   CHECK(std::get<pb::Options>(parse({"--stats"})).stats);
 }
 
+TEST_CASE("options: windowed overrides the fullscreen setting") {
+  CHECK_FALSE(std::get<pb::Options>(parse({})).windowed);
+  CHECK(std::get<pb::Options>(parse({"--windowed"})).windowed);
+}
+
 TEST_CASE("options: config file and no default folder") {
   auto o = std::get<pb::Options>(parse({"--config", "/tmp/x.ini"}));
   CHECK(*o.configFile == "/tmp/x.ini");

@@ -138,8 +138,10 @@ int App::run(const Options& options) {
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
   SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1);
 
+  // Fullscreen without a set mode is borderless desktop fullscreen; --bench always uses it.
+  const SDL_WindowFlags fullscreen = config.fullscreen || options.bench ? SDL_WINDOW_FULLSCREEN : 0;
   SDL_Window* window = SDL_CreateWindow("PhotoBrowse", 1280, 800,
-                                        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+                                        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | fullscreen);
   if (!window) {
     std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
     SDL_Quit();
@@ -263,10 +265,6 @@ int App::run(const Options& options) {
     if (options.bench) background.enableTiming();
     std::optional<BenchScript> bench;
     uint64_t lastSwap = 0, benchStart = 0;
-    if (options.bench) {
-      SDL_SetWindowFullscreenMode(window, nullptr);
-      SDL_SetWindowFullscreen(window, true);
-    }
 
     while (running) {
       // --- Input ---------------------------------------------------------------

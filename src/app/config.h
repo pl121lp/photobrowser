@@ -41,6 +41,7 @@ struct Config {
   double maxPhotoZoom = 4.0;  // maximum enlargement in whole-photo view (1..16)
   bool stats = false;
   bool statsGraph = false;
+  bool fullscreen = true;  // start in borderless desktop fullscreen
   BackgroundMode background = BackgroundMode::Solid;
   Rgb8 backgroundColor{0x17, 0x17, 0x1a};
   Rgb8 backgroundColor2{0x00, 0x00, 0x00};

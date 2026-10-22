@@ -45,6 +45,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | `--cache-dir <dir>` | thumbnail cache root (default: `$XDG_CACHE_HOME` or `~/.cache`; `%LOCALAPPDATA%` on Windows) |
 | `--rebuild-cache` | discard this library's cache and re-index |
 | `--layout square-crop` | layout mode (only one so far) |
+| `--windowed` | start in a window instead of fullscreen (overrides `[display] fullscreen`) |
 | `--stats` | start with the F3 stats display on |
 | `--bench` | fullscreen scripted pan/zoom tour; prints frame-time percentiles and exits |
 | `--snapshot <file.jpg>` | save the settled start view (or the end of `--bench`) and exit |
@@ -74,6 +75,7 @@ enabled = false            # stats display at startup (F3 toggles)
 graph = false              # frame-time graph in the fullscreen panel
 
 [display]
+fullscreen = true          # start fullscreen (--windowed starts in a window)
 gpu = auto                 # auto | integrated | discrete (laptops with two GPUs, Linux)
 
 [background]

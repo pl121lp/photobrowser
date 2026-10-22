@@ -67,7 +67,7 @@ the primary requirement; features come second.
 | Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order. |
 | `+` / `-` | Zoom in/out around screen center. |
 | `Home` | Return to the start view (center photo). |
-| `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). |
+| `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). The app starts fullscreen unless `[display] fullscreen = false` or `--windowed`. |
 | `Esc` | Leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
 | `Q` / window close | Quit. |
 | `F2` | Toggle photo info: while a photo is fully open in whole-photo view, a bottom-left panel shows its file name, width × height (megapixels), date taken (EXIF; file modification date if none) and file size. Off by default. |
