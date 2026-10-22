@@ -100,12 +100,21 @@ if(PB_HAVE_TURBOJPEG)
     src/library/indexer.cpp
   )
   target_link_libraries(pb_imaging PUBLIC pb_core PRIVATE pb_turbojpeg)
+
+  # pb_app: library indexing and streaming (no SDL / GL; talks to a TextureSink).
+  add_library(pb_app STATIC
+    src/app/library_index.cpp
+    src/app/streamer.cpp
+  )
+  target_link_libraries(pb_app PUBLIC pb_imaging)
   target_sources(pb_tests PRIVATE
     tests/test_imaging.cpp
     tests/test_cache.cpp
     tests/test_indexer.cpp
+    tests/test_library_index.cpp
+    tests/test_streamer.cpp
   )
-  target_link_libraries(pb_tests PRIVATE pb_imaging)
+  target_link_libraries(pb_tests PRIVATE pb_app)
 endif()
 
 # --- pb_gfx + photobrowse executable ------------------------------------------
@@ -126,6 +135,7 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
   add_executable(photobrowse
     src/main.cpp
     src/app/app.cpp
+    src/app/gpu_textures.cpp
   )
-  target_link_libraries(photobrowse PRIVATE pb_gfx pb_imaging SDL3::SDL3)
+  target_link_libraries(photobrowse PRIVATE pb_app pb_gfx SDL3::SDL3)
 endif()

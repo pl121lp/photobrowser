@@ -53,22 +53,25 @@ void PagedTexture::upload(uint16_t page, Vec2d origin, const std::vector<Image>&
   }
 }
 
-GLuint createImageTexture(const Image& img, bool mipmaps) {
+GLuint createTexture(const std::vector<Image>& mips) {
   GLuint t = 0;
   gl::GenTextures(1, &t);
   gl::BindTexture(GL_TEXTURE_2D, t);
   gl::PixelStorei(GL_UNPACK_ALIGNMENT, 4);
-  const std::vector<Image> mips = mipmaps ? buildMips(img) : std::vector<Image>{img};
   for (size_t l = 0; l < mips.size(); ++l) {
     gl::TexImage2D(GL_TEXTURE_2D, GLint(l), GL_SRGB8_ALPHA8, GLsizei(mips[l].w), GLsizei(mips[l].h), 0, GL_RGBA,
                    GL_UNSIGNED_BYTE, mips[l].rgba.data());
   }
   gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, GLint(mips.size() - 1));
-  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mipmaps ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, mips.size() > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
   gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   return t;
+}
+
+GLuint createImageTexture(const Image& img, bool mipmaps) {
+  return createTexture(mipmaps ? buildMips(img) : std::vector<Image>{img});
 }
 
 }  // namespace pb

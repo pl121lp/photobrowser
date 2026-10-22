@@ -31,7 +31,8 @@ class PagedTexture {
   std::vector<GLuint> pages_;
 };
 
-// Single-image texture with mips (whole-photo view, placeholders).
+// Single-image texture from a prepared mip chain (mips[0] = full size).
+GLuint createTexture(const std::vector<Image>& mips);
 GLuint createImageTexture(const Image& img, bool mipmaps);
 
 }  // namespace pb
