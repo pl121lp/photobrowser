@@ -5,6 +5,15 @@
 #include <cstdlib>
 #include <fstream>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+
 namespace pb {
 
 namespace fs = std::filesystem;
@@ -77,6 +86,15 @@ std::optional<std::vector<uint8_t>> readFileRange(const fs::path& path, uint64_t
 
 std::optional<std::vector<uint8_t>> readWholeFile(const fs::path& path) {
   return readFileRange(path, 0, UINT64_MAX);
+}
+
+void lowerCurrentThreadPriority() {
+#ifdef _WIN32
+  SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+#else
+  // On Linux, nice values apply per thread.
+  setpriority(PRIO_PROCESS, static_cast<id_t>(syscall(SYS_gettid)), 10);
+#endif
 }
 
 int64_t toUnixSeconds(fs::file_time_type t) {

@@ -10,6 +10,7 @@
 #include "app/gpu_textures.h"
 #include "app/library_index.h"
 #include "app/streamer.h"
+#include "core/frame_stats.h"
 #include "gfx/gl.h"
 #include "gfx/tile_renderer.h"
 #include "imaging/jpeg.h"
@@ -17,6 +18,7 @@
 #include "layout/layout.h"
 #include "platform/paths.h"
 #include "view/camera.h"
+#include "view/bench_script.h"
 #include "view/interaction.h"
 
 namespace pb {
@@ -141,7 +143,8 @@ int App::run(const Options& options) {
     // system before the cache and catalog its jobs reference.
     ThumbCache thumbs(libDir);
     Session session;
-    auto jobs = std::make_unique<JobSystem>(defaultWorkerCount());
+    auto jobs = std::make_unique<JobSystem>(streamingWorkerCount());
+    std::unique_ptr<JobSystem> indexJobs;  // all cores, only while first-run indexing
     std::unique_ptr<Indexer> indexer;
     GpuTextures textures;
     TileRenderer renderer;
@@ -155,6 +158,7 @@ int App::run(const Options& options) {
     camera.viewport = {double(pw), double(ph)};
     Interaction ui(camera, *layout);
 
+    size_t prewarmPages = 0;
     auto startSession = [&](LibraryState lib) {
       session.lib = std::move(lib);
       layout->build(uint32_t(session.lib.catalog.order.size()));
@@ -163,9 +167,11 @@ int App::run(const Options& options) {
       const size_t l0Pages = (session.lib.catalog.photos.size() + 16383) / 16384;
       const size_t fullReserve = size_t(Streamer::kFullSlots) * 3840 * 2880 * 4 * 4 / 3;
       const size_t budget = kVramBudget - std::min(kVramBudget / 2, l0Pages * kPageBytes + fullReserve);
+      prewarmPages = l0Pages + budget / kPageBytes;
       session.streamer =
           std::make_unique<Streamer>(session.lib.catalog, root, thumbs, *jobs, textures, budget);
       session.streamer->setL0(session.lib.l0);
+      session.streamer->setUploadTimeBudget(3.0);
       const std::string title = session.lib.catalog.order.empty()
                                     ? "PhotoBrowse — no photos in " + toUtf8(options.photoDir)
                                     : "PhotoBrowse — " + toUtf8(root.filename());
@@ -181,7 +187,8 @@ int App::run(const Options& options) {
         thumbs.sweep(kDiskCacheCap);
       });
     } else {
-      indexer = std::make_unique<Indexer>(root, libDir, *jobs, thumbs);
+      indexJobs = std::make_unique<JobSystem>(defaultWorkerCount());
+      indexer = std::make_unique<Indexer>(root, libDir, *indexJobs, thumbs);
       indexer->start();
     }
 
@@ -193,10 +200,18 @@ int App::run(const Options& options) {
     const uint64_t start = last;
     uint64_t lastTitle = 0;
     bool running = exitCode == 0, reportedGlError = false, animating = true;
+    bool showStats = false, prewarming = false, reportedFirstFrame = false;
+    FrameStats intervals, work;  // ms; F3 window or the whole --bench run
+    std::optional<BenchScript> bench;
+    uint64_t lastSwap = 0, benchStart = 0;
+    if (options.bench) {
+      SDL_SetWindowFullscreenMode(window, nullptr);
+      SDL_SetWindowFullscreen(window, true);
+    }
 
     while (running) {
       // --- Input ---------------------------------------------------------------
-      const bool wait = ui.idle() && !animating && !indexer && !options.snapshot &&
+      const bool wait = ui.idle() && !animating && !prewarming && !indexer && !options.snapshot && !options.bench &&
                         (!session.streamer || session.streamer->stats().pendingRequests == 0);
       SDL_Event ev;
       bool have = wait ? SDL_WaitEventTimeout(&ev, 100) : SDL_PollEvent(&ev);
@@ -225,6 +240,11 @@ int App::run(const Options& options) {
             const SDL_Keycode k = ev.key.key;
             if (k == SDLK_Q) {
               running = false;
+            } else if (k == SDLK_F3) {
+              showStats = !showStats;
+              intervals.reset();
+              work.reset();
+              if (!showStats) SDL_SetWindowTitle(window, ("PhotoBrowse — " + toUtf8(root.filename())).c_str());
             } else if (k == SDLK_F11 || k == SDLK_F) {
               const bool fs = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN;
               SDL_SetWindowFullscreenMode(window, nullptr);  // borderless desktop
@@ -245,6 +265,7 @@ int App::run(const Options& options) {
         if (indexer->finished()) {
           startSession(indexer->take());
           indexer.reset();
+          indexJobs.reset();
         } else if (now - lastTitle > 250'000'000ULL) {
           lastTitle = now;
           const std::string title = indexer->scanned() ? "PhotoBrowse — indexing " + std::to_string(indexer->done()) +
@@ -254,17 +275,42 @@ int App::run(const Options& options) {
         }
       }
 
+      // Allocate GPU textures ahead of need, one per frame while nothing is moving.
+      if (session.streamer && ui.idle()) {
+        Vec2d maxView = camera.viewport;
+        if (const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window))) {
+          maxView = {std::max(maxView.x, double(dm->w) * dm->pixel_density),
+                     std::max(maxView.y, double(dm->h) * dm->pixel_density)};
+        }
+        prewarming = textures.prewarm(prewarmPages, maxView);
+      } else {
+        prewarming = false;
+      }
+
       // --- Update ----------------------------------------------------------------
       const double dt = std::min(seconds(now - last), 0.1);
       last = now;
+      if (options.bench && session.streamer && !bench && !prewarming && now - start > 1'000'000'000ULL) {
+        bench.emplace();
+        benchStart = now;
+        intervals.reset();
+        work.reset();
+      }
+      if (bench) bench->drive(ui, camera.viewport, seconds(now));
       ui.update(seconds(now), dt);
 
       // --- Draw ------------------------------------------------------------------
+      const uint64_t tPre = SDL_GetTicksNS();
       renderer.beginFrame(camera.viewport, clear);
+      const uint64_t tBegin = SDL_GetTicksNS();
+      uint64_t tStream = tBegin;
       animating = false;
       if (session.streamer) {
         session.streamer->frame(seconds(now), camera, *layout, ui.focused(), draws);
+        textures.endFrame();
+        tStream = SDL_GetTicksNS();
         keyed.clear();
+        std::optional<std::pair<uint64_t, TileInstance>> focusedTile;
         for (const TileDraw& d : draws) {
           const PhotoRecord& rec = session.lib.catalog.photos[d.id];
           const UvRect crop = cropUv(rec.aspect(), 1.0);
@@ -276,9 +322,19 @@ int App::run(const Options& options) {
           setUv(ti.uv, compose(d.cur.uv, crop));
           setUv(ti.uvPrev, compose(d.prev.uv, crop));
           ti.fade = d.fade;
-          if (auto f = ui.focused(); f && *f != d.pos) ti.dim = float(0.85 * ui.focusProgress());
           animating |= d.fade < 1;
           const uint64_t key = uint64_t(textures.texture(d.cur)) << 32 | textures.texture(d.prev);
+          if (auto f = ui.focused(); f && *f == d.pos) {
+            // Whole-photo view: morph from the square crop to the full photo, drawn on top.
+            const FocusMorph m = focusMorph({a.x, a.y, b.x, b.y}, rec.aspect(), camera.viewport, ui.focusProgress());
+            setRect(ti.rect, m.rect);
+            setUv(ti.uv, compose(d.cur.uv, m.uv));
+            setUv(ti.uvPrev, compose(d.prev.uv, m.uv));
+            ui.setFocusRect(m.rect);
+            focusedTile.emplace(key, ti);
+            continue;
+          }
+          if (ui.focused()) ti.dim = float(0.85 * ui.focusProgress());
           keyed.emplace_back(key, ti);
         }
         std::sort(keyed.begin(), keyed.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
@@ -289,13 +345,30 @@ int App::run(const Options& options) {
           renderer.draw(GLuint(keyed[i].first >> 32), GLuint(keyed[i].first & 0xffffffffu), batch);
           i = j;
         }
+        if (focusedTile) {
+          const uint64_t key = focusedTile->first;
+          renderer.draw(GLuint(key >> 32), GLuint(key & 0xffffffffu), std::span(&focusedTile->second, 1));
+        }
       }
 
       if (GLenum err = gl::GetError(); err != GL_NO_ERROR && !reportedGlError) {
         std::fprintf(stderr, "OpenGL error 0x%x\n", err);
         reportedGlError = true;
       }
-      if (options.snapshot && session.streamer && ui.idle() && !animating &&
+      const uint64_t beforeSwap = SDL_GetTicksNS();
+      if (bench && bench->done(seconds(now))) {
+        std::printf("bench: %zu frames in %.1f s, %dx%d px\n", intervals.count(), seconds(now - benchStart),
+                    int(camera.viewport.x), int(camera.viewport.y));
+        std::printf("bench: frame interval ms p50=%.2f p95=%.2f p99=%.2f max=%.2f, >20ms: %zu\n",
+                    intervals.percentile(50), intervals.percentile(95), intervals.percentile(99), intervals.max(),
+                    intervals.countAbove(20));
+        std::printf("bench: cpu work ms p50=%.2f p99=%.2f max=%.2f | VRAM %.0f MB, jobs pending %zu\n",
+                    work.percentile(50), work.percentile(99), work.max(),
+                    double(session.streamer->stats().vramBytes) / (1 << 20), session.streamer->stats().pendingJobs);
+        if (options.snapshot && !saveSnapshot(*options.snapshot, camera.viewport)) exitCode = 1;
+        running = false;
+      }
+      if (!options.bench && options.snapshot && session.streamer && ui.idle() && !animating &&
           session.streamer->stats().pendingRequests == 0 && now - start > 1'500'000'000ULL) {
         if (!saveSnapshot(*options.snapshot, camera.viewport)) {
           std::fprintf(stderr, "could not write snapshot %s\n", toUtf8(*options.snapshot).c_str());
@@ -304,10 +377,42 @@ int App::run(const Options& options) {
         running = false;
       }
       SDL_GL_SwapWindow(window);
+      const uint64_t afterSwap = SDL_GetTicksNS();
+      if (session.streamer && !reportedFirstFrame) {
+        reportedFirstFrame = true;
+        std::printf("first full frame after %.0f ms (%zu photos)\n", double(afterSwap - start) * 1e-6,
+                    session.lib.catalog.order.size());
+      }
+      if (lastSwap && (bench || showStats)) {
+        intervals.add(double(afterSwap - lastSwap) * 1e-6);
+        work.add(double(beforeSwap - now) * 1e-6);
+      }
+      lastSwap = afterSwap;
+      if (bench && double(beforeSwap - now) * 1e-6 <= 20) textures.takeUploadMs();
+      if (bench && double(beforeSwap - now) * 1e-6 > 20) {
+        const auto st = session.streamer->stats();
+        std::printf("slow frame: gl upload %.1f ms, work %.1f ms [pre %.1f clear %.1f stream %.1f draw %.1f], swap %.1f ms, uploads %zu (%.1f MB), pages+ %zu, full %zu\n",
+                    textures.takeUploadMs(), double(beforeSwap - now) * 1e-6, double(tPre - now) * 1e-6, double(tBegin - tPre) * 1e-6,
+                    double(tStream - tBegin) * 1e-6, double(beforeSwap - tStream) * 1e-6,
+                    double(afterSwap - beforeSwap) * 1e-6, st.uploadsThisFrame,
+                    double(st.uploadBytesThisFrame) / (1 << 20), st.pagesAddedThisFrame, st.fullUploadsThisFrame);
+      }
+      if (showStats && session.streamer && afterSwap - lastTitle > 500'000'000ULL) {
+        lastTitle = afterSwap;
+        const auto st = session.streamer->stats();
+        char title[256];
+        std::snprintf(title, sizeof title, "PhotoBrowse — %.0f fps · p99 %.1f ms · jobs %zu · VRAM %.0f/%zu MB",
+                      intervals.count() ? 1000.0 / intervals.percentile(50) : 0.0, intervals.percentile(99),
+                      st.pendingJobs, double(st.vramBytes) / (1 << 20), kVramBudget >> 20);
+        SDL_SetWindowTitle(window, title);
+        intervals.reset();
+        work.reset();
+      }
     }
 
     session.streamer.reset();
     indexer.reset();
+    indexJobs.reset();
     jobs.reset();
   }
   SDL_GL_DestroyContext(context);

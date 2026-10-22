@@ -52,6 +52,7 @@ class Interaction {
   void unfocus();
   std::optional<uint32_t> nearestPosition(Vec2d world) const;
   void handleClick(Vec2d px, double t);
+  void clampCenter();  // keeps the view centered over the library
 
   Camera& cam_;
   const Layout& layout_;

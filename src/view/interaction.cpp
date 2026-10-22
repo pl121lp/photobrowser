@@ -109,6 +109,16 @@ std::optional<uint32_t> Interaction::nearestPosition(Vec2d world) const {
   return best;
 }
 
+void Interaction::clampCenter() {
+  if (layout_.count() == 0) return;
+  const Rect b = layout_.bounds();
+  const Vec2d c = cam_.center;
+  cam_.center = {std::clamp(c.x, b.x0, b.x1), std::clamp(c.y, b.y0, b.y1)};
+  if (cam_.center.x != c.x) momentum_.velocity.x = 0;
+  if (cam_.center.y != c.y) momentum_.velocity.y = 0;
+  if (momentum_.active && length(momentum_.velocity) < 5) momentum_.stop();
+}
+
 void Interaction::onPointerDown(Vec2d px, double t) {
   now_ = t;
   pressed_ = true;
@@ -129,6 +139,7 @@ void Interaction::onPointerMove(Vec2d px, double t) {
   if (dragging_) {
     cam_.center = cam_.center - (px - lastPos_) / cam_.scale;
     lastPos_ = px;
+    clampCenter();
   }
   tracker_.add(t, px);
 }
@@ -250,6 +261,7 @@ void Interaction::update(double t, double dt) {
     cam_.zoomAbout(zoomPivot_, std::exp(logZoom_.current));
   }
   if (momentum_.active && !pressed_) cam_.center = cam_.center - momentum_.step(dt) / cam_.scale;
+  clampCenter();
 
   focusProgress_ = std::clamp(focusTween_.value(t), 0.0, 1.0);
   if (!focusTarget_ && focusTween_.done(t)) focusProgress_ = 0;

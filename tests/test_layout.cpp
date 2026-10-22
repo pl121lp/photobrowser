@@ -94,3 +94,22 @@ TEST_CASE("layout: factory") {
   CHECK(pb::makeLayout("square-crop") != nullptr);
   CHECK(pb::makeLayout("nope") == nullptr);
 }
+
+TEST_CASE("content: whole-photo morph endpoints and no distortion") {
+  const pb::Rect cell{100, 100, 300, 300};
+  const pb::Vec2d vp{1000, 800};
+  const double a = 3.0 / 4.0;
+  auto g0 = pb::focusMorph(cell, a, vp, 0);
+  CHECK(g0.rect == cell);
+  CHECK(g0.uv.v0 == doctest::Approx(0.125));
+  auto g1 = pb::focusMorph(cell, a, vp, 1);
+  CHECK(g1.rect.height() == doctest::Approx(800 - 2 * 16));  // 2% margin of the short side
+  CHECK(g1.rect.width() / g1.rect.height() == doctest::Approx(a));
+  CHECK(g1.rect.center().x == doctest::Approx(500));
+  CHECK(g1.uv.u0 == 0);
+  CHECK(g1.uv.v0 == doctest::Approx(0));
+  auto gm = pb::focusMorph(cell, a, vp, 0.5);
+  // The visible part of the image always has the rect's aspect ratio.
+  const double visibleAspect = a * (gm.uv.u1 - gm.uv.u0) / (gm.uv.v1 - gm.uv.v0);
+  CHECK(visibleAspect == doctest::Approx(gm.rect.width() / gm.rect.height()));
+}

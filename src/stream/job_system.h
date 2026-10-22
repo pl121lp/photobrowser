@@ -17,7 +17,8 @@ struct CancelToken {
   std::atomic<bool> cancelled{false};
 };
 
-unsigned defaultWorkerCount();  // max(2, hardware threads - 1)
+unsigned defaultWorkerCount();    // max(2, hardware threads - 1): bulk indexing
+unsigned streamingWorkerCount();  // 2..4: loads while browsing (PB_WORKERS overrides)
 
 // Fixed pool of worker threads running prioritized jobs (lower priority value first,
 // FIFO among equal priorities).

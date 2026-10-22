@@ -27,6 +27,10 @@ int64_t toUnixSeconds(std::filesystem::file_time_type t);
 std::string toUtf8(const std::filesystem::path& p);  // generic ('/') separators
 std::filesystem::path fromUtf8(const std::string& s);
 
+// Lowers the calling thread's scheduling priority (background workers), so the
+// render thread wins the CPU when all cores are busy decoding.
+void lowerCurrentThreadPriority();
+
 uint64_t fnv1a(const void* data, size_t n, uint64_t seed = 0xcbf29ce484222325ULL);
 
 }  // namespace pb

@@ -1,6 +1,7 @@
 #include "app/streamer.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <thread>
 #include <unordered_map>
@@ -104,13 +105,22 @@ void Streamer::submit(const Residency::Request& r) {
   });
 }
 
+uint32_t Streamer::fitFullCapacity(PhotoId id, uint32_t longEdge) const {
+  const double a = catalog_.photos[id].aspect();
+  const Vec2d cap = sink_.fullCapacity();
+  const double w = a >= 1 ? longEdge : longEdge * a, h = a >= 1 ? longEdge / a : longEdge;
+  const double s = std::min({1.0, cap.x / w, cap.y / h});
+  return uint32_t(std::floor(longEdge * s));
+}
+
 std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdge, bool request) {
+  longEdge = fitFullCapacity(id, longEdge);
   for (int i = 0; i < kFullSlots; ++i) {
     Full& f = full_[size_t(i)];
     if (f.used && f.id == id) {
       f.lastUsed = now;
       if (f.loading) return std::nullopt;
-      return TexRef{kFullLevel, uint16_t(i), {0, 0, 1, 1}};
+      return TexRef{kFullLevel, uint16_t(i), f.uv};
     }
   }
   if (!request) return std::nullopt;
@@ -126,7 +136,12 @@ std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdg
   }
   if (victim < 0) return std::nullopt;
   Full& f = full_[size_t(victim)];
-  f = Full{true, true, id, 0, 0, longEdge, now, std::make_shared<CancelToken>()};
+  f = Full{};
+  f.used = f.loading = true;
+  f.id = id;
+  f.longEdge = longEdge;
+  f.lastUsed = now;
+  f.cancel = std::make_shared<CancelToken>();
   const PhotoRecord rec = catalog_.photos[id];
   jobs_.submit(kFullPriority, [results = results_, guard = guard_, rec, id, longEdge, cancel = f.cancel,
                                root = root_] {
@@ -144,9 +159,34 @@ std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdg
   return std::nullopt;
 }
 
+size_t Streamer::uploadFullChunk(int index, size_t budget) {
+  Full& f = full_[size_t(index)];
+  size_t sent = 0;
+  // Coarse mips first, so the photo becomes complete in one pass from the top.
+  while (f.mip < f.mips.size() && sent < budget) {
+    const Image& m = f.mips[f.mips.size() - 1 - f.mip];
+    const size_t rowBytes = size_t(m.w) * 4;
+    const uint32_t rows = std::min<uint32_t>(m.h - f.row, uint32_t(std::max<size_t>(1, (budget - sent) / rowBytes)));
+    sink_.uploadFullRows(index, int(f.mips.size() - 1 - f.mip), f.row, rows, m);
+    sent += rows * rowBytes;
+    f.row += rows;
+    if (f.row == m.h) {
+      f.row = 0;
+      ++f.mip;
+    }
+  }
+  if (f.mip == f.mips.size()) {
+    f.mips.clear();
+    f.loading = false;
+    ++fullUploadsThisFrame_;
+  }
+  return sent;
+}
+
 void Streamer::applyPageEvents() {
   for (const auto& e : residency_.takePageEvents()) {
     if (e.added) {
+      ++pagesAddedThisFrame_;
       sink_.addPage(e.level, e.page);
     } else {
       sink_.releasePage(e.level, e.page);
@@ -160,36 +200,47 @@ void Streamer::frame(double now, const Camera& cam, const Layout& layout, std::o
   requests_.clear();
   residency_.beginFrame();
 
-  // 1. Upload finished loads within the per-frame budget.
-  size_t budget = uploadBudget_;
-  uploadsThisFrame_ = 0;
-  while (true) {
+  // 1. Upload finished loads within the per-frame budget. Full images in progress
+  //    continue first; new results are taken one at a time until the budget is spent.
+  uploadsThisFrame_ = uploadBytesThisFrame_ = pagesAddedThisFrame_ = fullUploadsThisFrame_ = 0;
+  auto spend = [&](size_t bytes) { uploadBytesThisFrame_ += bytes; };
+  const auto uploadStart = std::chrono::steady_clock::now();
+  auto left = [&]() -> size_t {
+    // Byte budget for bandwidth, time budget for per-call driver overhead.
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - uploadStart).count();
+    if (ms >= uploadTimeBudgetMs_) return 0;
+    return uploadBytesThisFrame_ < uploadBudget_ ? uploadBudget_ - uploadBytesThisFrame_ : 0;
+  };
+  for (int i = 0; i < kFullSlots && left() > 0; ++i) {
+    if (full_[size_t(i)].used && !full_[size_t(i)].mips.empty()) spend(uploadFullChunk(i, left()));
+  }
+  while (left() > 0) {
     auto batch = results_->drain(1);
     if (batch.empty()) break;
     Result& r = batch.front();
-    const size_t bytes = mipBytes(r.mips);
+    ++uploadsThisFrame_;
     if (r.level == kFullLevel) {
       for (int i = 0; i < kFullSlots; ++i) {
         Full& f = full_[size_t(i)];
-        if (!f.used || f.id != r.id || !f.loading) continue;
+        if (!f.used || f.id != r.id || !f.loading || !f.mips.empty()) continue;
         if (r.mips.empty()) {
           f.used = false;
         } else {
-          sink_.uploadFull(i, r.mips);
-          f.loading = false;
-          f.w = r.mips[0].w;
-          f.h = r.mips[0].h;
+          f.uv = sink_.beginFull(i, r.mips[0].w, r.mips[0].h);
+          f.mips = std::move(r.mips);
+          f.mip = 0;
+          f.row = 0;
+          spend(uploadFullChunk(i, left()));
         }
+        break;
       }
     } else if (r.mips.empty()) {
       residency_.requestFailed(r.id, r.level);
     } else if (auto slot = residency_.place(r.id, r.level, r.mips[0].w, r.mips[0].h)) {
       applyPageEvents();
       sink_.upload(r.level, slot->page, residency_.pool(r.level).origin(*slot), r.mips);
+      spend(mipBytes(r.mips));
     }
-    ++uploadsThisFrame_;
-    if (bytes >= budget) break;
-    budget -= bytes;
   }
 
   // 2. Decide what each visible photo (plus a one-cell ring) needs.
@@ -240,6 +291,17 @@ void Streamer::frame(double now, const Camera& cam, const Layout& layout, std::o
     out.push_back(d);
   }
 
+  // Whole-photo view: have the previous/next photo ready at full resolution too.
+  if (focusedPos) {
+    for (int64_t p : {int64_t(*focusedPos) + 1, int64_t(*focusedPos) - 1}) {
+      if (p < 0 || p >= int64_t(catalog_.order.size())) continue;
+      const PhotoId id = catalog_.order[size_t(p)];
+      const double a = catalog_.photos[id].aspect();
+      const Rect fit = fitRect({0, 0, cam.viewport.x, cam.viewport.y}, a);
+      fullFor(id, now - 1e-3, uint32_t(std::max(fit.width(), fit.height())), true);
+    }
+  }
+
   // 3. Hand new requests to the workers.
   for (const auto& r : requests_) submit(r);
   residency_.endFrame();
@@ -247,7 +309,8 @@ void Streamer::frame(double now, const Camera& cam, const Layout& layout, std::o
 }
 
 StreamStats Streamer::stats() const {
-  return {jobs_.pending(), residency_.pendingRequests(), residency_.bytesUsed(), uploadsThisFrame_};
+  return {jobs_.pending(),         residency_.pendingRequests(), residency_.bytesUsed(), uploadsThisFrame_,
+          uploadBytesThisFrame_, pagesAddedThisFrame_,          fullUploadsThisFrame_};
 }
 
 }  // namespace pb

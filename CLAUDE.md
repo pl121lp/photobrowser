@@ -9,6 +9,18 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
   threading, and how future features (prefetch, search + fly-to, DB, layouts,
   shader effects) slot in.
 - `docs/plans/` — implementation plans.
+- `docs/perf.md` — benchmark method, results, and the causes of past hitches.
+
+## Module map
+- `src/core` geometry, levels, frame stats · `src/view` camera, motion, interaction,
+  bench script · `src/layout` layouts and crop/fit math · `src/library` EXIF, catalog,
+  scanner, indexer (decode helpers) · `src/cache` l0.pack + per-level JPEG cache ·
+  `src/stream` job system, residency (VRAM slots/budget) · `src/imaging` TurboJPEG,
+  resize · `src/app` options, library indexing, streamer (GL-free, via `TextureSink`),
+  GL texture sink, SDL app loop · `src/gfx` GL loader, shaders, paged textures,
+  upload ring, tile renderer · `shaders/` GLSL (embedded at build time).
+- Libraries: `pb_core` (no deps) → `pb_imaging` (+turbojpeg) → `pb_app` (no SDL/GL)
+  → `pb_gfx` + `photobrowse` exe (SDL3, GL).
 
 ## Build & test
 ```sh
@@ -26,3 +38,7 @@ build/linux-debug/pb_tests --test-case="<name>"      # single test
 - POSIX/Win32-specific code only in `src/platform/`.
 - OpenGL 4.1 core / GLSL 410 only (no glTexStorage, compute, bindless).
 - Write the failing test first for all pure logic.
+- Performance changes: verify with `--bench` (release build, fullscreen) before and
+  after, and record results in `docs/perf.md`. Never block the render thread on GPU
+  allocations, big uploads, or locks held by workers.
+- `--snapshot <file.jpg>` lets you look at what the app renders without screenshots.

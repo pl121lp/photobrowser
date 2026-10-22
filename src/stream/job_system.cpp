@@ -1,10 +1,22 @@
 #include "stream/job_system.h"
 
 #include <algorithm>
+#include <cstdlib>
+
+#include "platform/paths.h"
 
 namespace pb {
 
 unsigned defaultWorkerCount() { return std::max(2u, std::thread::hardware_concurrency() - 1); }
+
+unsigned streamingWorkerCount() {
+  // More decoders compete with the (often integrated) GPU for memory bandwidth
+  // and with the render thread for CPU; measured smoother frames with 4 than 15.
+  if (const char* env = std::getenv("PB_WORKERS")) {
+    if (const int n = std::atoi(env); n > 0) return unsigned(n);
+  }
+  return std::clamp(std::thread::hardware_concurrency() / 4, 2u, 4u);
+}
 
 JobSystem::JobSystem(unsigned threads) {
   for (unsigned i = 0; i < std::max(1u, threads); ++i) {
@@ -38,6 +50,7 @@ void JobSystem::clearPending() {
 }
 
 void JobSystem::run(std::stop_token st) {
+  lowerCurrentThreadPriority();
   while (true) {
     std::function<void()> job;
     {

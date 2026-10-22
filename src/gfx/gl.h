@@ -49,6 +49,11 @@ namespace pb::gl {
   X(PFNGLBUFFERDATAPROC, BufferData)                               \
   X(PFNGLBUFFERSUBDATAPROC, BufferSubData)                         \
   X(PFNGLDELETEBUFFERSPROC, DeleteBuffers)                         \
+  X(PFNGLMAPBUFFERRANGEPROC, MapBufferRange)                       \
+  X(PFNGLUNMAPBUFFERPROC, UnmapBuffer)                             \
+  X(PFNGLFENCESYNCPROC, FenceSync)                                 \
+  X(PFNGLCLIENTWAITSYNCPROC, ClientWaitSync)                       \
+  X(PFNGLDELETESYNCPROC, DeleteSync)                               \
   X(PFNGLVERTEXATTRIBPOINTERPROC, VertexAttribPointer)             \
   X(PFNGLENABLEVERTEXATTRIBARRAYPROC, EnableVertexAttribArray)     \
   X(PFNGLVERTEXATTRIBDIVISORPROC, VertexAttribDivisor)             \

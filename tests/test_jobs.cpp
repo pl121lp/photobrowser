@@ -91,3 +91,8 @@ TEST_CASE("results: drain respects max") {
   CHECK(b == std::vector<int>{2, 3, 4});
   CHECK(q.size() == 0);
 }
+
+TEST_CASE("jobs: streaming pool is small so decoding cannot starve rendering") {
+  CHECK(pb::streamingWorkerCount() >= 2);
+  CHECK(pb::streamingWorkerCount() <= 4);
+}

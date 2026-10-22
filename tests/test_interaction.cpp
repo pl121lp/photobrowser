@@ -238,3 +238,18 @@ TEST_CASE("interaction: click inside the whole photo stays, outside leaves") {
   f.run(0.4);
   CHECK_FALSE(f.ui.focused());
 }
+
+TEST_CASE("interaction: camera stays within the library bounds") {
+  Fixture f;
+  // Hard fling to the left: content moves left, camera center moves right.
+  f.ui.onPointerDown({900, 400}, 0);
+  for (int i = 1; i <= 6; ++i) f.ui.onPointerMove({900.0 - i * 150, 400}, i * 0.016);
+  f.ui.onPointerUp({0, 400}, 0.1);
+  f.t = 0.1;
+  f.run(3.0);
+  CHECK(f.cam.center.x <= f.layout.bounds().x1 + 1e-9);
+  // Dragging far past the edge is also held at the edge.
+  f.ui.onPointerDown({500, 400}, f.t);
+  f.ui.onPointerMove({500, 5000}, f.t + 0.5);
+  CHECK(f.cam.center.y >= f.layout.bounds().y0 - 1e-9);
+}

@@ -56,6 +56,7 @@ add_library(pb_core STATIC
   src/view/camera.cpp
   src/view/motion.cpp
   src/view/interaction.cpp
+  src/view/bench_script.cpp
   src/library/exif.cpp
   src/library/catalog.cpp
   src/library/scanner.cpp
@@ -84,6 +85,7 @@ add_executable(pb_tests
   tests/test_jobs.cpp
   tests/test_residency.cpp
   tests/test_options.cpp
+  tests/test_bench.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
