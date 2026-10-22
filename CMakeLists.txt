@@ -82,3 +82,19 @@ target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
 target_compile_definitions(pb_tests PRIVATE PB_TEST_PHOTOS_DIR="${CMAKE_SOURCE_DIR}/photos")
 add_test(NAME pb_tests COMMAND pb_tests)
+
+# --- pb_imaging: JPEG codec, resizing, thumbnail cache files, indexer ---------
+if(PB_HAVE_TURBOJPEG)
+  add_library(pb_imaging STATIC
+    src/imaging/jpeg.cpp
+    src/imaging/resize.cpp
+    src/cache/l0_pack.cpp
+    src/cache/thumb_cache.cpp
+  )
+  target_link_libraries(pb_imaging PUBLIC pb_core PRIVATE pb_turbojpeg)
+  target_sources(pb_tests PRIVATE
+    tests/test_imaging.cpp
+    tests/test_cache.cpp
+  )
+  target_link_libraries(pb_tests PRIVATE pb_imaging)
+endif()
