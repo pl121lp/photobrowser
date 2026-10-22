@@ -13,7 +13,7 @@ struct Fixture {
   pb::Camera cam;
   pb::Interaction ui;
   double t = 0;
-  explicit Fixture(uint32_t n = 20) : ui(setup(n), layout) {}
+  explicit Fixture(uint32_t n = 20, double maxPhotoZoom = 4.0) : ui(setup(n), layout, maxPhotoZoom) {}
   pb::Camera& setup(uint32_t n) {
     layout.build(n);
     cam.viewport = {1000, 800};
@@ -237,6 +237,109 @@ TEST_CASE("interaction: click inside the whole photo stays, outside leaves") {
   f.click({100, 400});
   f.run(0.4);
   CHECK_FALSE(f.ui.focused());
+}
+
+TEST_CASE("interaction: wheel zooms a focused photo up to its configured limit") {
+  Fixture f(20, 3.0);
+  f.ui.onKey(pb::Key::Enter, 0);
+  f.run(0.4);
+  f.ui.setFocusRect({200, 20, 800, 780});
+  f.ui.onWheel({500, 400}, 20);
+  f.run(1.0);
+  CHECK(f.ui.focused());
+  CHECK(f.ui.focusZoom() == doctest::Approx(3.0));
+  CHECK(f.ui.focusDisplayRect().width() == doctest::Approx(1800.0));
+  CHECK(f.ui.focusDisplayRect().height() == doctest::Approx(2280.0));
+}
+
+TEST_CASE("interaction: focused photo zoom preserves the point under the cursor") {
+  Fixture f;
+  f.ui.onKey(pb::Key::Enter, 0);
+  f.run(0.4);
+  f.ui.setFocusRect({200, 20, 800, 780});
+  f.ui.onWheel({500, 400}, 4);
+  f.run(1.0);
+  const pb::Vec2d cursor{650, 500};
+  const pb::Rect before = f.ui.focusDisplayRect();
+  const pb::Vec2d imagePoint{(cursor.x - before.x0) / before.width(), (cursor.y - before.y0) / before.height()};
+  f.ui.onWheel(cursor, 1);
+  f.run(1.0);
+  const pb::Rect after = f.ui.focusDisplayRect();
+  CHECK((cursor.x - after.x0) / after.width() == doctest::Approx(imagePoint.x));
+  CHECK((cursor.y - after.y0) / after.height() == doctest::Approx(imagePoint.y));
+}
+
+TEST_CASE("interaction: focused zoom waits for the photo rect before anchoring") {
+  Fixture f;
+  f.ui.onKey(pb::Key::Enter, 0);
+  f.ui.onWheel({700, 500}, 2);  // same event batch, before the focused photo has rendered
+  f.run(0.2);
+  CHECK(f.ui.focusZoom() == doctest::Approx(1.0));
+  f.ui.setFocusRect({200, 20, 800, 780});
+  f.run(0.5);
+  CHECK(f.ui.focusZoom() > 1.0);
+}
+
+TEST_CASE("interaction: left drag pans a zoomed focused photo") {
+  Fixture f;
+  f.ui.onKey(pb::Key::Enter, 0);
+  f.run(0.4);
+  f.ui.setFocusRect({200, 20, 800, 780});
+  f.ui.onWheel({500, 400}, 20);
+  f.run(1.0);
+  const pb::Vec2d before = f.ui.focusDisplayRect().center();
+  f.ui.onPointerDown({500, 400}, f.t);
+  f.ui.onPointerMove({600, 350}, f.t + 0.1);
+  f.ui.onPointerUp({600, 350}, f.t + 0.2);
+  CHECK(f.ui.focused());
+  CHECK(f.ui.focusDisplayRect().center() == before + pb::Vec2d{100, -50});
+}
+
+TEST_CASE("interaction: zoomed photo pans when drag has no intermediate motion event") {
+  Fixture f;
+  f.ui.onKey(pb::Key::Enter, 0);
+  f.run(0.4);
+  f.ui.setFocusRect({200, 20, 800, 780});
+  f.ui.onWheel({500, 400}, 20);
+  f.run(1.0);
+  const pb::Vec2d photoBefore = f.ui.focusDisplayRect().center();
+  const pb::Vec2d cameraBefore = f.cam.center;
+  f.ui.onPointerDown({500, 400}, f.t);
+  f.ui.onPointerUp({600, 350}, f.t + 0.1);
+  CHECK(f.ui.focused());
+  CHECK(f.ui.focusDisplayRect().center() == photoBefore + pb::Vec2d{100, -50});
+  CHECK(f.cam.center == cameraBefore);
+}
+
+TEST_CASE("interaction: wheel out returns to fit before leaving focus") {
+  Fixture f;
+  f.ui.onKey(pb::Key::Enter, 0);
+  f.run(0.4);
+  f.ui.setFocusRect({200, 20, 800, 780});
+  f.ui.onWheel({500, 400}, 20);
+  f.run(1.0);
+  f.ui.onWheel({500, 400}, -20);
+  f.run(1.0);
+  CHECK(f.ui.focused());
+  CHECK(f.ui.focusZoom() == doctest::Approx(1.0));
+  CHECK(f.ui.focusDisplayRect() == pb::Rect{200, 20, 800, 780});
+  f.ui.onWheel({500, 400}, -1);
+  f.run(0.4);
+  CHECK_FALSE(f.ui.focused());
+}
+
+TEST_CASE("interaction: secondary click resets focused photo zoom") {
+  Fixture f;
+  f.ui.onKey(pb::Key::Enter, 0);
+  f.run(0.4);
+  f.ui.setFocusRect({200, 20, 800, 780});
+  f.ui.onWheel({500, 400}, 20);
+  f.run(1.0);
+  f.ui.onSecondaryClick();
+  f.run(1.0);
+  CHECK(f.ui.focused());
+  CHECK(f.ui.focusZoom() == doctest::Approx(1.0));
+  CHECK(f.ui.focusDisplayRect() == pb::Rect{200, 20, 800, 780});
 }
 
 TEST_CASE("interaction: camera stays within the library bounds") {

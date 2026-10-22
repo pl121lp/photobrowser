@@ -73,7 +73,7 @@ class Streamer {
   void setUploadBudget(size_t bytesPerFrame) { uploadBudget_ = bytesPerFrame; }
   void setUploadTimeBudget(double msPerFrame) { uploadTimeBudgetMs_ = msPerFrame; }
   void frame(double now, const Camera& cam, const Layout& layout, std::optional<uint32_t> focusedPos,
-             std::vector<TileDraw>& out);
+             double focusDetailScale, std::vector<TileDraw>& out);
   StreamStats stats() const;
 
  private:

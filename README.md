@@ -67,6 +67,7 @@ folder = ~/Pictures        # photo folder (the command-line folder wins)
 
 [view]
 gap = 0.03                 # space around photos, 0 = none, max 0.2
+max_photo_zoom = 4         # focused-photo zoom limit, relative to fit (1 to 16)
 
 [stats]
 enabled = false            # stats display at startup (F3 toggles)
@@ -106,10 +107,11 @@ mistakes in the settings file are reported with the line number.
 
 | Input | Action |
 |---|---|
-| Drag | pan (release while moving to glide) |
+| Drag | pan (release while moving to glide); pan the photo when zoomed in whole-photo view |
 | Click a photo | glide it to the center |
 | Double-click / `Enter` / scroll in past max zoom | whole-photo view (uncropped) |
-| Mouse wheel | zoom about the cursor |
+| Mouse wheel | zoom about the cursor; in whole-photo view, zoom the focused photo up to `max_photo_zoom` |
+| Right-click | reset a zoomed focused photo to fit the window |
 | Arrow keys | move one photo (in whole-photo view: ←/→ previous/next) |
 | `+` / `-` | zoom about the center |
 | `Home` | back to the start view |

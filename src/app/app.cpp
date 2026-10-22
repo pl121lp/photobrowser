@@ -214,7 +214,7 @@ int App::run(const Options& options) {
     int pw = 0, ph = 0;
     SDL_GetWindowSizeInPixels(window, &pw, &ph);
     camera.viewport = {double(pw), double(ph)};
-    Interaction ui(camera, *layout);
+    Interaction ui(camera, *layout, config.maxPhotoZoom);
 
     size_t prewarmPages = 0;
     auto startSession = [&](LibraryState lib) {
@@ -287,6 +287,7 @@ int App::run(const Options& options) {
             break;
           case SDL_EVENT_MOUSE_BUTTON_DOWN:
             if (ev.button.button == SDL_BUTTON_LEFT) ui.onPointerDown(px(ev.button.x, ev.button.y), t);
+            if (ev.button.button == SDL_BUTTON_RIGHT) ui.onSecondaryClick();
             break;
           case SDL_EVENT_MOUSE_BUTTON_UP:
             if (ev.button.button == SDL_BUTTON_LEFT) ui.onPointerUp(px(ev.button.x, ev.button.y), t);
@@ -372,7 +373,7 @@ int App::run(const Options& options) {
       uint64_t tStream = tBegin;
       animating = false;
       if (session.streamer) {
-        session.streamer->frame(seconds(now), camera, *layout, ui.focused(), draws);
+        session.streamer->frame(seconds(now), camera, *layout, ui.focused(), config.maxPhotoZoom, draws);
         textures.endFrame();
         tStream = SDL_GetTicksNS();
         keyed.clear();
@@ -393,10 +394,10 @@ int App::run(const Options& options) {
           if (auto f = ui.focused(); f && *f == d.pos) {
             // Whole-photo view: morph from the square crop to the full photo, drawn on top.
             const FocusMorph m = focusMorph({a.x, a.y, b.x, b.y}, rec.aspect(), camera.viewport, ui.focusProgress());
-            setRect(ti.rect, m.rect);
+            ui.setFocusRect(m.rect);
+            setRect(ti.rect, ui.focusDisplayRect());
             setUv(ti.uv, compose(d.cur.uv, m.uv));
             setUv(ti.uvPrev, compose(d.prev.uv, m.uv));
-            ui.setFocusRect(m.rect);
             focusedTile.emplace(key, ti);
             continue;
           }

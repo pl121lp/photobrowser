@@ -139,7 +139,9 @@ ratio**, fitted inside a square of the level's slot size (long edge = slot size)
   per page texture (a handful of draw calls). Second pass for L3.
 - **Whole-photo view**: the focused photo is drawn last, on top, with its rect and
   UV rect interpolated from the square cell/crop to the window-fitted/full rect; the
-  grid gets a dim factor uniform.
+  grid gets a dim factor uniform. Focused-photo detail zoom scales that fitted rect
+  in screen space and clamps its pan offset so an oversized axis continues to cover
+  the viewport.
 - Instance buffer rebuilt each frame from the visible list (≤ ~10k instances at full
   zoom-out; ~1 MB) with buffer orphaning — cheap.
 - VSync on; adaptive vsync if available.

@@ -28,12 +28,14 @@ struct FakeSink : pb::TextureSink {
   }
   pb::Vec2d capacity{4096, 4096};
   uint32_t maxFullW = 0, maxFullH = 0;
+  std::vector<uint32_t> fullLongEdges;
   int fullBegins = 0;
   pb::Vec2d fullCapacity() const override { return capacity; }
   pb::UvRect beginFull(int, uint32_t w, uint32_t h) override {
     ++fullBegins;
     maxFullW = std::max(maxFullW, w);
     maxFullH = std::max(maxFullH, h);
+    fullLongEdges.push_back(std::max(w, h));
     return {0, 0, float(w / capacity.x), float(h / capacity.y)};
   }
   void uploadFullRows(int, int mip, uint32_t y0, uint32_t rows, const pb::Image& m) override {
@@ -66,18 +68,18 @@ struct World {
     cam.scale = 200;  // tiles ~188 px -> L2
     streamer = std::make_unique<pb::Streamer>(lib.catalog, photos.path, *thumbs, jobs, sink, 512u << 20);
   }
-  std::vector<pb::TileDraw> frame(std::optional<uint32_t> focus = std::nullopt) {
+  std::vector<pb::TileDraw> frame(std::optional<uint32_t> focus = std::nullopt, double focusDetailScale = 1.0) {
     std::vector<pb::TileDraw> out;
     t += 1.0 / 60;
-    streamer->frame(t, cam, layout, focus, out);
+    streamer->frame(t, cam, layout, focus, focusDetailScale, out);
     return out;
   }
   // Runs frames (letting workers progress) until pred(draws) or timeout.
   std::vector<pb::TileDraw> until(const std::function<bool(const std::vector<pb::TileDraw>&)>& pred,
-                                  std::optional<uint32_t> focus = std::nullopt) {
+                                  std::optional<uint32_t> focus = std::nullopt, double focusDetailScale = 1.0) {
     std::vector<pb::TileDraw> d;
     for (int i = 0; i < 600; ++i) {
-      d = frame(focus);
+      d = frame(focus, focusDetailScale);
       if (pred(d)) return d;
       std::this_thread::sleep_for(5ms);
     }
@@ -143,6 +145,28 @@ TEST_CASE("streamer: focused photo gets full resolution") {
   CHECK(d[1].cur.uv.u1 < 1);  // sub-rect of the pre-allocated full texture
 }
 
+TEST_CASE("streamer: focused photo preloads detail for its zoom limit") {
+  World w({"PXL_20260321_003010085.jpg"});
+  w.streamer->setL0(w.lib.l0);
+  w.sink.capacity = {2000, 1600};
+  w.until([](auto& d) { return !d.empty() && d[0].cur.level == pb::kFullLevel; }, 0u, 4.0);
+  CHECK(std::max(w.sink.maxFullW, w.sink.maxFullH) >= 1500);
+  CHECK(w.sink.maxFullW <= 2000);
+  CHECK(w.sink.maxFullH <= 1600);
+}
+
+TEST_CASE("streamer: focused photo upgrades an existing smaller full texture") {
+  World w({"PXL_20260321_003010085.jpg"});
+  w.streamer->setL0(w.lib.l0);
+  w.sink.capacity = {2000, 1600};
+  w.until([](auto& d) { return !d.empty() && d[0].cur.level == pb::kFullLevel; }, 0u, 1.0);
+  REQUIRE(w.sink.fullLongEdges.size() == 1);
+  const uint32_t fittedLongEdge = w.sink.fullLongEdges.front();
+
+  w.until([&](auto&) { return w.sink.fullLongEdges.size() >= 2; }, 0u, 4.0);
+  CHECK(w.sink.fullLongEdges.back() > fittedLongEdge);
+}
+
 TEST_CASE("streamer: full images upload a few rows per frame within the budget") {
   World w;
   w.streamer->setL0(w.lib.l0);
@@ -160,6 +184,16 @@ TEST_CASE("streamer: whole-photo view prefetches neighbours at full resolution")
   w.streamer->setL0(w.lib.l0);
   w.until([&](auto&) { return w.sink.fullUploads >= 2; }, 0u);
   CHECK(w.sink.fullUploads >= 2);
+}
+
+TEST_CASE("streamer: whole-photo neighbours preload for the focused zoom limit") {
+  World w;
+  w.streamer->setL0(w.lib.l0);
+  w.sink.capacity = {2000, 1600};
+  w.until([&](auto&) { return w.sink.fullUploads >= 2; }, 0u, 4.0);
+  REQUIRE(w.sink.fullLongEdges.size() == 2);
+  CHECK(w.sink.fullLongEdges[0] >= 1500);
+  CHECK(w.sink.fullLongEdges[1] >= 1500);
 }
 
 TEST_CASE("streamer: full images fit the full-texture capacity") {

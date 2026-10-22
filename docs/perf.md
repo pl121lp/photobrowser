@@ -91,3 +91,20 @@ on this GPU. A do-nothing animated shader costs 1.7 ms (pure 4K fill).
 Warp went from 6.4 to 4.4 ms by skipping the streak math for pixels that are not
 on a streak (early `continue`), fewer layers and a cheaper hash; replacing `atan`
 saved only ~0.5 ms. Measure before optimizing shaders.
+
+## 2026-10-22 — Focused-photo detail zoom
+
+Paired release benchmarks before and after the focused-photo 1×–4× zoom change.
+RTX 2080 Super Max-Q (PRIME offload), 3840×2160 fullscreen, animated warp
+background, 288-photo warm library, two runs each.
+
+| Build | p50 | p95 | p99 | max | frames > 20 ms | CPU work p99 |
+|---|---|---|---|---|---|---|
+| Before | 16.68 | 17.60–17.71 | 18.03–18.08 | 18.61–19.09 | 0 | 1.68–1.91 |
+| After | 16.67 | 17.67–17.69 | 18.11–18.35 | 19.28–21.27 | 0–2 of ~629 | 1.93–2.15 |
+
+The focused photo and its neighbours now decode at the sharpest size that fits the
+already allocated full-texture capacity. Frame pacing stayed at the 60 Hz limit;
+one after-run had two marginal 20–21 ms intervals, with CPU work peaking at only
+4.31 ms (consistent with the existing PRIME/display-copy variance rather than a
+decode or upload stall). Warm-run reported residency was 341 MB before and after.

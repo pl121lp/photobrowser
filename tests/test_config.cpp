@@ -79,9 +79,26 @@ TEST_CASE("config: gap is clamped") {
   CHECK(pb::parseConfig("[view]\ngap = -1\n").config.gap == 0);
 }
 
+TEST_CASE("config: focused photo zoom limit is configurable and validated") {
+  CHECK(pb::Config{}.maxPhotoZoom == doctest::Approx(4.0));
+  auto r = pb::parseConfig("[view]\nmax_photo_zoom = 6.5\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.maxPhotoZoom == doctest::Approx(6.5));
+
+  auto low = pb::parseConfig("[view]\nmax_photo_zoom = 0.5\n");
+  CHECK(low.config.maxPhotoZoom == doctest::Approx(1.0));
+  CHECK(hasWarning(low, "line 2"));
+  auto high = pb::parseConfig("[view]\nmax_photo_zoom = 50\n");
+  CHECK(high.config.maxPhotoZoom == doctest::Approx(16.0));
+  CHECK(hasWarning(high, "line 2"));
+  auto bad = pb::parseConfig("[view]\nmax_photo_zoom = much\n");
+  CHECK(bad.config.maxPhotoZoom == doctest::Approx(4.0));
+  CHECK(hasWarning(bad, "line 2"));
+}
+
 TEST_CASE("config: the generated default file documents every option and parses to the defaults") {
   const std::string text = pb::defaultConfigText();
-  for (auto key : {"folder", "gap", "enabled", "graph", "mode", "color", "color2", "shader"}) {
+  for (auto key : {"folder", "gap", "max_photo_zoom", "enabled", "graph", "mode", "color", "color2", "shader"}) {
     CHECK(text.find(key) != std::string::npos);
   }
   auto r = pb::parseConfig(text);

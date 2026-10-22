@@ -58,11 +58,12 @@ the primary requirement; features come second.
 ### 3.2 Interaction (v1)
 | Input | Behavior |
 |---|---|
-| Left-drag | Pan the surface; content tracks the cursor 1:1. |
+| Left-drag | Pan the surface; in a zoomed whole-photo view, pan the focused photo. Content tracks the cursor 1:1. |
 | Release while moving | **Momentum**: the surface keeps gliding and decelerates smoothly. |
 | Left-click (no drag) on a photo | That photo **glides to the center** with ease-in-out motion (~400 ms). |
 | Double-click on a photo | Open it in the **whole-photo view** (§3.3). |
-| Mouse wheel | **Smooth zoom about the cursor** (point under cursor stays put). |
+| Mouse wheel | **Smooth zoom about the cursor** (point under cursor stays put), including within whole-photo view. |
+| Right-click | In whole-photo view, reset the focused photo to fit the window. |
 | Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order. |
 | `+` / `-` | Zoom in/out around screen center. |
 | `Home` | Return to the start view (center photo). |
@@ -85,10 +86,14 @@ way to see one photo whole:
 - **Look**: the photo smoothly animates from its square crop to the **full, uncropped
   photo fitted to the window**, shown at screen resolution from the original. The rest
   of the grid dims behind it.
+- **Inspect**: wheel in to enlarge the focused photo about the cursor, up to
+  `view.max_photo_zoom` (4× fit-to-window by default), and left-drag to pan it. Wheel
+  out returns to the fitted photo before a further wheel-out leaves the view;
+  right-click resets directly to fit-to-window.
 - **Navigate**: ←/→ (and wheel-free left/right flick) step to the previous/next photo
   in time order; the grid behind follows so that photo is centered underneath.
-- **Leave**: `Esc`, click outside the photo, wheel-zoom out, or start dragging — the
-  photo animates back into its square cell.
+- **Leave**: `Esc`, click outside the photo, wheel-zoom out from the fitted view, or
+  start dragging while fitted — the photo animates back into its square cell.
 
 ### 3.4 Image quality behavior ("blurry first, then sharp")
 - Every visible photo is drawn immediately from the lowest-resolution level that is

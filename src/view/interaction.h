@@ -16,7 +16,7 @@ enum class Key { Left, Right, Up, Down, ZoomIn, ZoomOut, Home, Enter, Escape };
 // Pure logic: times are seconds from any monotonic clock, positions are drawable px.
 class Interaction {
  public:
-  Interaction(Camera& camera, const Layout& layout);
+  Interaction(Camera& camera, const Layout& layout, double maxPhotoZoom = 4.0);
 
   void setViewport(Vec2d px);
   void layoutChanged();  // call after Layout::build(); recomputes zoom limits
@@ -25,14 +25,17 @@ class Interaction {
   void onPointerDown(Vec2d px, double t);
   void onPointerMove(Vec2d px, double t);
   void onPointerUp(Vec2d px, double t);
+  void onSecondaryClick();
   void onWheel(Vec2d px, double notches);
   bool onKey(Key k, double t);  // false if unhandled (Escape when not focused)
-  // Screen rect (px) where the whole photo is currently drawn; clicks outside it unfocus.
-  void setFocusRect(const Rect& screen) { focusRect_ = screen; }
+  // Fitted screen rect (px) for the whole photo, before focused-photo zoom/pan.
+  void setFocusRect(const Rect& screen);
+  Rect focusDisplayRect() const;
   void update(double t, double dt);
 
   std::optional<uint32_t> focused() const;
   double focusProgress() const { return focusProgress_; }  // 0 grid .. 1 whole photo
+  double focusZoom() const;
   bool idle() const;
   double minScale() const { return minScale_; }
   double maxScale() const { return maxScale_; }
@@ -50,6 +53,9 @@ class Interaction {
   void stopMotion();
   void focus(uint32_t pos, double t);
   void unfocus();
+  void resetFocusZoom(bool immediate);
+  void clampFocusPan();
+  void beginDrag();
   std::optional<uint32_t> nearestPosition(Vec2d world) const;
   void handleClick(Vec2d px, double t);
   void clampCenter();  // keeps the view centered over the library
@@ -60,7 +66,7 @@ class Interaction {
   double now_ = 0;
 
   // Pointer
-  bool pressed_ = false, dragging_ = false;
+  bool pressed_ = false, dragging_ = false, focusDragging_ = false;
   Vec2d pressPos_, lastPos_;
   VelocityTracker tracker_;
   Momentum momentum_;
@@ -79,6 +85,11 @@ class Interaction {
   Tween focusTween_;
   double focusProgress_ = 0;
   Rect focusRect_;
+  bool focusRectValid_ = false;
+  double maxPhotoZoom_ = 4;
+  SmoothValue focusLogZoom_;
+  Vec2d focusZoomPivot_;
+  Vec2d focusPan_;
 
   Vec2d velocityPx_;
 };

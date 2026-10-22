@@ -135,6 +135,13 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "view.max_photo_zoom") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 1 || *d > 16) warn(key + " must be between 1 and 16; clamped");
+        c.maxPhotoZoom = std::clamp(*d, 1.0, 16.0);
+      } else {
+        bad("a number");
+      }
     } else if (key == "stats.enabled" || key == "stats.graph") {
       if (auto b = parseBool(value)) {
         (key == "stats.enabled" ? c.stats : c.statsGraph) = *b;
@@ -205,6 +212,8 @@ std::string defaultConfigText() {
 [view]
 # Space around each photo, as a fraction of a photo's size (0 to 0.2). 0 = no gaps.
 # gap = 0.03
+# Maximum enlargement in whole-photo view, relative to fit-to-window (1 to 16).
+# max_photo_zoom = 4
 
 [stats]
 # Show the stats display at startup (F3 toggles it). In fullscreen it is an on-screen

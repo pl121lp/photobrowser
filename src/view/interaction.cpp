@@ -16,7 +16,8 @@ constexpr double kWheelFactor = 1.25;
 constexpr double kFitMargin = 0.95;
 }  // namespace
 
-Interaction::Interaction(Camera& camera, const Layout& layout) : cam_(camera), layout_(layout) {
+Interaction::Interaction(Camera& camera, const Layout& layout, double maxPhotoZoom)
+    : cam_(camera), layout_(layout), maxPhotoZoom_(std::max(1.0, maxPhotoZoom)) {
   computeLimits();
   resetView();
 }
@@ -40,6 +41,7 @@ double Interaction::startScale() const {
 
 void Interaction::setViewport(Vec2d px) {
   cam_.viewport = px;  // camera center stays at the screen center
+  if (focusTarget_) focusRectValid_ = false;
   computeLimits();
   const double lo = std::log(minScale_), hi = std::log(maxScale_);
   logZoom_.target = std::clamp(logZoom_.target, lo, hi);
@@ -48,6 +50,7 @@ void Interaction::setViewport(Vec2d px) {
     logZoom_.current = logZoom_.target;
     cam_.scale = std::exp(logZoom_.current);
   }
+  clampFocusPan();
 }
 
 void Interaction::layoutChanged() { computeLimits(); }
@@ -77,6 +80,8 @@ void Interaction::glideTo(Vec2d center, double scale, double t) {
 }
 
 void Interaction::focus(uint32_t pos, double t) {
+  resetFocusZoom(true);
+  focusRectValid_ = false;
   focused_ = pos;
   focusTarget_ = true;
   focusTween_ = {focusProgress_, 1, t, kFocusS};
@@ -86,7 +91,45 @@ void Interaction::focus(uint32_t pos, double t) {
 void Interaction::unfocus() {
   if (!focusTarget_) return;
   focusTarget_ = false;
+  focusRectValid_ = false;
+  resetFocusZoom(true);
   focusTween_ = {focusProgress_, 0, now_, kFocusS};
+}
+
+double Interaction::focusZoom() const { return std::exp(focusLogZoom_.current); }
+
+void Interaction::setFocusRect(const Rect& screen) {
+  focusRect_ = screen;
+  focusRectValid_ = true;
+  clampFocusPan();
+}
+
+Rect Interaction::focusDisplayRect() const {
+  const double z = focusZoom();
+  const Vec2d c = focusRect_.center() + focusPan_;
+  const double hw = focusRect_.width() * z * 0.5;
+  const double hh = focusRect_.height() * z * 0.5;
+  return {c.x - hw, c.y - hh, c.x + hw, c.y + hh};
+}
+
+void Interaction::resetFocusZoom(bool immediate) {
+  focusZoomPivot_ = cam_.viewport * 0.5;
+  focusLogZoom_.target = 0;
+  if (immediate) focusLogZoom_.current = 0;
+  if (immediate) focusPan_ = {};
+}
+
+void Interaction::clampFocusPan() {
+  const double x = std::max(0.0, (focusRect_.width() * focusZoom() - cam_.viewport.x) * 0.5);
+  const double y = std::max(0.0, (focusRect_.height() * focusZoom() - cam_.viewport.y) * 0.5);
+  focusPan_.x = std::clamp(focusPan_.x, -x, x);
+  focusPan_.y = std::clamp(focusPan_.y, -y, y);
+}
+
+void Interaction::beginDrag() {
+  dragging_ = true;
+  focusDragging_ = focusTarget_ && focusZoom() > 1 + 1e-6;
+  if (!focusDragging_) unfocus();
 }
 
 std::optional<uint32_t> Interaction::focused() const {
@@ -123,8 +166,10 @@ void Interaction::onPointerDown(Vec2d px, double t) {
   now_ = t;
   pressed_ = true;
   dragging_ = false;
+  focusDragging_ = false;
   pressPos_ = lastPos_ = px;
   stopMotion();
+  focusLogZoom_.target = focusLogZoom_.current;
   tracker_.reset();
   tracker_.add(t, px);
 }
@@ -132,14 +177,16 @@ void Interaction::onPointerDown(Vec2d px, double t) {
 void Interaction::onPointerMove(Vec2d px, double t) {
   now_ = t;
   if (!pressed_) return;
-  if (!dragging_ && length(px - pressPos_) >= kClickSlopPx) {
-    dragging_ = true;
-    unfocus();
-  }
+  if (!dragging_ && length(px - pressPos_) >= kClickSlopPx) beginDrag();
   if (dragging_) {
-    cam_.center = cam_.center - (px - lastPos_) / cam_.scale;
+    if (focusDragging_) {
+      focusPan_ = focusPan_ + (px - lastPos_);
+      clampFocusPan();
+    } else {
+      cam_.center = cam_.center - (px - lastPos_) / cam_.scale;
+    }
     lastPos_ = px;
-    clampCenter();
+    if (!focusDragging_) clampCenter();
   }
   tracker_.add(t, px);
 }
@@ -149,10 +196,16 @@ void Interaction::onPointerUp(Vec2d px, double t) {
   if (!pressed_) return;
   pressed_ = false;
   if (!dragging_ && length(px - pressPos_) >= kClickSlopPx) {
-    dragging_ = true;
-    cam_.center = cam_.center - (px - lastPos_) / cam_.scale;
+    beginDrag();
+    if (focusDragging_) {
+      focusPan_ = focusPan_ + (px - lastPos_);
+      clampFocusPan();
+    } else {
+      cam_.center = cam_.center - (px - lastPos_) / cam_.scale;
+    }
   }
   if (dragging_) {
+    if (focusDragging_) return;
     tracker_.add(t, px);
     momentum_.start(tracker_.velocity(t));
     return;
@@ -162,7 +215,7 @@ void Interaction::onPointerUp(Vec2d px, double t) {
 
 void Interaction::handleClick(Vec2d px, double t) {
   if (focusTarget_) {
-    if (!focusRect_.contains(px)) unfocus();
+    if (!focusDisplayRect().contains(px)) unfocus();
     return;
   }
   const auto hit = layout_.hit(cam_.screenToWorld(px));
@@ -181,9 +234,20 @@ void Interaction::handleClick(Vec2d px, double t) {
   glideTo(layout_.place(*hit).cell.center(), cam_.scale, t);
 }
 
+void Interaction::onSecondaryClick() {
+  if (focusTarget_) resetFocusZoom(false);
+}
+
 void Interaction::onWheel(Vec2d px, double notches) {
   if (focusTarget_) {
-    if (notches < 0) unfocus();
+    const bool zoomed = focusLogZoom_.current > 1e-6 || focusLogZoom_.target > 1e-6;
+    if (notches > 0 || zoomed) {
+      focusZoomPivot_ = px;
+      focusLogZoom_.target = std::clamp(focusLogZoom_.target + notches * std::log(kWheelFactor), 0.0,
+                                        std::log(maxPhotoZoom_));
+    } else if (notches < 0) {
+      unfocus();
+    }
     return;
   }
   const double hi = std::log(maxScale_), lo = std::log(minScale_);
@@ -212,6 +276,8 @@ bool Interaction::onKey(Key k, double t) {
         const int64_t step = k == Key::Left ? -1 : 1;
         const int64_t next = std::clamp<int64_t>(int64_t(*focused_) + step, 0, int64_t(layout_.count()) - 1);
         focused_ = uint32_t(next);
+        resetFocusZoom(true);
+        focusRectValid_ = false;
         glideTo(layout_.place(*focused_).cell.center(), cam_.scale, t);
         return true;
       }
@@ -263,6 +329,16 @@ void Interaction::update(double t, double dt) {
   if (momentum_.active && !pressed_) cam_.center = cam_.center - momentum_.step(dt) / cam_.scale;
   clampCenter();
 
+  if (!focusLogZoom_.settled() && focusRectValid_) {
+    const double before = focusZoom();
+    const Vec2d oldCenter = focusRect_.center() + focusPan_;
+    focusLogZoom_.step(dt);
+    const double ratio = focusZoom() / before;
+    const Vec2d newCenter = focusZoomPivot_ + (oldCenter - focusZoomPivot_) * ratio;
+    focusPan_ = newCenter - focusRect_.center();
+    clampFocusPan();
+  }
+
   focusProgress_ = std::clamp(focusTween_.value(t), 0.0, 1.0);
   if (!focusTarget_ && focusTween_.done(t)) focusProgress_ = 0;
 
@@ -271,7 +347,8 @@ void Interaction::update(double t, double dt) {
 
 bool Interaction::idle() const {
   const bool focusSettled = focusTween_.done(now_);
-  return !pressed_ && !momentum_.active && !tween_.active && logZoom_.settled() && focusSettled;
+  return !pressed_ && !momentum_.active && !tween_.active && logZoom_.settled() && focusLogZoom_.settled() &&
+         focusSettled;
 }
 
 }  // namespace pb

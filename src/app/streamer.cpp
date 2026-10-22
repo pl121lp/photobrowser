@@ -115,27 +115,31 @@ uint32_t Streamer::fitFullCapacity(PhotoId id, uint32_t longEdge) const {
 
 std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdge, bool request) {
   longEdge = fitFullCapacity(id, longEdge);
+  int victim = -1;
   for (int i = 0; i < kFullSlots; ++i) {
     Full& f = full_[size_t(i)];
     if (f.used && f.id == id) {
       f.lastUsed = now;
       f.lastFrame = frameNo_;
       if (f.loading) return std::nullopt;
-      return TexRef{kFullLevel, uint16_t(i), f.uv};
+      if (!request || f.longEdge >= longEdge) return TexRef{kFullLevel, uint16_t(i), f.uv};
+      victim = i;  // replace a completed lower-resolution image in the same slot
+      break;
     }
   }
   if (!request) return std::nullopt;
   // Take a free slot or the least recently used one that is neither loading nor on
   // screen (used this frame or the last); otherwise the photo stays at L4.
-  int victim = -1;
-  for (int i = 0; i < kFullSlots; ++i) {
-    const Full& f = full_[size_t(i)];
-    if (!f.used) {
-      victim = i;
-      break;
+  if (victim < 0) {
+    for (int i = 0; i < kFullSlots; ++i) {
+      const Full& f = full_[size_t(i)];
+      if (!f.used) {
+        victim = i;
+        break;
+      }
+      if (f.loading || f.lastFrame + 2 > frameNo_) continue;
+      if (victim < 0 || f.lastUsed < full_[size_t(victim)].lastUsed) victim = i;
     }
-    if (f.loading || f.lastFrame + 2 > frameNo_) continue;
-    if (victim < 0 || f.lastUsed < full_[size_t(victim)].lastUsed) victim = i;
   }
   if (victim < 0) return std::nullopt;
   Full& f = full_[size_t(victim)];
@@ -199,7 +203,7 @@ void Streamer::applyPageEvents() {
 }
 
 void Streamer::frame(double now, const Camera& cam, const Layout& layout, std::optional<uint32_t> focusedPos,
-                     std::vector<TileDraw>& out) {
+                     double focusDetailScale, std::vector<TileDraw>& out) {
   out.clear();
   requests_.clear();
   ++frameNo_;
@@ -266,7 +270,7 @@ void Streamer::frame(double now, const Camera& cam, const Layout& layout, std::o
     double needed = tilePx / std::min(a, 1 / a);
     if (focused) {
       const Rect fit = fitRect({0, 0, cam.viewport.x, cam.viewport.y}, a);
-      needed = std::max(fit.width(), fit.height());
+      needed = std::max(fit.width(), fit.height()) * std::max(1.0, focusDetailScale);
     }
     const int want = desiredLevel(needed, desired_[id]);
     desired_[id] = int8_t(want);
@@ -303,7 +307,8 @@ void Streamer::frame(double now, const Camera& cam, const Layout& layout, std::o
       const PhotoId id = catalog_.order[size_t(p)];
       const double a = catalog_.photos[id].aspect();
       const Rect fit = fitRect({0, 0, cam.viewport.x, cam.viewport.y}, a);
-      fullFor(id, now - 1e-3, uint32_t(std::max(fit.width(), fit.height())), true);
+      const double detail = std::max(fit.width(), fit.height()) * std::max(1.0, focusDetailScale);
+      fullFor(id, now - 1e-3, uint32_t(detail), true);
     }
   }
 
