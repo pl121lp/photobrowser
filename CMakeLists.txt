@@ -92,11 +92,13 @@ if(PB_HAVE_TURBOJPEG)
     src/imaging/resize.cpp
     src/cache/l0_pack.cpp
     src/cache/thumb_cache.cpp
+    src/library/indexer.cpp
   )
   target_link_libraries(pb_imaging PUBLIC pb_core PRIVATE pb_turbojpeg)
   target_sources(pb_tests PRIVATE
     tests/test_imaging.cpp
     tests/test_cache.cpp
+    tests/test_indexer.cpp
   )
   target_link_libraries(pb_tests PRIVATE pb_imaging)
 endif()
