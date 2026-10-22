@@ -15,7 +15,8 @@ std::filesystem::path defaultCacheRoot();
 std::filesystem::path libraryCacheDir(const std::filesystem::path& cacheRoot,
                                       const std::filesystem::path& libraryAbs);
 
-// Writes to "<path>.tmp" then renames over `path`; creates parent directories.
+// Writes to a unique temp file next to `path`, then renames over it (atomic, safe
+// for concurrent writers); creates parent directories.
 bool atomicWriteFile(const std::filesystem::path& path, std::span<const uint8_t> data);
 // Reads up to maxBytes starting at offset; nullopt if the file can't be opened.
 std::optional<std::vector<uint8_t>> readFileRange(const std::filesystem::path& path, uint64_t offset,

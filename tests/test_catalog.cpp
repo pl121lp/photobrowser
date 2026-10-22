@@ -1,5 +1,9 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
+#include <atomic>
+#include <thread>
+
 #include "library/catalog.h"
 #include "platform/paths.h"
 #include "test_util.h"
@@ -121,4 +125,27 @@ TEST_CASE("paths: library cache dir is stable and distinct per library") {
   CHECK(a.parent_path() == std::filesystem::path("/cache/photobrowse"));
   CHECK(a.filename().string().size() == 16);
   CHECK_FALSE(pb::defaultCacheRoot().empty());
+}
+
+TEST_CASE("paths: concurrent atomic writes to one file never mix contents") {
+  pbtest::TempDir dir;
+  const auto p = dir.path / "same.bin";
+  std::atomic<int> bad{0};
+  std::vector<std::thread> threads;
+  for (int t = 0; t < 8; ++t) {
+    threads.emplace_back([&, t] {
+      const std::vector<uint8_t> data(size_t(t + 1) * 64 * 1024, uint8_t(t + 1));
+      for (int i = 0; i < 200; ++i) {
+        pb::atomicWriteFile(p, data);
+        // Whatever is at `p` must always be one complete write.
+        const auto got = pbtest::readFile(p.string());
+        if (got.empty()) continue;
+        const bool whole = got.size() == size_t(got[0]) * 64 * 1024 &&
+                           std::all_of(got.begin(), got.end(), [&](uint8_t b) { return b == got[0]; });
+        if (!whole) ++bad;
+      }
+    });
+  }
+  for (auto& th : threads) th.join();
+  CHECK(bad == 0);
 }

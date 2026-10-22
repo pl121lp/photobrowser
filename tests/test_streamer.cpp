@@ -28,8 +28,10 @@ struct FakeSink : pb::TextureSink {
   }
   pb::Vec2d capacity{4096, 4096};
   uint32_t maxFullW = 0, maxFullH = 0;
+  int fullBegins = 0;
   pb::Vec2d fullCapacity() const override { return capacity; }
   pb::UvRect beginFull(int, uint32_t w, uint32_t h) override {
+    ++fullBegins;
     maxFullW = std::max(maxFullW, w);
     maxFullH = std::max(maxFullH, h);
     return {0, 0, float(w / capacity.x), float(h / capacity.y)};
@@ -51,10 +53,8 @@ struct World {
   std::unique_ptr<pb::Streamer> streamer;
   double t = 0;
 
-  World() {
-    for (auto n : {"PXL_20260321_003010085.jpg", "PXL_20260321_010024264.jpg"}) {
-      fs::copy_file(pbtest::photo(n), photos.path / n);
-    }
+  explicit World(std::vector<const char*> names = {"PXL_20260321_003010085.jpg", "PXL_20260321_010024264.jpg"}) {
+    for (auto n : names) fs::copy_file(pbtest::photo(n), photos.path / n);
     thumbs = std::make_unique<pb::ThumbCache>(cache.path);
     pb::Indexer ix(photos.path, cache.path, jobs, *thumbs);
     ix.start();
@@ -189,4 +189,24 @@ TEST_CASE("streamer: uploads stop when the frame's time budget is spent") {
   CHECK(w.sink.uploads.size() - before == 1);  // one upload used up the 4 ms budget
   w.frame();
   CHECK(w.sink.uploads.size() - before == 2);
+}
+
+TEST_CASE("streamer: more tiles wanting full resolution than slots does not thrash") {
+  World w({"PXL_20260321_003010085.jpg", "PXL_20260321_005609566.jpg", "PXL_20260321_005621197.jpg",
+           "PXL_20260321_010458393.jpg", "PXL_20260321_011650209.jpg", "PXL_20260321_011652904.jpg"});
+  w.streamer->setL0(w.lib.l0);
+  w.cam.viewport = {2000, 1600};
+  w.cam.scale = 1600;       // max grid zoom: every visible tile wants full resolution
+  w.cam.center = {1, 1};    // corner of four cells (3x2 grid)
+  // Run until three full images are on screen, then keep going for a while.
+  int stableFrames = 0;
+  for (int i = 0; i < 3000 && stableFrames < 200; ++i) {
+    auto d = w.frame();
+    REQUIRE(d.size() == 4);
+    const auto full = std::count_if(d.begin(), d.end(), [](auto& t) { return t.cur.level == pb::kFullLevel; });
+    if (full == 3) ++stableFrames;
+    std::this_thread::sleep_for(5ms);
+  }
+  CHECK(stableFrames == 200);
+  CHECK(w.sink.fullBegins <= 3);  // the fourth tile stays at L4 instead of stealing a slot
 }

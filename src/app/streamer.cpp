@@ -119,12 +119,14 @@ std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdg
     Full& f = full_[size_t(i)];
     if (f.used && f.id == id) {
       f.lastUsed = now;
+      f.lastFrame = frameNo_;
       if (f.loading) return std::nullopt;
       return TexRef{kFullLevel, uint16_t(i), f.uv};
     }
   }
   if (!request) return std::nullopt;
-  // Take a free slot or the least recently used one that is not loading.
+  // Take a free slot or the least recently used one that is neither loading nor on
+  // screen (used this frame or the last); otherwise the photo stays at L4.
   int victim = -1;
   for (int i = 0; i < kFullSlots; ++i) {
     const Full& f = full_[size_t(i)];
@@ -132,7 +134,8 @@ std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdg
       victim = i;
       break;
     }
-    if (!f.loading && (victim < 0 || f.lastUsed < full_[size_t(victim)].lastUsed)) victim = i;
+    if (f.loading || f.lastFrame + 2 > frameNo_) continue;
+    if (victim < 0 || f.lastUsed < full_[size_t(victim)].lastUsed) victim = i;
   }
   if (victim < 0) return std::nullopt;
   Full& f = full_[size_t(victim)];
@@ -141,6 +144,7 @@ std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdg
   f.id = id;
   f.longEdge = longEdge;
   f.lastUsed = now;
+  f.lastFrame = frameNo_;
   f.cancel = std::make_shared<CancelToken>();
   const PhotoRecord rec = catalog_.photos[id];
   jobs_.submit(kFullPriority, [results = results_, guard = guard_, rec, id, longEdge, cancel = f.cancel,
@@ -198,6 +202,7 @@ void Streamer::frame(double now, const Camera& cam, const Layout& layout, std::o
                      std::vector<TileDraw>& out) {
   out.clear();
   requests_.clear();
+  ++frameNo_;
   residency_.beginFrame();
 
   // 1. Upload finished loads within the per-frame budget. Full images in progress

@@ -43,6 +43,17 @@ reads are served from the OS cache).
    a small pool (2–4 workers, `streamingWorkerCount`); first-run indexing uses all
    cores (no browsing happens until it finishes). Workers run at lowered priority.
 
-Remaining: an occasional ~30 ms frame (≤ 2 per 10 s run) at 10k; not yet attributed.
-Spec target "p99 below one refresh interval" is met in terms of dropped frames but
-the measured p99 interval (≈18 ms) includes swap-timing jitter.
+6. **Eviction thrash** (found in review): tiles visible last frame could be evicted
+   to place a new load, so a level whose slots were full kept reloading forever.
+   Entries seen in the last two frames are now protected, and the same rule applies
+   to the 3 full-resolution slots. This also removed the occasional ~30 ms frame.
+
+### After review fixes (same machine, 4K fullscreen)
+
+| Scenario | p50 | p95 | p99 | max | frames > 20 ms |
+|---|---|---|---|---|---|
+| 10k photos (3 runs) | 16.7 | 17.6 | 18.0–18.1 | 18.5–19.3 | 0 |
+| 20 photos (2 runs) | 16.7 | 17.6 | 18.0–18.1 | 18.2–18.8 | 0 |
+
+No dropped frames. The measured p99 interval (≈18 ms) is swap-timing jitter around
+the 16.7 ms vsync, not missed frames.

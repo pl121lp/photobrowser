@@ -111,7 +111,9 @@ LibraryState Indexer::take() {
 }
 
 bool refreshLibrary(const fs::path& root, const fs::path& libDir, const LibraryState& current,
-                    const ThumbCache& thumbs) {
+                    const ThumbCache& thumbs, const std::atomic<bool>* stop) {
+  auto stopped = [&] { return stop && stop->load(); };
+  if (stopped()) return false;
   const auto scan = scanFolder(root);
   const ScanDiff diff = diffCatalog(current.catalog, scan);
   if (diff.empty()) return false;
@@ -136,6 +138,7 @@ bool refreshLibrary(const fs::path& root, const fs::path& libDir, const LibraryS
     }
   }
   for (const auto& e : toIndex) {
+    if (stopped()) return false;
     auto [rec, l0] = indexOne(root, e, thumbs);
     if (!l0.empty()) next.l0.emplace_back(rec.key, std::move(l0));
     next.catalog.photos.push_back(std::move(rec));

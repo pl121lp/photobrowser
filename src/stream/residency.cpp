@@ -10,7 +10,8 @@ constexpr double kUpsample = 1.4;
 constexpr double kHysteresis = 0.8;
 constexpr uint64_t kStaleFrames = 30;
 constexpr uint64_t kBlockFrames = 60;
-constexpr uint64_t kIdleFrames = 120;
+constexpr uint64_t kIdleFrames = 30;      // under pressure, reclaim entries unseen for 0.5 s
+constexpr uint64_t kProtectFrames = 2;    // never evict what was visible this or last frame
 }  // namespace
 
 int desiredLevel(double neededPx, int current) {
@@ -108,7 +109,9 @@ std::optional<SlotRef> Residency::place(PhotoId id, int level, uint32_t w, uint3
   std::optional<SlotRef> slot = pool.allocate();
   if (!slot && tryAddPage(level)) slot = pool.allocate();
   if (!slot) {
-    // Evict the least recently used photo of this level that is not visible now.
+    // Evict the least recently used photo of this level that is not on screen.
+    // Results are placed before this frame's touches, so "visible" means touched
+    // this frame or the previous one.
     auto& ids = residentIds_[level - 1];
     PhotoId victim = 0;
     uint64_t oldest = frame_;
@@ -119,7 +122,7 @@ std::optional<SlotRef> Residency::place(PhotoId id, int level, uint32_t w, uint3
         victim = other;
       }
     }
-    if (oldest < frame_) {
+    if (oldest + kProtectFrames <= frame_) {
       evict(victim, level);
       slot = pool.allocate();
     }

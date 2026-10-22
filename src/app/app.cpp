@@ -143,6 +143,7 @@ int App::run(const Options& options) {
     // system before the cache and catalog its jobs reference.
     ThumbCache thumbs(libDir);
     Session session;
+    auto stopBackground = std::make_shared<std::atomic<bool>>(false);  // set on quit
     auto jobs = std::make_unique<JobSystem>(streamingWorkerCount());
     std::unique_ptr<JobSystem> indexJobs;  // all cores, only while first-run indexing
     std::unique_ptr<Indexer> indexer;
@@ -182,9 +183,9 @@ int App::run(const Options& options) {
       startSession(std::move(*warm));
       // Pick up folder changes for the next launch; trim the disk cache.
       auto snapshot = std::make_shared<LibraryState>(session.lib);
-      jobs->submit(kBackgroundPriority, [root, libDir, snapshot, &thumbs] {
-        refreshLibrary(root, libDir, *snapshot, thumbs);
-        thumbs.sweep(kDiskCacheCap);
+      jobs->submit(kBackgroundPriority, [root, libDir, snapshot, stop = stopBackground, &thumbs] {
+        refreshLibrary(root, libDir, *snapshot, thumbs, stop.get());
+        if (!*stop) thumbs.sweep(kDiskCacheCap);
       });
     } else {
       indexJobs = std::make_unique<JobSystem>(defaultWorkerCount());
@@ -410,6 +411,7 @@ int App::run(const Options& options) {
       }
     }
 
+    *stopBackground = true;
     session.streamer.reset();
     indexer.reset();
     indexJobs.reset();

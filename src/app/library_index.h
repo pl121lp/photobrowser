@@ -55,8 +55,10 @@ class Indexer {
 
 // Re-scans the folder; if anything was added, removed or changed, indexes the new
 // files and saves an updated catalog + L0 pack for the next launch. Returns true if
-// the saved library changed. Runs synchronously (call it from a worker).
+// the saved library changed. Runs synchronously (call it from a worker); returns
+// early without saving once *stop becomes true.
 bool refreshLibrary(const std::filesystem::path& root, const std::filesystem::path& libDir,
-                    const LibraryState& current, const ThumbCache& thumbs);
+                    const LibraryState& current, const ThumbCache& thumbs,
+                    const std::atomic<bool>* stop = nullptr);
 
 }  // namespace pb

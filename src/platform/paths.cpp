@@ -1,6 +1,10 @@
 #include "platform/paths.h"
 
+#include <atomic>
 #include <chrono>
+#include <functional>
+#include <string>
+#include <thread>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -54,8 +58,11 @@ fs::path libraryCacheDir(const fs::path& cacheRoot, const fs::path& libraryAbs) 
 bool atomicWriteFile(const fs::path& path, std::span<const uint8_t> data) {
   std::error_code ec;
   fs::create_directories(path.parent_path(), ec);
+  // Unique temp name: workers may write the same cache file concurrently.
+  static std::atomic<uint64_t> counter{0};
   fs::path tmp = path;
-  tmp += ".tmp";
+  tmp += "." + std::to_string(counter++) + "." +
+         std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id()) & 0xffffff) + ".tmp";
   {
     std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
     if (!f) return false;

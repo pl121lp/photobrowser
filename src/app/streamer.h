@@ -94,6 +94,7 @@ class Streamer {
     PhotoId id = 0;
     uint32_t longEdge = 0;
     double lastUsed = 0;
+    uint64_t lastFrame = 0;
     std::shared_ptr<CancelToken> cancel;
     UvRect uv;
     std::vector<Image> mips;  // being uploaded
@@ -130,6 +131,7 @@ class Streamer {
   std::vector<Residency::Request> requests_;
   std::vector<uint32_t> visible_;
   size_t uploadBudget_ = 4u << 20;
+  uint64_t frameNo_ = 2;
   double uploadTimeBudgetMs_ = 1e9;  // off by default; the app sets it
   size_t uploadsThisFrame_ = 0, uploadBytesThisFrame_ = 0, pagesAddedThisFrame_ = 0, fullUploadsThisFrame_ = 0;
 };

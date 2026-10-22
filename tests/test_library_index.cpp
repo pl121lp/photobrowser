@@ -111,3 +111,14 @@ TEST_CASE("library: abandoning an indexer skips its queued work") {
   releaser.join();
   CHECK_FALSE(fs::exists(lib.libDir() / "catalog.bin"));
 }
+
+TEST_CASE("library: refresh stops early when asked") {
+  Lib lib({"PXL_20260321_003010085.jpg"});
+  pb::JobSystem jobs(2);
+  auto st = indexNow(lib, jobs);
+  pb::ThumbCache thumbs(lib.libDir());
+  fs::copy_file(pbtest::photo("PXL_20260321_134351678.jpg"), lib.photos.path / "new.jpg");
+  std::atomic<bool> stop{true};
+  CHECK_FALSE(pb::refreshLibrary(lib.photos.path, lib.libDir(), st, thumbs, &stop));
+  CHECK(pb::loadWarm(lib.libDir())->catalog.photos.size() == 1);  // nothing saved
+}

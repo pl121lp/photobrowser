@@ -197,3 +197,38 @@ TEST_CASE("residency: empty pages are released to budget") {
   for (auto& e : r.takePageEvents()) released |= (!e.added && e.level == 4);
   CHECK(released);
 }
+
+TEST_CASE("residency: more visible tiles than slots settles instead of thrashing") {
+  Residency r(100, pb::kPageBytes);  // one L4 page = 16 slots, 20 tiles visible
+  std::vector<Residency::Request> pending, out;
+  size_t l4Placements = 0;
+  for (int f = 0; f < 300; ++f) {
+    // Same order as Streamer::frame: last frame's results are placed before touches.
+    r.beginFrame();
+    for (const auto& q : pending) {
+      if (r.place(q.id, q.level, 1024, 768) && q.level == 4) ++l4Placements;
+    }
+    out.clear();
+    for (pb::PhotoId i = 0; i < 20; ++i) r.touch(i, 4, 0, out);
+    pending = out;
+    r.endFrame();
+  }
+  CHECK(l4Placements <= 20);  // each photo placed at L4 at most once: no evicting visible tiles
+}
+
+TEST_CASE("residency: entries touched last frame are not evicted") {
+  Residency r(100, pb::kPageBytes);
+  std::vector<Residency::Request> out;
+  r.beginFrame();
+  for (pb::PhotoId i = 0; i < 17; ++i) r.touch(i, 4, 0, out);
+  for (pb::PhotoId i = 0; i < 16; ++i) REQUIRE(r.place(i, 4, 1024, 768));
+  r.endFrame();
+  // Next frame: the result for 16 arrives before this frame's touches of 0..15.
+  r.beginFrame();
+  CHECK_FALSE(r.place(16, 4, 1024, 768));
+  for (pb::PhotoId i = 0; i < 16; ++i) {
+    auto src = r.touch(i, 4, 0, out);
+    REQUIRE(src);
+    CHECK(src->level == 4);
+  }
+}
