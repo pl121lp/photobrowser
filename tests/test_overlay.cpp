@@ -189,3 +189,54 @@ TEST_CASE("photo info: panel sits in the bottom-left corner and holds its text")
     CHECK(quad.rect.y1 <= panel.y1 + 1e-9);
   }
 }
+
+TEST_CASE("help: lists every key binding in printable ASCII") {
+  const auto entries = pb::helpEntries();
+  auto has = [&](std::string_view key) {
+    return std::any_of(entries.begin(), entries.end(), [&](const pb::HelpEntry& e) { return e.key == key; });
+  };
+  for (auto key : {"F1", "F2", "F3", "F5", "F6", "F11 / F", "Arrows", "+ / -", "Home", "Enter", "Esc", "Q", "Drag",
+                   "Wheel", "Double-click", "Right-click"}) {
+    CHECK_MESSAGE(has(key), key);
+  }
+  for (const auto& e : entries) {
+    for (char ch : e.key + e.action) CHECK((ch >= 32 && ch <= 126));
+  }
+}
+
+TEST_CASE("help: centered panel, keys and descriptions in two aligned columns") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Vec2d viewport{1920, 1080};
+  const pb::Rect panel = pb::buildHelp(kFont, 1.0, viewport, q);
+  REQUIRE_FALSE(q.empty());
+  CHECK(q[0].rect == panel);
+  CHECK(q[0].color[3] < 1);
+  CHECK(panel.center().x == doctest::Approx(viewport.x / 2));
+  CHECK(panel.center().y == doctest::Approx(viewport.y / 2));
+  for (const auto& quad : q) {
+    CHECK(quad.rect.x0 >= panel.x0 - 1e-9);
+    CHECK(quad.rect.x1 <= panel.x1 + 1e-9);
+    CHECK(quad.rect.y0 >= panel.y0 - 1e-9);
+    CHECK(quad.rect.y1 <= panel.y1 + 1e-9);
+  }
+  // Rows start at one of two x positions: the key column and the description column.
+  std::vector<double> starts;
+  double lastY = -1;
+  for (const auto& quad : q) {
+    if (quad.kind != pb::OverlayQuad::Kind::Text) continue;
+    if (quad.rect.y0 != lastY) starts.push_back(quad.rect.x0), lastY = quad.rect.y0;
+  }
+  std::sort(starts.begin(), starts.end());
+  starts.erase(std::unique(starts.begin(), starts.end()), starts.end());
+  CHECK(starts.size() <= 3);  // key column, description column (+ title)
+}
+
+TEST_CASE("help: shrinks to fit a small window") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Vec2d viewport{640, 360};
+  const pb::Rect panel = pb::buildHelp(kFont, 2.0, viewport, q);
+  CHECK(panel.x0 >= 0);
+  CHECK(panel.y0 >= 0);
+  CHECK(panel.x1 <= viewport.x);
+  CHECK(panel.y1 <= viewport.y);
+}

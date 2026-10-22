@@ -159,6 +159,66 @@ Rect buildPhotoInfo(const PhotoInfo& p, const FontInfo& font, double scale, Vec2
   return panel;
 }
 
+std::vector<HelpEntry> helpEntries() {
+  return {
+      {"F1", "show / hide this help"},
+      {"F2", "photo info (in whole-photo view)"},
+      {"F3", "performance stats"},
+      {"F5", "screensaver on / off"},
+      {"F6", "next background"},
+      {"F11 / F", "fullscreen on / off"},
+      {"", ""},
+      {"Arrows", "move one photo (whole-photo view: previous / next)"},
+      {"+ / -", "zoom in / out"},
+      {"Home", "back to the start view"},
+      {"Enter", "open the centered photo whole"},
+      {"Esc", "close help, leave whole-photo view, then fullscreen"},
+      {"Q", "quit"},
+      {"", ""},
+      {"Drag", "pan (release while moving to glide); pan a zoomed photo"},
+      {"Click", "glide a photo to the center"},
+      {"Double-click", "open a photo whole"},
+      {"Wheel", "zoom about the cursor (also inside a whole photo)"},
+      {"Right-click", "reset a zoomed photo to fit"},
+  };
+}
+
+Rect buildHelp(const FontInfo& font, double scale, Vec2d viewport, std::vector<OverlayQuad>& out) {
+  const std::string title = "PhotoBrowse keys";
+  const auto entries = helpEntries();
+  size_t keyChars = 0, actionChars = 0;
+  for (const auto& e : entries) {
+    keyChars = std::max(keyChars, e.key.size());
+    actionChars = std::max(actionChars, e.action.size());
+  }
+  keyChars += 3;  // gap between the columns
+  const double cols = double(std::max(title.size(), keyChars + actionChars));
+  const double rows = double(entries.size() + 2);  // title and a gap
+  // Shrink so the panel fits inside the margins.
+  auto size = [&](double s) {
+    return Vec2d{cols * font.cellW * s + 2 * kPadding * s, rows * font.cellH * s + 2 * kPadding * s};
+  };
+  const Vec2d full = size(scale);
+  const double fit = std::min({1.0, (viewport.x - 2 * kMargin) / full.x, (viewport.y - 2 * kMargin) / full.y});
+  scale *= fit;
+  const Vec2d sz = size(scale);
+  const Vec2d c = viewport * 0.5;
+  const Rect panel{c.x - sz.x / 2, c.y - sz.y / 2, c.x + sz.x / 2, c.y + sz.y / 2};
+  // Nearly opaque: blending is in linear light, so even 0.9 looks quite see-through.
+  out.push_back(solid(OverlayQuad::Kind::Panel, panel, font, 0, 0, 0, 0.98f));
+
+  const float white[4] = {0.95f, 0.95f, 0.95f, 1}, grey[4] = {0.72f, 0.72f, 0.72f, 1};
+  const float accent[4] = {0.45f, 0.7f, 1.0f, 1};
+  const double pad = kPadding * scale, lineH = font.cellH * scale, charW = font.cellW * scale;
+  layoutText(title, {panel.x0 + pad, panel.y0 + pad}, scale, white, font, out);
+  for (size_t i = 0; i < entries.size(); ++i) {
+    const double y = panel.y0 + pad + double(i + 2) * lineH;
+    layoutText(entries[i].key, {panel.x0 + pad, y}, scale, accent, font, out);
+    layoutText(entries[i].action, {panel.x0 + pad + double(keyChars) * charW, y}, scale, grey, font, out);
+  }
+  return panel;
+}
+
 std::vector<OverlayQuad> overlayBars(const std::vector<OverlayQuad>& quads) {
   std::vector<OverlayQuad> bars;
   std::copy_if(quads.begin(), quads.end(), std::back_inserter(bars),

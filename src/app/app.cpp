@@ -280,7 +280,7 @@ int App::run(const Options& options) {
     const uint64_t start = last;
     uint64_t lastTitle = 0;
     bool running = exitCode == 0, reportedGlError = false, animating = true;
-    bool showStats = config.stats, showInfo = false, prewarming = false, reportedFirstFrame = false;
+    bool showStats = config.stats, showInfo = false, showHelp = false, prewarming = false, reportedFirstFrame = false;
     FrameStats intervals, work, backgroundGpu;  // ms; F3 window or the whole --bench run
     if (options.bench) background.enableTiming();
     std::optional<BenchScript> bench;
@@ -326,6 +326,10 @@ int App::run(const Options& options) {
               setScreensaver(!screensaver.active());
             } else if (k == SDLK_F6) {
               setBackground(nextBackground(backgroundChoices, backgroundName));
+            } else if (k == SDLK_F1) {
+              showHelp = !showHelp;
+            } else if (k == SDLK_ESCAPE && showHelp) {
+              showHelp = false;  // Esc closes the help before anything else
             } else if (k == SDLK_F2) {
               showInfo = !showInfo;
             } else if (k == SDLK_F3) {
@@ -475,6 +479,13 @@ int App::run(const Options& options) {
         overlayQuads.clear();
         buildPhotoInfo(info, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,
                        overlayQuads);
+        overlay.draw(camera.viewport, overlayQuads);
+      }
+
+      // Help (F1): every key binding, centered on top of everything.
+      if (showHelp) {
+        overlayQuads.clear();
+        buildHelp(overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport, overlayQuads);
         overlay.draw(camera.viewport, overlayQuads);
       }
 

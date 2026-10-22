@@ -64,6 +64,14 @@ std::vector<std::string> photoInfoLines(const PhotoInfo& p);
 Rect buildPhotoInfo(const PhotoInfo& p, const FontInfo& font, double scale, Vec2d viewport,
                     std::vector<OverlayQuad>& out);
 
+// Help (F1): every key and mouse binding. An entry with an empty key and action is a gap.
+struct HelpEntry {
+  std::string key, action;
+};
+std::vector<HelpEntry> helpEntries();
+// Help panel centered in a `viewport`-sized screen, shrunk to fit if needed. Returns the panel rect.
+Rect buildHelp(const FontInfo& font, double scale, Vec2d viewport, std::vector<OverlayQuad>& out);
+
 std::vector<OverlayQuad> overlayBars(const std::vector<OverlayQuad>& quads);
 
 }  // namespace pb

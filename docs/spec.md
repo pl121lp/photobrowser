@@ -68,8 +68,9 @@ the primary requirement; features come second.
 | `+` / `-` | Zoom in/out around screen center. |
 | `Home` | Return to the start view (center photo). |
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). The app starts fullscreen unless `[display] fullscreen = false` or `--windowed`. |
-| `Esc` | Leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
+| `Esc` | Close the help; otherwise leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
 | `Q` / window close | Quit. |
+| `F1` | Toggle **help**: a centered panel listing every key and mouse binding (shrinks to fit small windows). `Esc` also closes it. Off by default. |
 | `F2` | Toggle photo info: while a photo is fully open in whole-photo view, a bottom-left panel shows its file name, width × height (megapixels), date taken (EXIF; file modification date if none) and file size. Off by default. |
 | `F3` | Toggle performance stats: on-screen overlay in fullscreen (fps, frame time, p99, loads, GPU memory, frame-time graph); window title otherwise. |
 | `F5` | Toggle **screensaver mode**: fly to a random photo and open it in the whole-photo view, hold it for `[screensaver] hold` seconds (30 by default), then travel to another random photo. Each journey is eased and pulls back (zooms out) mid-way, then zooms in on arrival; longer distances take longer (2–6 s). Repeats until turned off; any click, scroll or key (other than F2/F3/F5/F11/F) also stops it. The cursor is hidden while it runs. Off by default; `[screensaver] enabled = on` starts the app in it. |
