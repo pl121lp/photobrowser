@@ -57,8 +57,9 @@ std::vector<std::string> overlayLines(const OverlayStats& s) {
 
 std::string statsTitle(const OverlayStats& s) {
   char t[256];
-  std::snprintf(t, sizeof t, "PhotoBrowse — %.0f fps · p99 %.1f ms · %zu photos · jobs %zu · VRAM %.0f/%.0f MB", s.fps,
-                s.p99Ms, s.photos, s.jobs, s.vramMB, s.budgetMB);
+  std::snprintf(t, sizeof t,
+                "PhotoBrowse — %.0f fps · p99 %.1f ms · %zu photos · %zu tiles · %.0f px · jobs %zu · VRAM %.0f/%.0f MB",
+                s.fps, s.p99Ms, s.photos, s.tiles, s.tilePx, s.jobs, s.vramMB, s.budgetMB);
   return t;
 }
 

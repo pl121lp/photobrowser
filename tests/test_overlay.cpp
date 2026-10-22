@@ -108,5 +108,6 @@ TEST_CASE("frame history: percentile") {
 }
 
 TEST_CASE("overlay: window title shows the same stats including photo count") {
-  CHECK(pb::statsTitle(stats()) == "PhotoBrowse — 60 fps · p99 17.9 ms · 10000 photos · jobs 3 · VRAM 341/640 MB");
+  CHECK(pb::statsTitle(stats()) ==
+        "PhotoBrowse — 60 fps · p99 17.9 ms · 10000 photos · 412 tiles · 128 px · jobs 3 · VRAM 341/640 MB");
 }
