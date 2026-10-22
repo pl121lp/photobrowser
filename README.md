@@ -44,6 +44,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | `--cache-dir <dir>` | thumbnail cache root (default: `$XDG_CACHE_HOME` or `~/.cache`; `%LOCALAPPDATA%` on Windows) |
 | `--rebuild-cache` | discard this library's cache and re-index |
 | `--layout square-crop` | layout mode (only one so far) |
+| `--stats` | start with the F3 stats display on |
 | `--bench` | fullscreen scripted pan/zoom tour; prints frame-time percentiles and exits |
 | `--snapshot <file.jpg>` | save the settled start view (or the end of `--bench`) and exit |
 
@@ -66,7 +67,7 @@ added or removed while the app runs show up on the next launch.
 | `Home` | back to the start view |
 | `F11` or `F` | toggle fullscreen |
 | `Esc` | leave whole-photo view, then fullscreen |
-| `F3` | frame-time / memory stats in the title bar |
+| `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
 | `Q` | quit |
 
 ## Performance testing

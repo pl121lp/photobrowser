@@ -57,6 +57,7 @@ add_library(pb_core STATIC
   src/view/motion.cpp
   src/view/interaction.cpp
   src/view/bench_script.cpp
+  src/view/overlay.cpp
   src/library/exif.cpp
   src/library/catalog.cpp
   src/library/scanner.cpp
@@ -86,6 +87,7 @@ add_executable(pb_tests
   tests/test_residency.cpp
   tests/test_options.cpp
   tests/test_bench.cpp
+  tests/test_overlay.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
@@ -126,12 +128,15 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     src/gfx/shader.cpp
     src/gfx/paged_texture.cpp
     src/gfx/tile_renderer.cpp
+    src/gfx/overlay_renderer.cpp
   )
   target_include_directories(pb_gfx PUBLIC third_party/khronos)
   target_link_libraries(pb_gfx PUBLIC pb_imaging)
   pb_embed_shaders(pb_gfx "${CMAKE_CURRENT_BINARY_DIR}/generated/shaders_embedded.h"
     "${CMAKE_SOURCE_DIR}/shaders/tile.vert"
     "${CMAKE_SOURCE_DIR}/shaders/tile.frag"
+    "${CMAKE_SOURCE_DIR}/shaders/overlay.vert"
+    "${CMAKE_SOURCE_DIR}/shaders/overlay.frag"
   )
 
   add_executable(photobrowse

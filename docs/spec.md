@@ -69,7 +69,7 @@ the primary requirement; features come second.
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). |
 | `Esc` | Leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
 | `Q` / window close | Quit. |
-| `F3` | Toggle performance stats (frame time, loads in flight, cache usage). |
+| `F3` | Toggle performance stats: on-screen overlay in fullscreen (fps, frame time, p99, loads, GPU memory, frame-time graph); window title otherwise. |
 
 - A click is a press+release with < ~4 px of movement; anything more is a drag.
 - Grabbing during momentum or an eased animation stops it immediately.

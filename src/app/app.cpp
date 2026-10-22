@@ -10,8 +10,10 @@
 #include "app/gpu_textures.h"
 #include "app/library_index.h"
 #include "app/streamer.h"
+#include "core/frame_history.h"
 #include "core/frame_stats.h"
 #include "gfx/gl.h"
+#include "gfx/overlay_renderer.h"
 #include "gfx/tile_renderer.h"
 #include "imaging/jpeg.h"
 #include "layout/content.h"
@@ -149,7 +151,11 @@ int App::run(const Options& options) {
     std::unique_ptr<Indexer> indexer;
     GpuTextures textures;
     TileRenderer renderer;
-    if (!renderer.init()) exitCode = 1;
+    OverlayRenderer overlay;
+    if (!renderer.init() || !overlay.init()) exitCode = 1;
+    const FontInfo overlayFont = OverlayRenderer::font();
+    FrameHistory history;  // frame intervals for the fullscreen stats overlay
+    std::vector<OverlayQuad> overlayQuads;
 
     std::unique_ptr<Layout> layout = makeLayout(options.layout);
     layout->build(0);
@@ -201,7 +207,7 @@ int App::run(const Options& options) {
     const uint64_t start = last;
     uint64_t lastTitle = 0;
     bool running = exitCode == 0, reportedGlError = false, animating = true;
-    bool showStats = false, prewarming = false, reportedFirstFrame = false;
+    bool showStats = options.stats, prewarming = false, reportedFirstFrame = false;
     FrameStats intervals, work;  // ms; F3 window or the whole --bench run
     std::optional<BenchScript> bench;
     uint64_t lastSwap = 0, benchStart = 0;
@@ -212,7 +218,9 @@ int App::run(const Options& options) {
 
     while (running) {
       // --- Input ---------------------------------------------------------------
+      // With stats shown, keep rendering at the display rate so the numbers mean something.
       const bool wait = ui.idle() && !animating && !prewarming && !indexer && !options.snapshot && !options.bench &&
+                        !showStats &&
                         (!session.streamer || session.streamer->stats().pendingRequests == 0);
       SDL_Event ev;
       bool have = wait ? SDL_WaitEventTimeout(&ev, 100) : SDL_PollEvent(&ev);
@@ -245,6 +253,7 @@ int App::run(const Options& options) {
               showStats = !showStats;
               intervals.reset();
               work.reset();
+              history.clear();
               if (!showStats) SDL_SetWindowTitle(window, ("PhotoBrowse — " + toUtf8(root.filename())).c_str());
             } else if (k == SDLK_F11 || k == SDLK_F) {
               const bool fs = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN;
@@ -352,6 +361,25 @@ int App::run(const Options& options) {
         }
       }
 
+      // Stats: drawn as an overlay in fullscreen (no title bar there), else in the title.
+      const bool fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN;
+      if (showStats && fullscreen && session.streamer) {
+        const auto st = session.streamer->stats();
+        OverlayStats os;
+        os.frameMs = history.median();
+        os.fps = os.frameMs > 0 ? 1000.0 / os.frameMs : 0;
+        os.p99Ms = history.percentile(99);
+        os.jobs = st.pendingJobs;
+        os.vramMB = double(st.vramBytes) / (1 << 20);
+        os.budgetMB = double(kVramBudget >> 20);
+        os.photos = session.lib.catalog.order.size();
+        os.tiles = draws.size();
+        os.tilePx = layout->count() ? layout->place(0).photo.width() * camera.scale : 0;
+        overlayQuads.clear();
+        buildOverlay(os, history, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), overlayQuads);
+        overlay.draw(camera.viewport, overlayQuads);
+      }
+
       if (GLenum err = gl::GetError(); err != GL_NO_ERROR && !reportedGlError) {
         std::fprintf(stderr, "OpenGL error 0x%x\n", err);
         reportedGlError = true;
@@ -386,6 +414,7 @@ int App::run(const Options& options) {
       }
       if (lastSwap && (bench || showStats)) {
         intervals.add(double(afterSwap - lastSwap) * 1e-6);
+        history.add(double(afterSwap - lastSwap) * 1e-6);
         work.add(double(beforeSwap - now) * 1e-6);
       }
       lastSwap = afterSwap;
@@ -398,7 +427,7 @@ int App::run(const Options& options) {
                     double(afterSwap - beforeSwap) * 1e-6, st.uploadsThisFrame,
                     double(st.uploadBytesThisFrame) / (1 << 20), st.pagesAddedThisFrame, st.fullUploadsThisFrame);
       }
-      if (showStats && session.streamer && afterSwap - lastTitle > 500'000'000ULL) {
+      if (showStats && !fullscreen && session.streamer && afterSwap - lastTitle > 500'000'000ULL) {
         lastTitle = afterSwap;
         const auto st = session.streamer->stats();
         char title[256];

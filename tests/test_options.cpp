@@ -60,3 +60,8 @@ TEST_CASE("options: snapshot") {
   CHECK(*std::get<pb::Options>(r).snapshot == "out.jpg");
   CHECK(std::holds_alternative<std::string>(parse({"--snapshot"})));
 }
+
+TEST_CASE("options: stats starts with the F3 display on") {
+  CHECK_FALSE(std::get<pb::Options>(parse({})).stats);
+  CHECK(std::get<pb::Options>(parse({"--stats"})).stats);
+}
