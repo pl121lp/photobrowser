@@ -189,21 +189,27 @@ std::string defaultConfigText() {
 # graph = false
 
 [background]
-# solid    : color
-# gradient : color at the top, color2 at the bottom
-# vignette : color in the middle, color2 at the edges
-# shader   : your own GLSL fragment shader (see below); falls back to solid on errors
+# mode = solid     : just color
+# mode = gradient  : color at the top, color2 at the bottom (same as shader = gradient)
+# mode = vignette  : color in the middle, color2 at the edges (same as shader = vignette)
+# mode = shader    : a built-in preset or your own shader file, chosen with shader = ...
 # mode = solid
 # color = #17171a
 # color2 = #000000
 #
-# A shader file is a complete "#version 410 core" fragment shader. It may declare
+# Built-in presets (all use color and color2):
+#   still:    gradient, vignette, grain, dots, spotlight
+#   animated: waves, aurora, nebula, bokeh, starfield
+# shader = aurora
+#
+# Or a file: a complete "#version 410 core" fragment shader writing
+# "out vec4 fragColor;". It may declare
 #   uniform vec2 uResolution;  // drawable size in pixels
-#   uniform float uTime;       // seconds since start (animated shaders redraw continuously)
+#   uniform float uTime;       // seconds since start; shaders using it redraw continuously
 #   uniform vec3 uColor;       // color
 #   uniform vec3 uColor2;      // color2
-# and must write "out vec4 fragColor;". Example: ~/.config/photobrowse/background.frag
-# shader =
+# The presets in the source tree's shaders/backgrounds/ folder are good starting points.
+# shader = ~/.config/photobrowse/my-background.frag
 )";
 }
 

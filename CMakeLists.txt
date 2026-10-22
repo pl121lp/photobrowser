@@ -67,9 +67,12 @@ add_library(pb_core STATIC
   src/stream/residency.cpp
   src/app/options.cpp
   src/app/config.cpp
+  src/app/background_presets.cpp
   src/layout/square_grid.cpp
 )
 target_include_directories(pb_core PUBLIC src)
+file(GLOB PB_BACKGROUND_SHADERS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/shaders/backgrounds/*.frag")
+pb_embed_shaders(pb_core "${CMAKE_CURRENT_BINARY_DIR}/generated/core/background_shaders.h" ${PB_BACKGROUND_SHADERS})
 target_link_libraries(pb_core PUBLIC Threads::Threads)
 
 # --- Tests ------------------------------------------------------------------
@@ -90,6 +93,7 @@ add_executable(pb_tests
   tests/test_bench.cpp
   tests/test_overlay.cpp
   tests/test_config.cpp
+  tests/test_background.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
@@ -140,8 +144,7 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     "${CMAKE_SOURCE_DIR}/shaders/tile.frag"
     "${CMAKE_SOURCE_DIR}/shaders/overlay.vert"
     "${CMAKE_SOURCE_DIR}/shaders/overlay.frag"
-    "${CMAKE_SOURCE_DIR}/shaders/background.vert"
-    "${CMAKE_SOURCE_DIR}/shaders/background.frag"
+    "${CMAKE_SOURCE_DIR}/shaders/fullscreen.vert"
   )
 
   add_executable(photobrowse

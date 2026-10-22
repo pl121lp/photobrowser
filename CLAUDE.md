@@ -20,7 +20,9 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
   `src/stream` job system, residency (VRAM slots/budget) · `src/imaging` TurboJPEG,
   resize · `src/app` options, library indexing, streamer (GL-free, via `TextureSink`),
   GL texture sink, SDL app loop · `src/gfx` GL loader, shaders, paged textures,
-  upload ring, tile renderer · `shaders/` GLSL (embedded at build time).
+  upload ring, tile renderer · `shaders/` GLSL (embedded at build time); `shaders/backgrounds/*.frag` are the
+  background presets, picked up automatically by name (add one + its name in
+  `src/app/background_presets.cpp`). Keep animated ones cheap: benchmark at 4K.
 - Libraries: `pb_core` (no deps) → `pb_imaging` (+turbojpeg) → `pb_app` (no SDL/GL)
   → `pb_gfx` + `photobrowse` exe (SDL3, GL).
 

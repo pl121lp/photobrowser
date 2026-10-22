@@ -3,31 +3,30 @@
 #include <array>
 #include <string>
 
+
 #include "core/geom.h"
 #include "gfx/gl.h"
 
 namespace pb {
 
-// Fills the frame behind the photos: a solid clear colour, a built-in gradient or
-// vignette, or a user-supplied GLSL fragment shader.
+// Fills the frame behind the photos: the clear colour alone, or a fullscreen
+// fragment shader (a built-in preset or the user's) given uResolution, uTime,
+// uColor and uColor2.
 class BackgroundRenderer {
  public:
-  enum class Mode { Solid, Gradient, Vignette, Shader };
-
   ~BackgroundRenderer();
-  // `userShader` is the source for Mode::Shader. Returns false (and falls back to
-  // solid) if a shader fails to compile; `error` then says why.
-  bool init(Mode mode, std::array<float, 3> color, std::array<float, 3> color2, const std::string& userShader,
-            std::string& error);
+  // Empty `shaderSource` = solid colour. Returns false (falling back to solid) if
+  // the shader fails to compile; the compiler log goes to stderr.
+  bool init(std::array<float, 3> color, std::array<float, 3> color2, const std::string& shaderSource, bool animated);
   void draw(Vec2d viewportPx, double timeSeconds);
-  bool animated() const { return mode_ == Mode::Shader; }  // needs continuous redraw
+  bool animated() const { return animated_; }  // needs continuous redraw
   const std::array<float, 3>& clearColor() const { return color_; }
 
  private:
-  Mode mode_ = Mode::Solid;
+  bool animated_ = false;
   std::array<float, 3> color_{}, color2_{};
   GLuint program_ = 0, vao_ = 0;
-  GLint uResolution_ = -1, uTime_ = -1, uColor_ = -1, uColor2_ = -1, uMode_ = -1;
+  GLint uResolution_ = -1, uTime_ = -1, uColor_ = -1, uColor2_ = -1;
 };
 
 }  // namespace pb

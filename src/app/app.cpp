@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "app/background_presets.h"
 #include "app/config.h"
 #include "app/gpu_textures.h"
 #include "app/library_index.h"
@@ -164,22 +165,34 @@ int App::run(const Options& options) {
     if (!renderer.init() || !overlay.init()) exitCode = 1;
     BackgroundRenderer background;
     {
-      std::string shaderSource, error;
-      if (config.background == BackgroundMode::Shader) {
-        if (auto src = readWholeFile(config.backgroundShader)) {
-          shaderSource.assign(src->begin(), src->end());
+      // Resolve the background: a built-in preset (by name) or a shader file.
+      std::string source, what = "solid color";
+      bool animated = false;
+      std::string shaderSetting = toUtf8(config.backgroundShader);
+      if (config.background == BackgroundMode::Gradient) shaderSetting = "gradient";
+      if (config.background == BackgroundMode::Vignette) shaderSetting = "vignette";
+      if (config.background != BackgroundMode::Solid) {
+        if (const BackgroundPreset* preset = findBackgroundPreset(shaderSetting)) {
+          source = preset->source;
+          animated = preset->animated;
+          what = "preset " + shaderSetting;
+        } else if (shaderSetting.empty()) {
+          std::fprintf(stderr, "photobrowse: background mode = shader needs shader = <preset or file>\n");
+        } else if (auto file = readWholeFile(config.backgroundShader)) {
+          source.assign(file->begin(), file->end());
+          animated = shaderUsesTime(source);
+          what = "shader file " + shaderSetting;
         } else {
-          std::fprintf(stderr, "photobrowse: background shader '%s' not found; using solid color\n",
-                       toUtf8(config.backgroundShader).c_str());
+          std::fprintf(stderr, "photobrowse: background shader '%s' is not a preset or a readable file\n",
+                       shaderSetting.c_str());
         }
       }
-      const auto mode = config.background == BackgroundMode::Shader && shaderSource.empty()
-                            ? BackgroundRenderer::Mode::Solid
-                            : BackgroundRenderer::Mode(int(config.background));
-      if (!background.init(mode, toLinear(config.backgroundColor), toLinear(config.backgroundColor2), shaderSource,
-                           error)) {
-        std::fprintf(stderr, "photobrowse: %s\n", error.c_str());
+      if (!background.init(toLinear(config.backgroundColor), toLinear(config.backgroundColor2), source, animated)) {
+        std::fprintf(stderr, "photobrowse: background shader failed to compile (details above); using solid color\n");
+        what = "solid color";
+        animated = false;
       }
+      std::printf("background: %s%s\n", what.c_str(), animated ? " (animated)" : "");
     }
     const FontInfo overlayFont = OverlayRenderer::font();
     FrameHistory history;  // frame intervals for the fullscreen stats overlay

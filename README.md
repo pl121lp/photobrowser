@@ -73,16 +73,23 @@ enabled = false            # stats display at startup (F3 toggles)
 graph = false              # frame-time graph in the fullscreen panel
 
 [background]
-mode = solid               # solid | gradient | vignette | shader
-color = #17171a
-color2 = #000000           # gradient bottom / vignette edge
-shader = ~/my-bg.frag      # for mode = shader
+mode = shader              # solid | gradient | vignette | shader
+shader = aurora            # a built-in preset name, or a path to your own .frag
+color = #6fa8dc            # main colour (presets use both colours)
+color2 = #0b1020
 ```
 
-A background shader is a complete `#version 410 core` fragment shader that may use
-`uResolution`, `uTime`, `uColor` and `uColor2`; see
-[docs/examples/background-waves.frag](docs/examples/background-waves.frag). Mistakes
-in the file are reported on the terminal with the line number, and the default is used.
+Built-in background presets (in `shaders/backgrounds/`, compiled into the program):
+
+| Still | Animated |
+|---|---|
+| `gradient`, `vignette`, `grain`, `dots`, `spotlight` | `waves`, `aurora`, `nebula`, `bokeh`, `starfield` |
+
+Animated backgrounds redraw continuously (a little more power); still ones don't.
+Your own shader is a complete `#version 410 core` fragment shader writing
+`out vec4 fragColor` and may use `uResolution`, `uTime`, `uColor`, `uColor2` — copy a
+preset as a starting point. The active background is printed at startup, and
+mistakes in the settings file are reported with the line number.
 
 ### Controls
 
