@@ -260,6 +260,7 @@ std::string defaultConfigText() {
 # hold = 30
 
 [background]
+# The starting background; F6 steps through solid, every preset and your shader file.
 # mode = solid     : just color
 # mode = gradient  : color at the top, color2 at the bottom (same as shader = gradient)
 # mode = vignette  : color in the middle, color2 at the edges (same as shader = vignette)

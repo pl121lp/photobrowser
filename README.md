@@ -126,6 +126,7 @@ mistakes in the settings file are reported with the line number.
 | `F2` | photo info (name, size, date taken, file size) while a photo is open in whole-photo view |
 | `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
 | `F5` | screensaver: tours random photos, flying between them (any click, scroll or key stops it) |
+| `F6` | next background: solid, each built-in preset, your shader file, then solid again |
 | `Q` | quit |
 
 ## Performance testing

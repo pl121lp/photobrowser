@@ -175,38 +175,45 @@ int App::run(const Options& options) {
     OverlayRenderer overlay;
     if (!renderer.init() || !overlay.init()) exitCode = 1;
     BackgroundRenderer background;
-    {
-      // Resolve the background: a built-in preset (by name) or a shader file.
+    // The user's shader file is read once here; F6 switches without file I/O.
+    const std::string userShader = toUtf8(config.backgroundShader);
+    std::string userShaderSource;
+    if (!userShader.empty() && !isPresetName(userShader)) {
+      if (auto file = readWholeFile(config.backgroundShader)) userShaderSource.assign(file->begin(), file->end());
+    }
+    const std::vector<std::string> backgroundChoices = backgroundCycle(userShaderSource.empty() ? "" : userShader);
+    std::string backgroundName;
+    // Switches to a background by name: "solid", a built-in preset, or the shader file.
+    auto setBackground = [&](const std::string& name) {
       std::string source, what = "solid color";
       bool animated = false;
-      std::string shaderSetting = toUtf8(config.backgroundShader);
-      if (config.background == BackgroundMode::Gradient) shaderSetting = "gradient";
-      if (config.background == BackgroundMode::Vignette) shaderSetting = "vignette";
-      if (config.background != BackgroundMode::Solid) {
-        if (const BackgroundPreset* preset = findBackgroundPreset(shaderSetting)) {
-          source = preset->source;
-          animated = preset->animated;
-          what = "preset " + shaderSetting;
-        } else if (shaderSetting.empty()) {
-          std::fprintf(stderr, "photobrowse: background mode = shader needs shader = <preset or file>\n");
-        } else if (auto file = readWholeFile(config.backgroundShader)) {
-          source.assign(file->begin(), file->end());
-          animated = shaderUsesTime(source);
-          what = "shader file " + shaderSetting;
-        } else {
-          std::fprintf(stderr, "photobrowse: background shader '%s' is not a preset or a readable file\n",
-                       shaderSetting.c_str());
-        }
+      if (name == "solid") {  // the clear colour alone
+      } else if (const BackgroundPreset* preset = findBackgroundPreset(name)) {
+        source = preset->source;
+        animated = preset->animated;
+        what = "preset " + name;
+      } else if (!userShaderSource.empty()) {
+        source = userShaderSource;
+        animated = shaderUsesTime(source);
+        what = "shader file " + name;
+      } else {
+        std::fprintf(stderr, "photobrowse: background shader '%s' is not a preset or a readable file\n", name.c_str());
       }
       if (!background.init(toLinear(config.backgroundColor), toLinear(config.backgroundColor2), source, animated)) {
         std::fprintf(stderr, "photobrowse: background shader failed to compile (details above); using solid color\n");
         what = "solid color";
         animated = false;
       }
-      background.setSpeed(float(config.backgroundSpeed));
-      background.setDensity(float(config.backgroundDensity));
+      backgroundName = name;
       std::printf("background: %s%s\n", what.c_str(), animated ? " (animated)" : "");
+      std::fflush(stdout);
+    };
+    if (config.background == BackgroundMode::Shader && config.backgroundShader.empty()) {
+      std::fprintf(stderr, "photobrowse: background mode = shader needs shader = <preset or file>\n");
     }
+    background.setSpeed(float(config.backgroundSpeed));
+    background.setDensity(float(config.backgroundDensity));
+    setBackground(backgroundSetting(config));
     const FontInfo overlayFont = OverlayRenderer::font();
     FrameHistory history;  // frame intervals for the fullscreen stats overlay
     std::vector<OverlayQuad> overlayQuads;
@@ -317,6 +324,8 @@ int App::run(const Options& options) {
               running = false;
             } else if (k == SDLK_F5) {
               setScreensaver(!screensaver.active());
+            } else if (k == SDLK_F6) {
+              setBackground(nextBackground(backgroundChoices, backgroundName));
             } else if (k == SDLK_F2) {
               showInfo = !showInfo;
             } else if (k == SDLK_F3) {

@@ -17,7 +17,8 @@ class BackgroundRenderer {
  public:
   ~BackgroundRenderer();
   // Empty `shaderSource` = solid colour. Returns false (falling back to solid) if
-  // the shader fails to compile; the compiler log goes to stderr.
+  // the shader fails to compile; the compiler log goes to stderr. May be called
+  // again to switch backgrounds; the previous shader is released.
   bool init(std::array<float, 3> color, std::array<float, 3> color2, const std::string& shaderSource, bool animated);
   void setSpeed(float speed) { speed_ = speed; }        // scales uTime
   void setDensity(float density) { density_ = density; }  // uDensity

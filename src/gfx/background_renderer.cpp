@@ -15,6 +15,9 @@ bool BackgroundRenderer::init(std::array<float, 3> color, std::array<float, 3> c
                               const std::string& shaderSource, bool animated) {
   color_ = color;
   color2_ = color2;
+  animated_ = false;
+  if (program_) gl::DeleteProgram(program_);
+  program_ = 0;
   if (shaderSource.empty()) return true;
   program_ = buildProgram(kShader_fullscreen_vert, shaderSource.c_str());
   if (!program_) return false;
@@ -24,7 +27,7 @@ bool BackgroundRenderer::init(std::array<float, 3> color, std::array<float, 3> c
   uColor_ = gl::GetUniformLocation(program_, "uColor");
   uColor2_ = gl::GetUniformLocation(program_, "uColor2");
   uDensity_ = gl::GetUniformLocation(program_, "uDensity");
-  gl::GenVertexArrays(1, &vao_);
+  if (!vao_) gl::GenVertexArrays(1, &vao_);
   return true;
 }
 

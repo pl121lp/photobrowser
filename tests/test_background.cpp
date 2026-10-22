@@ -51,3 +51,38 @@ TEST_CASE("backgrounds: star presets honour the density setting") {
     CHECK_MESSAGE(src.find("uniform float uDensity;") != std::string::npos, name);
   }
 }
+
+TEST_CASE("backgrounds: the F6 cycle is solid, every preset, then the user's shader file") {
+  const auto plain = pb::backgroundCycle("");
+  REQUIRE(plain.size() == 1 + pb::backgroundPresets().size());
+  CHECK(plain[0] == "solid");
+  CHECK(plain[1] == "gradient");
+  CHECK(plain[2] == "vignette");
+  CHECK(plain.back() == "warp");
+  CHECK(pb::backgroundCycle("aurora") == plain);  // a preset is already in the cycle
+  const auto withFile = pb::backgroundCycle("/home/me/my.frag");
+  CHECK(withFile.size() == plain.size() + 1);
+  CHECK(withFile.back() == "/home/me/my.frag");
+}
+
+TEST_CASE("backgrounds: next in the cycle wraps back to solid") {
+  const auto cycle = pb::backgroundCycle("");
+  CHECK(pb::nextBackground(cycle, "solid") == "gradient");
+  CHECK(pb::nextBackground(cycle, "gradient") == "vignette");
+  CHECK(pb::nextBackground(cycle, "warp") == "solid");
+  CHECK(pb::nextBackground(cycle, "unknown") == "solid");
+}
+
+TEST_CASE("backgrounds: the starting entry follows the config") {
+  pb::Config c;
+  CHECK(pb::backgroundSetting(c) == "solid");
+  c.background = pb::BackgroundMode::Gradient;
+  CHECK(pb::backgroundSetting(c) == "gradient");
+  c.background = pb::BackgroundMode::Vignette;
+  CHECK(pb::backgroundSetting(c) == "vignette");
+  c.background = pb::BackgroundMode::Shader;
+  c.backgroundShader = "nebula";
+  CHECK(pb::backgroundSetting(c) == "nebula");
+  c.backgroundShader = "";
+  CHECK(pb::backgroundSetting(c) == "solid");  // shader mode without a shader
+}

@@ -2,7 +2,9 @@
 
 #include <array>
 
+#include "app/config.h"
 #include "background_shaders.h"
+#include "platform/paths.h"
 
 namespace pb {
 
@@ -46,5 +48,29 @@ const BackgroundPreset* findBackgroundPreset(std::string_view name) {
 }
 
 bool isPresetName(std::string_view value) { return findBackgroundPreset(value) != nullptr; }
+
+std::string backgroundSetting(const Config& config) {
+  switch (config.background) {
+    case BackgroundMode::Solid: return "solid";
+    case BackgroundMode::Gradient: return "gradient";
+    case BackgroundMode::Vignette: return "vignette";
+    case BackgroundMode::Shader: break;
+  }
+  return config.backgroundShader.empty() ? "solid" : toUtf8(config.backgroundShader);
+}
+
+std::vector<std::string> backgroundCycle(std::string_view userShader) {
+  std::vector<std::string> cycle{"solid"};
+  for (const auto& p : backgroundPresets()) cycle.emplace_back(p.name);
+  if (!userShader.empty() && !isPresetName(userShader)) cycle.emplace_back(userShader);
+  return cycle;
+}
+
+const std::string& nextBackground(std::span<const std::string> cycle, std::string_view current) {
+  for (size_t i = 0; i < cycle.size(); ++i) {
+    if (cycle[i] == current) return cycle[(i + 1) % cycle.size()];
+  }
+  return cycle.front();
+}
 
 }  // namespace pb
