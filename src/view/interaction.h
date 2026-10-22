@@ -65,6 +65,9 @@ class Interaction {
   void clampFocusPan();
   void beginDrag();
   std::optional<uint32_t> nearestPosition(Vec2d world) const;
+  // The photo in the row above (dir -1) or below (+1) `pos` closest to it horizontally.
+  std::optional<uint32_t> closestInRow(uint32_t pos, int dir) const;
+  void showFocused(uint32_t pos, double t);  // switch the whole-photo view to `pos`
   void handleClick(Vec2d px, double t);
   void clampCenter();  // keeps the view centered over the library
 

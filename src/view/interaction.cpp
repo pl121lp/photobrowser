@@ -168,6 +168,31 @@ std::optional<uint32_t> Interaction::nearestPosition(Vec2d world) const {
   return best;
 }
 
+std::optional<uint32_t> Interaction::closestInRow(uint32_t pos, int dir) const {
+  const Rect cell = layout_.place(pos).cell;
+  const double y = cell.center().y + dir * cell.height(), cx = cell.center().x;
+  const Rect b = layout_.bounds();
+  std::vector<uint32_t> cand;
+  layout_.visible({b.x0, y - cell.height() * 0.25, b.x1, y + cell.height() * 0.25}, cand);
+  std::optional<uint32_t> best;
+  double bestD = std::numeric_limits<double>::max();
+  for (uint32_t p : cand) {
+    const double d = std::abs(layout_.place(p).cell.center().x - cx);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+void Interaction::showFocused(uint32_t pos, double t) {
+  focused_ = pos;
+  resetFocusZoom(true);
+  focusRectValid_ = false;
+  glideTo(layout_.place(pos).cell.center(), cam_.scale, t);
+}
+
 void Interaction::clampCenter() {
   if (layout_.count() == 0) return;
   const Rect b = layout_.bounds();
@@ -290,13 +315,13 @@ bool Interaction::onKey(Key k, double t) {
       case Key::Left:
       case Key::Right: {
         const int64_t step = k == Key::Left ? -1 : 1;
-        const int64_t next = std::clamp<int64_t>(int64_t(*focused_) + step, 0, int64_t(layout_.count()) - 1);
-        focused_ = uint32_t(next);
-        resetFocusZoom(true);
-        focusRectValid_ = false;
-        glideTo(layout_.place(*focused_).cell.center(), cam_.scale, t);
+        showFocused(uint32_t(std::clamp<int64_t>(int64_t(*focused_) + step, 0, int64_t(layout_.count()) - 1)), t);
         return true;
       }
+      case Key::Up:
+      case Key::Down:
+        if (auto p = closestInRow(*focused_, k == Key::Up ? -1 : 1)) showFocused(*p, t);
+        return true;
       case Key::ZoomOut: unfocus(); return true;
       default: return true;
     }

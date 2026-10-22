@@ -122,7 +122,7 @@ mistakes in the settings file are reported with the line number.
 | Double-click / `Enter` / scroll in past max zoom | whole-photo view (uncropped) |
 | Mouse wheel | zoom about the cursor; in whole-photo view, zoom the focused photo up to `max_photo_zoom` |
 | Right-click | reset a zoomed focused photo to fit the window |
-| Arrow keys | move one photo (in whole-photo view: ←/→ previous/next) |
+| Arrow keys | move one photo (in whole-photo view: ←/→ previous/next, ↑/↓ closest photo one row up/down) |
 | `+` / `-` | zoom about the center |
 | `Home` | back to the start view |
 | `F11` or `F` | toggle fullscreen |

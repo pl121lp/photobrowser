@@ -64,7 +64,7 @@ the primary requirement; features come second.
 | Double-click on a photo | Open it in the **whole-photo view** (§3.3). |
 | Mouse wheel | **Smooth zoom about the cursor** (point under cursor stays put), including within whole-photo view. |
 | Right-click | In whole-photo view, reset the focused photo to fit the window. |
-| Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order. |
+| Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order; ↑/↓ the closest photo one row up/down (stays put on the top/bottom row). |
 | `+` / `-` | Zoom in/out around screen center. |
 | `Home` | Return to the start view (center photo). |
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). The app starts fullscreen unless `[display] fullscreen = false` or `--windowed`. |

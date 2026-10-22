@@ -168,6 +168,34 @@ TEST_CASE("interaction: focus left/right steps and clamps") {
   CHECK(f.cam.center == f.layout.place(2).cell.center());
 }
 
+TEST_CASE("interaction: focus up/down jumps one row, clamping at the edges") {
+  Fixture f;  // 20 photos: 5 columns, 4 rows
+  f.ui.openPhoto(7, f.t);  // row 1, column 2
+  f.run(0.5);
+  f.ui.onKey(pb::Key::Down, f.t);
+  CHECK(*f.ui.focused() == 12);
+  f.ui.onKey(pb::Key::Up, f.t);
+  f.ui.onKey(pb::Key::Up, f.t);
+  CHECK(*f.ui.focused() == 2);
+  f.ui.onKey(pb::Key::Up, f.t);  // top row: stays
+  CHECK(*f.ui.focused() == 2);
+  f.run(0.5);
+  CHECK(f.cam.center == f.layout.place(2).cell.center());
+  CHECK(f.ui.focusProgress() == doctest::Approx(1));  // still in whole-photo view
+}
+
+TEST_CASE("interaction: focus down into a shorter last row picks the closest photo") {
+  Fixture f(23);  // 5 columns; the last row holds 20, 21, 22
+  f.ui.openPhoto(19, f.t);  // row 3, last column
+  f.run(0.5);
+  f.ui.onKey(pb::Key::Down, f.t);
+  CHECK(*f.ui.focused() == 22);
+  f.ui.onKey(pb::Key::Down, f.t);  // bottom row: stays
+  CHECK(*f.ui.focused() == 22);
+  f.ui.onKey(pb::Key::Up, f.t);
+  CHECK(*f.ui.focused() == 17);
+}
+
 TEST_CASE("interaction: drag leaves focus") {
   Fixture f;
   f.ui.onKey(pb::Key::Enter, 0);
