@@ -56,6 +56,7 @@ add_library(pb_core STATIC
   src/view/camera.cpp
   src/view/motion.cpp
   src/view/interaction.cpp
+  src/library/exif.cpp
   src/layout/square_grid.cpp
 )
 target_include_directories(pb_core PUBLIC src)
@@ -70,6 +71,7 @@ add_executable(pb_tests
   tests/test_camera.cpp
   tests/test_motion.cpp
   tests/test_interaction.cpp
+  tests/test_exif.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
