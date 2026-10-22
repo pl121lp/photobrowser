@@ -115,6 +115,7 @@ mistakes in the settings file are reported with the line number.
 | `Home` | back to the start view |
 | `F11` or `F` | toggle fullscreen |
 | `Esc` | leave whole-photo view, then fullscreen |
+| `F2` | photo info (name, size, date taken, file size) while a photo is open in whole-photo view |
 | `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
 | `Q` | quit |
 

@@ -258,7 +258,7 @@ int App::run(const Options& options) {
     const uint64_t start = last;
     uint64_t lastTitle = 0;
     bool running = exitCode == 0, reportedGlError = false, animating = true;
-    bool showStats = config.stats, prewarming = false, reportedFirstFrame = false;
+    bool showStats = config.stats, showInfo = false, prewarming = false, reportedFirstFrame = false;
     FrameStats intervals, work, backgroundGpu;  // ms; F3 window or the whole --bench run
     if (options.bench) background.enableTiming();
     std::optional<BenchScript> bench;
@@ -301,6 +301,8 @@ int App::run(const Options& options) {
             const SDL_Keycode k = ev.key.key;
             if (k == SDLK_Q) {
               running = false;
+            } else if (k == SDLK_F2) {
+              showInfo = !showInfo;
             } else if (k == SDLK_F3) {
               showStats = !showStats;
               intervals.reset();
@@ -434,6 +436,17 @@ int App::run(const Options& options) {
         overlayQuads.clear();
         buildOverlay(os, history, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), overlayQuads,
                      config.statsGraph);
+        overlay.draw(camera.viewport, overlayQuads);
+      }
+
+      // Photo info (F2): only once a photo is fully open in whole-photo view.
+      if (const auto f = ui.focused(); showInfo && f && ui.focusProgress() >= 1 && session.streamer &&
+                                       *f < session.lib.catalog.order.size()) {
+        const PhotoRecord& rec = session.lib.catalog.photos[session.lib.catalog.order[*f]];
+        const PhotoInfo info{rec.relPath, rec.width, rec.height, rec.takenAt, rec.takenAt == rec.mtime, rec.fileSize};
+        overlayQuads.clear();
+        buildPhotoInfo(info, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,
+                       overlayQuads);
         overlay.draw(camera.viewport, overlayQuads);
       }
 

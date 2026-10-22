@@ -69,6 +69,7 @@ the primary requirement; features come second.
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). |
 | `Esc` | Leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
 | `Q` / window close | Quit. |
+| `F2` | Toggle photo info: while a photo is fully open in whole-photo view, a bottom-left panel shows its file name, width × height (megapixels), date taken (EXIF; file modification date if none) and file size. Off by default. |
 | `F3` | Toggle performance stats: on-screen overlay in fullscreen (fps, frame time, p99, loads, GPU memory, frame-time graph); window title otherwise. |
 
 - A click is a press+release with < ~4 px of movement; anything more is a drag.

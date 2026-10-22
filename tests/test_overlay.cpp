@@ -122,3 +122,70 @@ TEST_CASE("overlay: graph can be turned off") {
   CHECK(small.height() < big.height());
   CHECK(small.width() < big.width());
 }
+
+namespace {
+pb::PhotoInfo info() {
+  pb::PhotoInfo p;
+  p.name = "IMG_1234.jpg";
+  p.width = 4032;
+  p.height = 3024;
+  p.takenAt = 1715954602;  // 2024-05-17 14:03:22
+  p.fileSize = 3565158;    // 3.4 MB
+  return p;
+}
+}  // namespace
+
+TEST_CASE("photo info: date formatting") {
+  CHECK(pb::formatDateTime(0) == "1970-01-01 00:00:00");
+  CHECK(pb::formatDateTime(1715954602) == "2024-05-17 14:03:22");
+  CHECK(pb::formatDateTime(951782400) == "2000-02-29 00:00:00");  // leap day
+  CHECK(pb::formatDateTime(-1) == "1969-12-31 23:59:59");
+}
+
+TEST_CASE("photo info: lines") {
+  auto lines = pb::photoInfoLines(info());
+  REQUIRE(lines.size() == 4);
+  CHECK(lines[0] == "IMG_1234.jpg");
+  CHECK(lines[1] == "4032 x 3024  12.2 MP");
+  CHECK(lines[2] == "Taken 2024-05-17 14:03:22");
+  CHECK(lines[3] == "3.4 MB");
+}
+
+TEST_CASE("photo info: file date is labelled as such, unknown size skipped") {
+  auto p = info();
+  p.dateFromFile = true;
+  p.width = p.height = 0;
+  auto lines = pb::photoInfoLines(p);
+  REQUIRE(lines.size() == 3);
+  CHECK(lines[1] == "Modified 2024-05-17 14:03:22");
+}
+
+TEST_CASE("photo info: name is the file name only, long names shortened") {
+  auto p = info();
+  p.name = "2024/holiday/IMG_1234.jpg";
+  CHECK(pb::photoInfoLines(p)[0] == "IMG_1234.jpg");
+  p.name = std::string(100, 'a') + ".jpg";
+  const auto first = pb::photoInfoLines(p)[0];
+  CHECK(first.size() == 48);
+  CHECK(first.ends_with("a.jpg"));
+  CHECK(first.find("...") != std::string::npos);
+}
+
+TEST_CASE("photo info: panel sits in the bottom-left corner and holds its text") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Vec2d viewport{1920, 1080};
+  const pb::Rect panel = pb::buildPhotoInfo(info(), kFont, 1.0, viewport, q);
+  REQUIRE_FALSE(q.empty());
+  CHECK(q[0].rect == panel);
+  CHECK(q[0].color[3] < 1);
+  CHECK(panel.x0 > 0);
+  CHECK(panel.x0 < 100);
+  CHECK(panel.y1 < viewport.y);
+  CHECK(panel.y1 > viewport.y - 100);
+  for (const auto& quad : q) {
+    CHECK(quad.rect.x0 >= panel.x0 - 1e-9);
+    CHECK(quad.rect.x1 <= panel.x1 + 1e-9);
+    CHECK(quad.rect.y0 >= panel.y0 - 1e-9);
+    CHECK(quad.rect.y1 <= panel.y1 + 1e-9);
+  }
+}

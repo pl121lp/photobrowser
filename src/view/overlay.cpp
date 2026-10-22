@@ -107,6 +107,58 @@ Rect buildOverlay(const OverlayStats& s, const FrameHistory& history, const Font
   return panel;
 }
 
+std::string formatDateTime(int64_t seconds) {
+  // Civil date from days since 1970 (Howard Hinnant's algorithm), no time zone involved.
+  int64_t days = seconds / 86400, secs = seconds % 86400;
+  if (secs < 0) secs += 86400, --days;
+  const int64_t z = days + 719468, era = (z >= 0 ? z : z - 146096) / 146097;
+  const int64_t doe = z - era * 146097, yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
+  const int64_t day = doy - (153 * mp + 2) / 5 + 1, month = mp < 10 ? mp + 3 : mp - 9;
+  const int64_t year = yoe + era * 400 + (month <= 2);
+  char t[96];
+  std::snprintf(t, sizeof t, "%04lld-%02lld-%02lld %02lld:%02lld:%02lld", (long long)year, (long long)month,
+                (long long)day, (long long)(secs / 3600), (long long)(secs / 60 % 60), (long long)(secs % 60));
+  return t;
+}
+
+std::vector<std::string> photoInfoLines(const PhotoInfo& p) {
+  constexpr size_t kMaxName = 48;
+  std::vector<std::string> lines;
+  std::string name = p.name.substr(p.name.find_last_of('/') + 1);
+  if (name.size() > kMaxName) {
+    const size_t tail = (kMaxName - 3) / 2;
+    name = name.substr(0, kMaxName - 3 - tail) + "..." + name.substr(name.size() - tail);
+  }
+  lines.push_back(name);
+  char t[96];
+  if (p.width && p.height) {
+    std::snprintf(t, sizeof t, "%u x %u  %.1f MP", p.width, p.height, double(p.width) * p.height / 1e6);
+    lines.push_back(t);
+  }
+  lines.push_back((p.dateFromFile ? "Modified " : "Taken ") + formatDateTime(p.takenAt));
+  std::snprintf(t, sizeof t, "%.1f MB", double(p.fileSize) / (1 << 20));
+  lines.push_back(t);
+  return lines;
+}
+
+Rect buildPhotoInfo(const PhotoInfo& p, const FontInfo& font, double scale, Vec2d viewport,
+                    std::vector<OverlayQuad>& out) {
+  const auto lines = photoInfoLines(p);
+  size_t longest = 0;
+  for (const auto& l : lines) longest = std::max(longest, l.size());
+  const double pad = kPadding * scale, lineH = font.cellH * scale;
+  const double x0 = kMargin * scale, y1 = viewport.y - kMargin * scale;
+  const Rect panel{x0, y1 - 2 * pad - double(lines.size()) * lineH, x0 + double(longest) * font.cellW * scale + 2 * pad,
+                   y1};
+  out.push_back(solid(OverlayQuad::Kind::Panel, panel, font, 0, 0, 0, 0.6f));
+  const float white[4] = {0.95f, 0.95f, 0.95f, 1}, grey[4] = {0.7f, 0.7f, 0.7f, 1};
+  for (size_t i = 0; i < lines.size(); ++i) {
+    layoutText(lines[i], {x0 + pad, panel.y0 + pad + double(i) * lineH}, scale, i == 0 ? white : grey, font, out);
+  }
+  return panel;
+}
+
 std::vector<OverlayQuad> overlayBars(const std::vector<OverlayQuad>& quads) {
   std::vector<OverlayQuad> bars;
   std::copy_if(quads.begin(), quads.end(), std::back_inserter(bars),

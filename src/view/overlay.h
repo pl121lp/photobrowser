@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -46,6 +47,22 @@ std::string statsTitle(const OverlayStats& s);
 // rect. `scale` is the display's pixel density.
 Rect buildOverlay(const OverlayStats& s, const FrameHistory& history, const FontInfo& font, double scale,
                   std::vector<OverlayQuad>& out, bool graph = true);
+
+// Basic metadata of the photo in whole-photo view (F2), all from the catalog.
+struct PhotoInfo {
+  std::string name;  // relative path; only the file name is shown
+  uint32_t width = 0, height = 0;  // after EXIF orientation; 0 if unknown
+  int64_t takenAt = 0;             // naive local time stored as seconds since 1970
+  bool dateFromFile = false;       // no EXIF date: takenAt is the file's modification time
+  uint64_t fileSize = 0;
+};
+
+// "YYYY-MM-DD HH:MM:SS" for a naive time stored as seconds since 1970.
+std::string formatDateTime(int64_t seconds);
+std::vector<std::string> photoInfoLines(const PhotoInfo& p);
+// Photo info panel in the bottom-left corner of a `viewport`-sized screen. Returns the panel rect.
+Rect buildPhotoInfo(const PhotoInfo& p, const FontInfo& font, double scale, Vec2d viewport,
+                    std::vector<OverlayQuad>& out);
 
 std::vector<OverlayQuad> overlayBars(const std::vector<OverlayQuad>& quads);
 
