@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <optional>
 
@@ -170,6 +171,19 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("auto, integrated or discrete");
       }
+    } else if (key == "background.speed" || key == "background.density") {
+      const bool speed = key == "background.speed";
+      const double lo = speed ? 0.0 : 0.1, hi = speed ? 10.0 : 4.0;
+      if (auto d = parseNumber(value)) {
+        if (*d < lo || *d > hi) {
+          char msg[96];
+          std::snprintf(msg, sizeof msg, " must be between %g and %g; clamped", lo, hi);
+          warn(key + msg);
+        }
+        (speed ? c.backgroundSpeed : c.backgroundDensity) = std::clamp(*d, lo, hi);
+      } else {
+        bad("a number");
+      }
     } else if (key == "background.shader") {
       c.backgroundShader = value.empty() ? fs::path{} : expandPath(value);
     } else {
@@ -217,6 +231,11 @@ std::string defaultConfigText() {
 # color = #17171a
 # color2 = #000000
 #
+# Animation speed of animated backgrounds (1 = normal, 0.5 = half, 2 = double, 0 = frozen):
+# speed = 1
+# How many stars / lights the warp, starfield and bokeh presets show (0.1 to 4):
+# density = 1
+#
 # Built-in presets (all use color and color2):
 #   still:    gradient, vignette, grain, dots, spotlight
 #   animated: waves, aurora, nebula, bokeh, starfield, warp
@@ -228,7 +247,8 @@ std::string defaultConfigText() {
 #   uniform float uTime;       // seconds since start; shaders using it redraw continuously
 #   uniform vec3 uColor;       // color
 #   uniform vec3 uColor2;      // color2
-# The presets in the source tree's shaders/backgrounds/ folder are good starting points.
+#   uniform float uDensity;    // density
+# (uTime already includes speed.) The presets in the source tree's shaders/backgrounds/ folder are good starting points.
 # shader = ~/.config/photobrowse/my-background.frag
 )";
 }

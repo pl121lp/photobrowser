@@ -80,6 +80,8 @@ mode = shader              # solid | gradient | vignette | shader
 shader = aurora            # a built-in preset name, or a path to your own .frag
 color = #6fa8dc            # main colour (presets use both colours)
 color2 = #0b1020
+speed = 1                  # animation speed: 0.5 = half, 2 = double, 0 = frozen
+density = 1                # stars/lights in warp, starfield, bokeh (0.1 to 4)
 ```
 
 `gpu = discrete` runs on the dedicated GPU (NVIDIA PRIME offload, or `DRI_PRIME=1`
@@ -95,7 +97,8 @@ Built-in background presets (in `shaders/backgrounds/`, compiled into the progra
 
 Animated backgrounds redraw continuously (a little more power); still ones don't.
 Your own shader is a complete `#version 410 core` fragment shader writing
-`out vec4 fragColor` and may use `uResolution`, `uTime`, `uColor`, `uColor2` — copy a
+`out vec4 fragColor` and may use `uResolution`, `uTime` (already scaled by `speed`),
+`uColor`, `uColor2` and `uDensity` — copy a
 preset as a starting point. The active background is printed at startup, and
 mistakes in the settings file are reported with the line number.
 

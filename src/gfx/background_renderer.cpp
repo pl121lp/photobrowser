@@ -23,6 +23,7 @@ bool BackgroundRenderer::init(std::array<float, 3> color, std::array<float, 3> c
   uTime_ = gl::GetUniformLocation(program_, "uTime");
   uColor_ = gl::GetUniformLocation(program_, "uColor");
   uColor2_ = gl::GetUniformLocation(program_, "uColor2");
+  uDensity_ = gl::GetUniformLocation(program_, "uDensity");
   gl::GenVertexArrays(1, &vao_);
   return true;
 }
@@ -31,7 +32,8 @@ void BackgroundRenderer::draw(Vec2d viewportPx, double timeSeconds) {
   if (!program_) return;  // solid: the clear colour is the background
   gl::UseProgram(program_);
   gl::Uniform2f(uResolution_, float(viewportPx.x), float(viewportPx.y));
-  gl::Uniform1f(uTime_, float(timeSeconds));
+  gl::Uniform1f(uTime_, float(timeSeconds * speed_));
+  gl::Uniform1f(uDensity_, density_);
   gl::Uniform3f(uColor_, color_[0], color_[1], color_[2]);
   gl::Uniform3f(uColor2_, color2_[0], color2_[1], color2_[2]);
   gl::BindVertexArray(vao_);

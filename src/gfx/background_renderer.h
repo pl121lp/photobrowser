@@ -19,6 +19,8 @@ class BackgroundRenderer {
   // Empty `shaderSource` = solid colour. Returns false (falling back to solid) if
   // the shader fails to compile; the compiler log goes to stderr.
   bool init(std::array<float, 3> color, std::array<float, 3> color2, const std::string& shaderSource, bool animated);
+  void setSpeed(float speed) { speed_ = speed; }        // scales uTime
+  void setDensity(float density) { density_ = density; }  // uDensity
   void draw(Vec2d viewportPx, double timeSeconds);
   // GPU time of the most recent completed background pass (ms), when measured.
   void enableTiming() { timing_ = true; }
@@ -30,7 +32,8 @@ class BackgroundRenderer {
   bool animated_ = false;
   std::array<float, 3> color_{}, color2_{};
   GLuint program_ = 0, vao_ = 0;
-  GLint uResolution_ = -1, uTime_ = -1, uColor_ = -1, uColor2_ = -1;
+  GLint uResolution_ = -1, uTime_ = -1, uColor_ = -1, uColor2_ = -1, uDensity_ = -1;
+  float speed_ = 1, density_ = 1;
   bool timing_ = false;
   GLuint queries_[3] = {};  // ring: results are read a couple of frames later
   int queryNext_ = 0, queriesIssued_ = 0;

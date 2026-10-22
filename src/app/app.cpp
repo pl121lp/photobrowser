@@ -200,6 +200,8 @@ int App::run(const Options& options) {
         what = "solid color";
         animated = false;
       }
+      background.setSpeed(float(config.backgroundSpeed));
+      background.setDensity(float(config.backgroundDensity));
       std::printf("background: %s%s\n", what.c_str(), animated ? " (animated)" : "");
     }
     const FontInfo overlayFont = OverlayRenderer::font();

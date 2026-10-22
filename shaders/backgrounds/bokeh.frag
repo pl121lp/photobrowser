@@ -6,6 +6,7 @@ uniform vec2 uResolution;
 uniform float uTime;
 uniform vec3 uColor;
 uniform vec3 uColor2;
+uniform float uDensity;  // light count multiplier (config: density)
 out vec4 fragColor;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -20,7 +21,7 @@ void main() {
     vec2 p = uv * cells + vec2(fl * 7.3, -uTime * speed * cells);
     vec2 cell = floor(p);
     float h = hash(cell);
-    if (h < 0.55) continue;
+    if (h < 1.0 - 0.45 * uDensity) continue;
     float r = 0.12 + 0.2 * hash(cell + 1.9);
     vec2 center = vec2(r) + (1.0 - 2.0 * r) * vec2(hash(cell + 3.1), hash(cell + 7.7));
     float d = length(fract(p) - center);

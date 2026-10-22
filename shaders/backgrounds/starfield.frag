@@ -4,6 +4,7 @@ uniform vec2 uResolution;
 uniform float uTime;
 uniform vec3 uColor;
 uniform vec3 uColor2;
+uniform float uDensity;  // star count multiplier (config: density)
 out vec4 fragColor;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
@@ -16,7 +17,7 @@ void main() {
     vec2 p = gl_FragCoord.xy / cellSize + vec2(uTime * (0.05 + fl * 0.04), fl * 13.0);
     vec2 cell = floor(p);
     float h = hash(cell);
-    if (h > 0.7) {
+    if (h > 1.0 - 0.3 * uDensity) {
       vec2 star = vec2(hash(cell + 1.7), hash(cell + 4.3)) * 0.8 + 0.1;
       float d = length(fract(p) - star) * cellSize;
       float twinkle = 0.6 + 0.4 * sin(uTime * (1.0 + h * 3.0) + h * 40.0);

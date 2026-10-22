@@ -44,6 +44,8 @@ struct Config {
   Rgb8 backgroundColor{0x17, 0x17, 0x1a};
   Rgb8 backgroundColor2{0x00, 0x00, 0x00};
   std::filesystem::path backgroundShader;
+  double backgroundSpeed = 1.0;    // time scale for animated backgrounds (0..10)
+  double backgroundDensity = 1.0;  // star/light count multiplier (0.1..4): warp, starfield, bokeh
   GpuPreference gpu = GpuPreference::Auto;
   friend bool operator==(const Config&, const Config&) = default;
 };

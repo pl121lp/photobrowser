@@ -7,6 +7,7 @@ uniform vec2 uResolution;
 uniform float uTime;
 uniform vec3 uColor;
 uniform vec3 uColor2;
+uniform float uDensity;  // star count multiplier (config: density)
 out vec4 fragColor;
 
 // Arithmetic hash (no sin): cheap on integrated GPUs.
@@ -38,7 +39,7 @@ void main() {
   vec3 starColor = mix(uColor, vec3(1.0), 0.6);
   for (int layer = 0; layer < 2; ++layer) {
     float fl = float(layer);
-    float rays = 120.0 + fl * 90.0;
+    float rays = floor((120.0 + fl * 90.0) * uDensity) + 1.0;
     float s = angle * rays + fl * 0.37;
     float id = floor(s) + fl * 1000.0;
     float h = hash(id);

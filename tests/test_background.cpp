@@ -44,3 +44,10 @@ TEST_CASE("backgrounds: a shader setting is a preset name or a file") {
   CHECK_FALSE(pb::isPresetName("/home/me/aurora"));
   CHECK_FALSE(pb::isPresetName("unknown"));
 }
+
+TEST_CASE("backgrounds: star presets honour the density setting") {
+  for (auto name : {"warp", "starfield", "bokeh"}) {
+    const std::string src = pb::findBackgroundPreset(name)->source;
+    CHECK_MESSAGE(src.find("uniform float uDensity;") != std::string::npos, name);
+  }
+}

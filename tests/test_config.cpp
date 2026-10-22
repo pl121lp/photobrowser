@@ -167,3 +167,23 @@ TEST_CASE("gpu: environment for each preference") {
   CHECK(clears(igpu, "__NV_PRIME_RENDER_OFFLOAD"));
   CHECK(clears(igpu, "__GLX_VENDOR_LIBRARY_NAME"));
 }
+
+TEST_CASE("config: background speed and density") {
+  CHECK(pb::Config{}.backgroundSpeed == 1.0);
+  CHECK(pb::Config{}.backgroundDensity == 1.0);
+  auto r = pb::parseConfig("[background]\nspeed = 2.5\ndensity = 0.5\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.backgroundSpeed == doctest::Approx(2.5));
+  CHECK(r.config.backgroundDensity == doctest::Approx(0.5));
+  auto clamped = pb::parseConfig("[background]\nspeed = 50\ndensity = 0\n");
+  CHECK(clamped.config.backgroundSpeed == doctest::Approx(10));
+  CHECK(clamped.config.backgroundDensity == doctest::Approx(0.1));
+  CHECK(hasWarning(clamped, "line 2"));
+  CHECK(hasWarning(clamped, "line 3"));
+  auto bad = pb::parseConfig("[background]\nspeed = fast\n");
+  CHECK(bad.config.backgroundSpeed == 1.0);
+  CHECK(hasWarning(bad, "line 2"));
+  const std::string text = pb::defaultConfigText();
+  CHECK(text.find("speed = 1") != std::string::npos);
+  CHECK(text.find("density = 1") != std::string::npos);
+}
