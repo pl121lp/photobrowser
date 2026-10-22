@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace pb {
@@ -21,6 +22,18 @@ std::array<float, 3> toLinear(Rgb8 c);
 
 enum class BackgroundMode { Solid, Gradient, Vignette, Shader };
 
+// Which GPU renders on hybrid laptops. Auto leaves the system's choice (and any
+// launcher such as switcherooctl / prime-run) alone.
+enum class GpuPreference { Auto, Integrated, Discrete };
+
+// Environment variables that select the GPU for OpenGL (Linux; glvnd + Mesa/NVIDIA).
+// Applied before SDL starts. `nvidiaDriver`: the NVIDIA driver is loaded.
+struct GpuEnvironment {
+  std::vector<std::pair<std::string, std::string>> set;
+  std::vector<std::string> unset;
+};
+GpuEnvironment gpuEnvironment(GpuPreference preference, bool nvidiaDriver);
+
 // User settings from config.ini (see defaultConfigText() for documentation).
 struct Config {
   std::filesystem::path photoFolder = "photos";
@@ -31,6 +44,7 @@ struct Config {
   Rgb8 backgroundColor{0x17, 0x17, 0x1a};
   Rgb8 backgroundColor2{0x00, 0x00, 0x00};
   std::filesystem::path backgroundShader;
+  GpuPreference gpu = GpuPreference::Auto;
   friend bool operator==(const Config&, const Config&) = default;
 };
 

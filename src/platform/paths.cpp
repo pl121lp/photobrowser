@@ -95,6 +95,31 @@ std::optional<std::vector<uint8_t>> readWholeFile(const fs::path& path) {
   return readFileRange(path, 0, UINT64_MAX);
 }
 
+void setEnvironment(const std::string& name, const std::string& value) {
+#ifdef _WIN32
+  _putenv_s(name.c_str(), value.c_str());
+#else
+  setenv(name.c_str(), value.c_str(), 1);
+#endif
+}
+
+void unsetEnvironment(const std::string& name) {
+#ifdef _WIN32
+  _putenv_s(name.c_str(), "");
+#else
+  unsetenv(name.c_str());
+#endif
+}
+
+bool nvidiaDriverLoaded() {
+#ifdef __linux__
+  std::error_code ec;
+  return fs::exists("/proc/driver/nvidia/version", ec);
+#else
+  return false;
+#endif
+}
+
 void lowerCurrentThreadPriority() {
 #ifdef _WIN32
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);

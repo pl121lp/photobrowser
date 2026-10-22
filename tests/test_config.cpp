@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
+
 #include "app/config.h"
 #include "app/options.h"
 #include "test_util.h"
@@ -124,4 +126,44 @@ TEST_CASE("config: sRGB colours convert to linear for rendering") {
   CHECK(pb::toLinear({0, 0, 0})[0] == 0);
   CHECK(pb::toLinear({255, 255, 255})[1] == doctest::Approx(1));
   CHECK(pb::toLinear({128, 0, 0})[0] == doctest::Approx(0.2158).epsilon(0.01));
+}
+
+TEST_CASE("config: gpu preference") {
+  CHECK(pb::Config{}.gpu == pb::GpuPreference::Auto);
+  CHECK(pb::parseConfig("[display]\ngpu = discrete\n").config.gpu == pb::GpuPreference::Discrete);
+  CHECK(pb::parseConfig("[display]\ngpu = integrated\n").config.gpu == pb::GpuPreference::Integrated);
+  auto bad = pb::parseConfig("[display]\ngpu = fastest\n");
+  CHECK(bad.config.gpu == pb::GpuPreference::Auto);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("gpu = auto") != std::string::npos);
+}
+
+TEST_CASE("gpu: environment for each preference") {
+  using pb::GpuPreference;
+  auto has = [](const pb::GpuEnvironment& e, const char* name, const char* value) {
+    for (const auto& [n, v] : e.set) {
+      if (n == name && v == value) return true;
+    }
+    return false;
+  };
+  auto clears = [](const pb::GpuEnvironment& e, const char* name) {
+    return std::find(e.unset.begin(), e.unset.end(), name) != e.unset.end();
+  };
+  const auto autoEnv = pb::gpuEnvironment(GpuPreference::Auto, true);
+  CHECK(autoEnv.set.empty());
+  CHECK(autoEnv.unset.empty());
+
+  const auto nv = pb::gpuEnvironment(GpuPreference::Discrete, true);
+  CHECK(has(nv, "__NV_PRIME_RENDER_OFFLOAD", "1"));
+  CHECK(has(nv, "__GLX_VENDOR_LIBRARY_NAME", "nvidia"));
+  CHECK(has(nv, "__VK_LAYER_NV_optimus", "NVIDIA_only"));
+
+  const auto other = pb::gpuEnvironment(GpuPreference::Discrete, false);  // e.g. AMD + Intel
+  CHECK(has(other, "DRI_PRIME", "1"));
+  CHECK_FALSE(has(other, "__GLX_VENDOR_LIBRARY_NAME", "nvidia"));  // would break GLX without NVIDIA
+
+  const auto igpu = pb::gpuEnvironment(GpuPreference::Integrated, true);
+  CHECK(has(igpu, "DRI_PRIME", "0"));
+  CHECK(clears(igpu, "__NV_PRIME_RENDER_OFFLOAD"));
+  CHECK(clears(igpu, "__GLX_VENDOR_LIBRARY_NAME"));
 }

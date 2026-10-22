@@ -159,6 +159,17 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a colour like #1a2b3c");
       }
+    } else if (key == "display.gpu") {
+      const std::string g = lower(value);
+      if (g == "auto") {
+        c.gpu = GpuPreference::Auto;
+      } else if (g == "integrated") {
+        c.gpu = GpuPreference::Integrated;
+      } else if (g == "discrete") {
+        c.gpu = GpuPreference::Discrete;
+      } else {
+        bad("auto, integrated or discrete");
+      }
     } else if (key == "background.shader") {
       c.backgroundShader = value.empty() ? fs::path{} : expandPath(value);
     } else {
@@ -187,6 +198,15 @@ std::string defaultConfigText() {
 # enabled = false
 # Add a frame-time graph (last 4 seconds) to the on-screen panel.
 # graph = false
+
+[display]
+# Which graphics chip draws on laptops with two (e.g. Intel + NVIDIA):
+#   auto       : the system's default (usually the power-saving integrated one);
+#                launchers such as switcherooctl or prime-run still work
+#   integrated : always the integrated GPU (best battery life)
+#   discrete   : the dedicated GPU (more headroom: high-refresh monitors, heavy shaders)
+# Linux only; on Windows use Settings > System > Display > Graphics.
+# gpu = auto
 
 [background]
 # mode = solid     : just color
@@ -241,6 +261,29 @@ fs::path defaultConfigPath() {
   if (const char* h = std::getenv("HOME"); h && *h) return fs::path(h) / ".config" / "photobrowse" / "config.ini";
 #endif
   return fs::path("photobrowse") / "config.ini";
+}
+
+GpuEnvironment gpuEnvironment(GpuPreference preference, bool nvidiaDriver) {
+  GpuEnvironment e;
+  switch (preference) {
+    case GpuPreference::Auto:
+      break;
+    case GpuPreference::Discrete:
+      if (nvidiaDriver) {
+        // NVIDIA PRIME render offload (glvnd picks NVIDIA's GLX/EGL implementation).
+        e.set = {{"__NV_PRIME_RENDER_OFFLOAD", "1"},
+                 {"__GLX_VENDOR_LIBRARY_NAME", "nvidia"},
+                 {"__VK_LAYER_NV_optimus", "NVIDIA_only"}};
+      } else {
+        e.set = {{"DRI_PRIME", "1"}};  // Mesa: the non-default (discrete) GPU
+      }
+      break;
+    case GpuPreference::Integrated:
+      e.set = {{"DRI_PRIME", "0"}};
+      e.unset = {"__NV_PRIME_RENDER_OFFLOAD", "__GLX_VENDOR_LIBRARY_NAME", "__VK_LAYER_NV_optimus"};
+      break;
+  }
+  return e;
 }
 
 void applyOptions(Config& config, const Options& options) {

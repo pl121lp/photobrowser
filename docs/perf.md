@@ -57,3 +57,17 @@ reads are served from the OS cache).
 
 No dropped frames. The measured p99 interval (≈18 ms) is swap-timing jitter around
 the 16.7 ms vsync, not missed frames.
+
+### Integrated vs discrete GPU (2026-10-21, 10k photos, fullscreen 4K)
+
+| GPU | background | p50 / p99 interval | max | CPU work p99 |
+|---|---|---|---|---|
+| Intel UHD 630 | solid | 16.7 / 18.0–18.2 ms | 18.7 ms | 9–11 ms |
+| Intel UHD 630 | aurora | 16.7 / 17.9–18.3 ms | 20.0 ms | 11–16 ms |
+| RTX 2080 Super Max-Q (PRIME offload) | solid | 16.7 / 17.9–18.1 ms | 24 ms (1–2 frames) | 6.3 ms |
+| RTX 2080 Super Max-Q (PRIME offload) | aurora | 16.7 / 18.1 ms | 20.2 ms (1–2 frames) | 6.2–6.6 ms |
+
+Both reach the 60 Hz panel's limit. The NVIDIA GPU halves CPU time per frame and has
+far more GPU headroom (useful for high-refresh monitors or heavy shaders); its few
+20–24 ms frames are likely the PRIME copy to the Intel-driven panel. Select it with
+`[display] gpu = discrete`.

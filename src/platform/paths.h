@@ -32,6 +32,12 @@ std::filesystem::path fromUtf8(const std::string& s);
 // render thread wins the CPU when all cores are busy decoding.
 void lowerCurrentThreadPriority();
 
+// Process environment (used to pick the GPU before the graphics driver loads).
+void setEnvironment(const std::string& name, const std::string& value);
+void unsetEnvironment(const std::string& name);
+// True if NVIDIA's proprietary driver is loaded (Linux); false elsewhere.
+bool nvidiaDriverLoaded();
+
 uint64_t fnv1a(const void* data, size_t n, uint64_t seed = 0xcbf29ce484222325ULL);
 
 }  // namespace pb

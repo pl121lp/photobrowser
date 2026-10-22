@@ -119,6 +119,14 @@ int App::run(const Options& options) {
   if (options.rebuildCache) fs::remove_all(libDir, ec);
   fs::create_directories(libDir, ec);
 
+  // GPU choice must be in the environment before SDL loads the OpenGL driver.
+  if (config.gpu != GpuPreference::Auto) {
+    const GpuEnvironment env = gpuEnvironment(config.gpu, nvidiaDriverLoaded());
+    for (const auto& name : env.unset) unsetEnvironment(name);
+    for (const auto& [name, value] : env.set) setEnvironment(name, value);
+    std::printf("gpu: %s requested\n", config.gpu == GpuPreference::Discrete ? "discrete" : "integrated");
+  }
+
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
     return 1;

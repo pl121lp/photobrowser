@@ -72,12 +72,20 @@ gap = 0.03                 # space around photos, 0 = none, max 0.2
 enabled = false            # stats display at startup (F3 toggles)
 graph = false              # frame-time graph in the fullscreen panel
 
+[display]
+gpu = auto                 # auto | integrated | discrete (laptops with two GPUs, Linux)
+
 [background]
 mode = shader              # solid | gradient | vignette | shader
 shader = aurora            # a built-in preset name, or a path to your own .frag
 color = #6fa8dc            # main colour (presets use both colours)
 color2 = #0b1020
 ```
+
+`gpu = discrete` runs on the dedicated GPU (NVIDIA PRIME offload, or `DRI_PRIME=1`
+for other dual-GPU setups); the startup line `OpenGL: ...` shows which one is used.
+With `auto`, launchers such as `switcherooctl launch -g 1 photobrowse` also work. On
+Windows choose the GPU in Settings > System > Display > Graphics.
 
 Built-in background presets (in `shaders/backgrounds/`, compiled into the program):
 
