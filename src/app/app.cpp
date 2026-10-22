@@ -363,9 +363,9 @@ int App::run(const Options& options) {
 
       // Stats: drawn as an overlay in fullscreen (no title bar there), else in the title.
       const bool fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN;
-      if (showStats && fullscreen && session.streamer) {
+      OverlayStats os;
+      if (showStats && session.streamer) {
         const auto st = session.streamer->stats();
-        OverlayStats os;
         os.frameMs = history.median();
         os.fps = os.frameMs > 0 ? 1000.0 / os.frameMs : 0;
         os.p99Ms = history.percentile(99);
@@ -375,6 +375,8 @@ int App::run(const Options& options) {
         os.photos = session.lib.catalog.order.size();
         os.tiles = draws.size();
         os.tilePx = layout->count() ? layout->place(0).photo.width() * camera.scale : 0;
+      }
+      if (showStats && fullscreen && session.streamer) {
         overlayQuads.clear();
         buildOverlay(os, history, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), overlayQuads);
         overlay.draw(camera.viewport, overlayQuads);
@@ -429,12 +431,10 @@ int App::run(const Options& options) {
       }
       if (showStats && !fullscreen && session.streamer && afterSwap - lastTitle > 500'000'000ULL) {
         lastTitle = afterSwap;
-        const auto st = session.streamer->stats();
-        char title[256];
-        std::snprintf(title, sizeof title, "PhotoBrowse — %.0f fps · p99 %.1f ms · jobs %zu · VRAM %.0f/%zu MB",
-                      intervals.count() ? 1000.0 / intervals.percentile(50) : 0.0, intervals.percentile(99),
-                      st.pendingJobs, double(st.vramBytes) / (1 << 20), kVramBudget >> 20);
-        SDL_SetWindowTitle(window, title);
+        // The title updates twice a second, so it summarizes that half second.
+        os.fps = intervals.count() ? 1000.0 / intervals.percentile(50) : 0.0;
+        os.p99Ms = intervals.percentile(99);
+        SDL_SetWindowTitle(window, statsTitle(os).c_str());
         intervals.reset();
         work.reset();
       }

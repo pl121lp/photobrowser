@@ -55,6 +55,13 @@ std::vector<std::string> overlayLines(const OverlayStats& s) {
   return {a, b, c};
 }
 
+std::string statsTitle(const OverlayStats& s) {
+  char t[256];
+  std::snprintf(t, sizeof t, "PhotoBrowse — %.0f fps · p99 %.1f ms · %zu photos · jobs %zu · VRAM %.0f/%.0f MB", s.fps,
+                s.p99Ms, s.photos, s.jobs, s.vramMB, s.budgetMB);
+  return t;
+}
+
 Rect buildOverlay(const OverlayStats& s, const FrameHistory& history, const FontInfo& font, double scale,
                   std::vector<OverlayQuad>& out) {
   const auto lines = overlayLines(s);

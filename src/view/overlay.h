@@ -38,6 +38,8 @@ void layoutText(std::string_view text, Vec2d origin, double scale, const float c
                 std::vector<OverlayQuad>& out);
 
 std::vector<std::string> overlayLines(const OverlayStats& s);
+// Window-title form of the stats, for windowed mode (UTF-8).
+std::string statsTitle(const OverlayStats& s);
 
 // Stats panel in the top-left corner: background, text lines, and a frame-time graph
 // (one bar per recorded frame, 0..50 ms, with a line at 16.7 ms). Returns the panel

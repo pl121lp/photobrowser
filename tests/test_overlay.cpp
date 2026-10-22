@@ -106,3 +106,7 @@ TEST_CASE("frame history: percentile") {
   CHECK(h.percentile(50) == doctest::Approx(50).epsilon(0.03));
   CHECK(pb::FrameHistory(5).percentile(99) == 0);
 }
+
+TEST_CASE("overlay: window title shows the same stats including photo count") {
+  CHECK(pb::statsTitle(stats()) == "PhotoBrowse — 60 fps · p99 17.9 ms · 10000 photos · jobs 3 · VRAM 341/640 MB");
+}
