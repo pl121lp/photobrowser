@@ -53,6 +53,9 @@ find_package(Threads REQUIRED)
 # --- pb_core: pure logic, no SDL / GL / codec dependencies -------------------
 add_library(pb_core STATIC
   src/layout/content.cpp
+  src/view/camera.cpp
+  src/view/motion.cpp
+  src/view/interaction.cpp
   src/layout/square_grid.cpp
 )
 target_include_directories(pb_core PUBLIC src)
@@ -64,6 +67,9 @@ add_executable(pb_tests
   tests/test_main.cpp
   tests/test_geom.cpp
   tests/test_layout.cpp
+  tests/test_camera.cpp
+  tests/test_motion.cpp
+  tests/test_interaction.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
