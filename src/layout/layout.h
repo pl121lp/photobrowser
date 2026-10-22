@@ -34,6 +34,6 @@ class Layout {
   virtual ContentMode contentMode() const = 0;
 };
 
-std::unique_ptr<Layout> makeLayout(std::string_view name);
+std::unique_ptr<Layout> makeLayout(std::string_view name, double gap = 0.03);
 
 }  // namespace pb

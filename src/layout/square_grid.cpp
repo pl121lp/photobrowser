@@ -62,8 +62,8 @@ std::optional<uint32_t> SquareGridLayout::hit(Vec2d world) const {
   return pos;
 }
 
-std::unique_ptr<Layout> makeLayout(std::string_view name) {
-  if (name == "square-crop") return std::make_unique<SquareGridLayout>();
+std::unique_ptr<Layout> makeLayout(std::string_view name, double gap) {
+  if (name == "square-crop") return std::make_unique<SquareGridLayout>(gap);
   return nullptr;
 }
 

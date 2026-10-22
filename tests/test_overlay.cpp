@@ -111,3 +111,14 @@ TEST_CASE("overlay: window title shows the same stats including photo count") {
   CHECK(pb::statsTitle(stats()) ==
         "PhotoBrowse — 60 fps · p99 17.9 ms · 10000 photos · 412 tiles · 128 px · jobs 3 · VRAM 341/640 MB");
 }
+
+TEST_CASE("overlay: graph can be turned off") {
+  pb::FrameHistory h(240);
+  for (int i = 0; i < 50; ++i) h.add(16.7);
+  std::vector<pb::OverlayQuad> with, without;
+  const auto big = pb::buildOverlay(stats(), h, kFont, 1.0, with, true);
+  const auto small = pb::buildOverlay(stats(), h, kFont, 1.0, without, false);
+  CHECK(pb::overlayBars(without).empty());
+  CHECK(small.height() < big.height());
+  CHECK(small.width() < big.width());
+}

@@ -113,3 +113,11 @@ TEST_CASE("content: whole-photo morph endpoints and no distortion") {
   const double visibleAspect = a * (gm.uv.u1 - gm.uv.u0) / (gm.uv.v1 - gm.uv.v0);
   CHECK(visibleAspect == doctest::Approx(gm.rect.width() / gm.rect.height()));
 }
+
+TEST_CASE("grid: zero gap means photos touch") {
+  pb::SquareGridLayout g(0.0);
+  g.build(4);
+  CHECK(g.place(3).photo == g.place(3).cell);
+  CHECK(g.hit({1.0001, 1.5}).value() == 3);
+  CHECK(pb::makeLayout("square-crop", 0.1) != nullptr);
+}

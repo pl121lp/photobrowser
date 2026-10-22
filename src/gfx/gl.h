@@ -41,6 +41,9 @@ namespace pb::gl {
   X(PFNGLGETUNIFORMLOCATIONPROC, GetUniformLocation)               \
   X(PFNGLUNIFORM1IPROC, Uniform1i)                                 \
   X(PFNGLUNIFORM2FPROC, Uniform2f)                                 \
+  X(PFNGLUNIFORM1FPROC, Uniform1f)                                 \
+  X(PFNGLUNIFORM3FPROC, Uniform3f)                                 \
+  X(PFNGLDRAWARRAYSPROC, DrawArrays)                               \
   X(PFNGLGENVERTEXARRAYSPROC, GenVertexArrays)                     \
   X(PFNGLBINDVERTEXARRAYPROC, BindVertexArray)                     \
   X(PFNGLDELETEVERTEXARRAYSPROC, DeleteVertexArrays)               \

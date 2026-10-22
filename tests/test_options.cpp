@@ -15,7 +15,7 @@ TEST_CASE("options: defaults") {
   auto r = parse({});
   REQUIRE(std::holds_alternative<pb::Options>(r));
   auto& o = std::get<pb::Options>(r);
-  CHECK(o.photoDir == "photos");
+  CHECK_FALSE(o.photoDir);
   CHECK_FALSE(o.cacheDir);
   CHECK_FALSE(o.rebuildCache);
   CHECK(o.layout == "square-crop");
@@ -27,7 +27,7 @@ TEST_CASE("options: folder and flags") {
   auto r = parse({"/data/pics", "--cache-dir", "/tmp/c", "--rebuild-cache", "--layout", "square-crop", "--bench"});
   REQUIRE(std::holds_alternative<pb::Options>(r));
   auto& o = std::get<pb::Options>(r);
-  CHECK(o.photoDir == "/data/pics");
+  CHECK(*o.photoDir == "/data/pics");
   CHECK(*o.cacheDir == "/tmp/c");
   CHECK(o.rebuildCache);
   CHECK(o.bench);
@@ -64,4 +64,10 @@ TEST_CASE("options: snapshot") {
 TEST_CASE("options: stats starts with the F3 display on") {
   CHECK_FALSE(std::get<pb::Options>(parse({})).stats);
   CHECK(std::get<pb::Options>(parse({"--stats"})).stats);
+}
+
+TEST_CASE("options: config file and no default folder") {
+  auto o = std::get<pb::Options>(parse({"--config", "/tmp/x.ini"}));
+  CHECK(*o.configFile == "/tmp/x.ini");
+  CHECK_FALSE(o.photoDir);  // the folder comes from the config unless given
 }

@@ -43,13 +43,15 @@ void TileRenderer::beginFrame(Vec2d viewportPx, const float clearRgb[3]) {
   gl::Viewport(0, 0, GLsizei(viewportPx.x), GLsizei(viewportPx.y));
   gl::ClearColor(clearRgb[0], clearRgb[1], clearRgb[2], 1);
   gl::Clear(GL_COLOR_BUFFER_BIT);
-  gl::UseProgram(program_);
-  gl::Uniform2f(uViewport_, float(viewportPx.x), float(viewportPx.y));
-  gl::BindVertexArray(vao_);
+  viewport_ = viewportPx;
 }
 
 void TileRenderer::draw(GLuint tex, GLuint texPrev, std::span<const TileInstance> tiles) {
   if (tiles.empty()) return;
+  // Bound per draw: other passes (background, overlay) use their own programs.
+  gl::UseProgram(program_);
+  gl::Uniform2f(uViewport_, float(viewport_.x), float(viewport_.y));
+  gl::BindVertexArray(vao_);
   gl::ActiveTexture(GL_TEXTURE0);
   gl::BindTexture(GL_TEXTURE_2D, tex);
   gl::ActiveTexture(GL_TEXTURE1);

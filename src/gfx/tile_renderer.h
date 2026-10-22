@@ -27,6 +27,7 @@ class TileRenderer {
   GLuint program_ = 0, vao_ = 0, vbo_ = 0;
   GLint uViewport_ = -1;
   size_t capacity_ = 0;
+  Vec2d viewport_;
 };
 
 }  // namespace pb

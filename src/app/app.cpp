@@ -7,11 +7,13 @@
 #include <memory>
 #include <vector>
 
+#include "app/config.h"
 #include "app/gpu_textures.h"
 #include "app/library_index.h"
 #include "app/streamer.h"
 #include "core/frame_history.h"
 #include "core/frame_stats.h"
+#include "gfx/background_renderer.h"
 #include "gfx/gl.h"
 #include "gfx/overlay_renderer.h"
 #include "gfx/tile_renderer.h"
@@ -99,10 +101,17 @@ struct Session {
 }  // namespace
 
 int App::run(const Options& options) {
+  // Settings: config file, then command-line overrides.
+  const fs::path configPath = options.configFile ? *options.configFile : defaultConfigPath();
+  ConfigResult loaded = loadConfig(configPath, !options.configFile);
+  for (const auto& w : loaded.warnings) std::fprintf(stderr, "photobrowse: %s\n", w.c_str());
+  Config config = loaded.config;
+  applyOptions(config, options);
+
   std::error_code ec;
-  const fs::path root = fs::absolute(options.photoDir, ec);
+  const fs::path root = fs::absolute(config.photoFolder, ec);
   if (ec || !fs::is_directory(root, ec)) {
-    std::fprintf(stderr, "photobrowse: photo folder '%s' does not exist\n", toUtf8(options.photoDir).c_str());
+    std::fprintf(stderr, "photobrowse: photo folder '%s' does not exist\n", toUtf8(config.photoFolder).c_str());
     return 2;
   }
   const fs::path libDir = libraryCacheDir(options.cacheDir ? fs::absolute(*options.cacheDir) : defaultCacheRoot(), root);
@@ -153,11 +162,30 @@ int App::run(const Options& options) {
     TileRenderer renderer;
     OverlayRenderer overlay;
     if (!renderer.init() || !overlay.init()) exitCode = 1;
+    BackgroundRenderer background;
+    {
+      std::string shaderSource, error;
+      if (config.background == BackgroundMode::Shader) {
+        if (auto src = readWholeFile(config.backgroundShader)) {
+          shaderSource.assign(src->begin(), src->end());
+        } else {
+          std::fprintf(stderr, "photobrowse: background shader '%s' not found; using solid color\n",
+                       toUtf8(config.backgroundShader).c_str());
+        }
+      }
+      const auto mode = config.background == BackgroundMode::Shader && shaderSource.empty()
+                            ? BackgroundRenderer::Mode::Solid
+                            : BackgroundRenderer::Mode(int(config.background));
+      if (!background.init(mode, toLinear(config.backgroundColor), toLinear(config.backgroundColor2), shaderSource,
+                           error)) {
+        std::fprintf(stderr, "photobrowse: %s\n", error.c_str());
+      }
+    }
     const FontInfo overlayFont = OverlayRenderer::font();
     FrameHistory history;  // frame intervals for the fullscreen stats overlay
     std::vector<OverlayQuad> overlayQuads;
 
-    std::unique_ptr<Layout> layout = makeLayout(options.layout);
+    std::unique_ptr<Layout> layout = makeLayout(options.layout, config.gap);
     layout->build(0);
     Camera camera;
     int pw = 0, ph = 0;
@@ -180,7 +208,7 @@ int App::run(const Options& options) {
       session.streamer->setL0(session.lib.l0);
       session.streamer->setUploadTimeBudget(3.0);
       const std::string title = session.lib.catalog.order.empty()
-                                    ? "PhotoBrowse — no photos in " + toUtf8(options.photoDir)
+                                    ? "PhotoBrowse — no photos in " + toUtf8(config.photoFolder)
                                     : "PhotoBrowse — " + toUtf8(root.filename());
       SDL_SetWindowTitle(window, title.c_str());
     };
@@ -199,7 +227,7 @@ int App::run(const Options& options) {
       indexer->start();
     }
 
-    const float clear[3] = {0.008f, 0.008f, 0.009f};
+    const float clear[3] = {background.clearColor()[0], background.clearColor()[1], background.clearColor()[2]};
     std::vector<TileDraw> draws;
     std::vector<std::pair<uint64_t, TileInstance>> keyed;
     std::vector<TileInstance> batch;
@@ -207,7 +235,7 @@ int App::run(const Options& options) {
     const uint64_t start = last;
     uint64_t lastTitle = 0;
     bool running = exitCode == 0, reportedGlError = false, animating = true;
-    bool showStats = options.stats, prewarming = false, reportedFirstFrame = false;
+    bool showStats = config.stats, prewarming = false, reportedFirstFrame = false;
     FrameStats intervals, work;  // ms; F3 window or the whole --bench run
     std::optional<BenchScript> bench;
     uint64_t lastSwap = 0, benchStart = 0;
@@ -220,7 +248,7 @@ int App::run(const Options& options) {
       // --- Input ---------------------------------------------------------------
       // With stats shown, keep rendering at the display rate so the numbers mean something.
       const bool wait = ui.idle() && !animating && !prewarming && !indexer && !options.snapshot && !options.bench &&
-                        !showStats &&
+                        !showStats && !background.animated() &&
                         (!session.streamer || session.streamer->stats().pendingRequests == 0);
       SDL_Event ev;
       bool have = wait ? SDL_WaitEventTimeout(&ev, 100) : SDL_PollEvent(&ev);
@@ -312,6 +340,7 @@ int App::run(const Options& options) {
       // --- Draw ------------------------------------------------------------------
       const uint64_t tPre = SDL_GetTicksNS();
       renderer.beginFrame(camera.viewport, clear);
+      background.draw(camera.viewport, seconds(now - start));
       const uint64_t tBegin = SDL_GetTicksNS();
       uint64_t tStream = tBegin;
       animating = false;
@@ -378,7 +407,8 @@ int App::run(const Options& options) {
       }
       if (showStats && fullscreen && session.streamer) {
         overlayQuads.clear();
-        buildOverlay(os, history, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), overlayQuads);
+        buildOverlay(os, history, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), overlayQuads,
+                     config.statsGraph);
         overlay.draw(camera.viewport, overlayQuads);
       }
 

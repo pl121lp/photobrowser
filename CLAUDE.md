@@ -12,6 +12,8 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
 - `docs/perf.md` — benchmark method, results, and the causes of past hitches.
 
 ## Module map
+- `src/app/config` user settings (config.ini) — new settings go there with a
+  documented entry in `defaultConfigText()` and a test.
 - `src/core` geometry, levels, frame stats · `src/view` camera, motion, interaction,
   bench script · `src/layout` layouts and crop/fit math · `src/library` EXIF, catalog,
   scanner, indexer (decode helpers) · `src/cache` l0.pack + per-level JPEG cache ·

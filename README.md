@@ -41,6 +41,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 
 | Option | |
 |---|---|
+| `--config <file>` | settings file to use instead of the default location |
 | `--cache-dir <dir>` | thumbnail cache root (default: `$XDG_CACHE_HOME` or `~/.cache`; `%LOCALAPPDATA%` on Windows) |
 | `--rebuild-cache` | discard this library's cache and re-index |
 | `--layout square-crop` | layout mode (only one so far) |
@@ -53,6 +54,35 @@ small preview most cameras embed are read from the start of each file, so 10,000
 photos take seconds. Later runs open instantly from the cache in
 `<cache>/photobrowse/<library-hash>/`. The photo folder is never modified. Photos
 added or removed while the app runs show up on the next launch.
+
+### Settings file
+
+On first run PhotoBrowse writes a documented settings file to
+`~/.config/photobrowse/config.ini` (`%APPDATA%\photobrowse\config.ini` on Windows);
+`--config <file>` uses another one. Uncomment a line to change it:
+
+```ini
+[library]
+folder = ~/Pictures        # photo folder (the command-line folder wins)
+
+[view]
+gap = 0.03                 # space around photos, 0 = none, max 0.2
+
+[stats]
+enabled = false            # stats display at startup (F3 toggles)
+graph = false              # frame-time graph in the fullscreen panel
+
+[background]
+mode = solid               # solid | gradient | vignette | shader
+color = #17171a
+color2 = #000000           # gradient bottom / vignette edge
+shader = ~/my-bg.frag      # for mode = shader
+```
+
+A background shader is a complete `#version 410 core` fragment shader that may use
+`uResolution`, `uTime`, `uColor` and `uColor2`; see
+[docs/examples/background-waves.frag](docs/examples/background-waves.frag). Mistakes
+in the file are reported on the terminal with the line number, and the default is used.
 
 ### Controls
 

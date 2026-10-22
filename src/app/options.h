@@ -8,7 +8,8 @@
 namespace pb {
 
 struct Options {
-  std::filesystem::path photoDir = "photos";
+  std::optional<std::filesystem::path> photoDir;    // overrides the config file
+  std::optional<std::filesystem::path> configFile;  // instead of the default location
   std::optional<std::filesystem::path> cacheDir;
   bool rebuildCache = false;
   std::string layout = "square-crop";

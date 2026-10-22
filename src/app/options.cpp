@@ -9,7 +9,10 @@ namespace pb {
 std::string usage() {
   return "Usage: photobrowse [photo-folder] [options]\n"
          "\n"
-         "  photo-folder          folder with JPEG photos (default: ./photos), scanned recursively\n"
+         "  photo-folder          folder with JPEG photos, scanned recursively\n"
+         "                        (default: [library] folder in the config file, else ./photos)\n"
+         "  --config <file>       settings file (default: ~/.config/photobrowse/config.ini,\n"
+         "                        created with documented defaults on first run)\n"
          "  --cache-dir <dir>     thumbnail cache root (default: per-user cache directory)\n"
          "  --rebuild-cache       discard this library's cache and re-index\n"
          "  --layout <name>       layout mode: square-crop (default)\n"
@@ -34,6 +37,10 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv) {
       auto v = value();
       if (!v) return std::string("--cache-dir needs a directory");
       o.cacheDir = *v;
+    } else if (a == "--config") {
+      auto v = value();
+      if (!v) return std::string("--config needs a file");
+      o.configFile = *v;
     } else if (a == "--rebuild-cache") {
       o.rebuildCache = true;
     } else if (a == "--layout") {

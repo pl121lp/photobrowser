@@ -42,10 +42,10 @@ std::vector<std::string> overlayLines(const OverlayStats& s);
 std::string statsTitle(const OverlayStats& s);
 
 // Stats panel in the top-left corner: background, text lines, and a frame-time graph
-// (one bar per recorded frame, 0..50 ms, with a line at 16.7 ms). Returns the panel
+// (one bar per recorded frame, 0..50 ms, with a line at 16.7 ms) when `graph`. Returns the panel
 // rect. `scale` is the display's pixel density.
 Rect buildOverlay(const OverlayStats& s, const FrameHistory& history, const FontInfo& font, double scale,
-                  std::vector<OverlayQuad>& out);
+                  std::vector<OverlayQuad>& out, bool graph = true);
 
 std::vector<OverlayQuad> overlayBars(const std::vector<OverlayQuad>& quads);
 

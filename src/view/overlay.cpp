@@ -64,16 +64,17 @@ std::string statsTitle(const OverlayStats& s) {
 }
 
 Rect buildOverlay(const OverlayStats& s, const FrameHistory& history, const FontInfo& font, double scale,
-                  std::vector<OverlayQuad>& out) {
+                  std::vector<OverlayQuad>& out, bool graph) {
   const auto lines = overlayLines(s);
   size_t longest = 0;
   for (const auto& l : lines) longest = std::max(longest, l.size());
   const double pad = kPadding * scale, lineH = font.cellH * scale;
   const double textW = double(longest) * font.cellW * scale;
-  const double graphW = double(history.capacity()) * kBarW * scale, graphH = kGraphH * scale;
+  const double graphW = graph ? double(history.capacity()) * kBarW * scale : 0;
+  const double graphH = graph ? kGraphH * scale : 0, graphGap = graph ? kGap * scale : 0;
   const double x0 = kMargin * scale, y0 = kMargin * scale;
   const double innerW = std::max(textW, graphW);
-  const Rect panel{x0, y0, x0 + innerW + 2 * pad, y0 + pad + double(lines.size()) * lineH + kGap * scale + graphH + pad};
+  const Rect panel{x0, y0, x0 + innerW + 2 * pad, y0 + pad + double(lines.size()) * lineH + graphGap + graphH + pad};
 
   out.push_back(solid(OverlayQuad::Kind::Panel, panel, font, 0, 0, 0, 0.75f));
 
@@ -81,6 +82,8 @@ Rect buildOverlay(const OverlayStats& s, const FrameHistory& history, const Font
   for (size_t i = 0; i < lines.size(); ++i) {
     layoutText(lines[i], {x0 + pad, y0 + pad + double(i) * lineH}, scale, white, font, out);
   }
+
+  if (!graph) return panel;
 
   // Frame-time graph, newest frame on the right.
   const double gx = x0 + pad, gy = panel.y1 - pad - graphH;
