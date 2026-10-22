@@ -19,7 +19,7 @@ bool shaderUsesTime(std::string_view source) {
 
 std::span<const BackgroundPreset> backgroundPresets() {
   static const std::array presets = [] {
-    std::array<BackgroundPreset, 10> p = {{
+    std::array<BackgroundPreset, 11> p = {{
         {"gradient", kShader_gradient_frag, false},
         {"vignette", kShader_vignette_frag, false},
         {"grain", kShader_grain_frag, false},
@@ -30,6 +30,7 @@ std::span<const BackgroundPreset> backgroundPresets() {
         {"nebula", kShader_nebula_frag, false},
         {"bokeh", kShader_bokeh_frag, false},
         {"starfield", kShader_starfield_frag, false},
+        {"warp", kShader_warp_frag, false},
     }};
     for (auto& preset : p) preset.animated = shaderUsesTime(preset.source);
     return p;

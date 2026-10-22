@@ -257,7 +257,8 @@ int App::run(const Options& options) {
     uint64_t lastTitle = 0;
     bool running = exitCode == 0, reportedGlError = false, animating = true;
     bool showStats = config.stats, prewarming = false, reportedFirstFrame = false;
-    FrameStats intervals, work;  // ms; F3 window or the whole --bench run
+    FrameStats intervals, work, backgroundGpu;  // ms; F3 window or the whole --bench run
+    if (options.bench) background.enableTiming();
     std::optional<BenchScript> bench;
     uint64_t lastSwap = 0, benchStart = 0;
     if (options.bench) {
@@ -361,6 +362,7 @@ int App::run(const Options& options) {
       // --- Draw ------------------------------------------------------------------
       const uint64_t tPre = SDL_GetTicksNS();
       renderer.beginFrame(camera.viewport, clear);
+      if (auto gpuMs = background.takeGpuMs(); gpuMs && bench) backgroundGpu.add(*gpuMs);
       background.draw(camera.viewport, seconds(now - start));
       const uint64_t tBegin = SDL_GetTicksNS();
       uint64_t tStream = tBegin;
@@ -447,6 +449,10 @@ int App::run(const Options& options) {
         std::printf("bench: cpu work ms p50=%.2f p99=%.2f max=%.2f | VRAM %.0f MB, jobs pending %zu\n",
                     work.percentile(50), work.percentile(99), work.max(),
                     double(session.streamer->stats().vramBytes) / (1 << 20), session.streamer->stats().pendingJobs);
+        if (backgroundGpu.count()) {
+          std::printf("bench: background shader GPU ms p50=%.2f p99=%.2f max=%.2f\n", backgroundGpu.percentile(50),
+                      backgroundGpu.percentile(99), backgroundGpu.max());
+        }
         if (options.snapshot && !saveSnapshot(*options.snapshot, camera.viewport)) exitCode = 1;
         running = false;
       }

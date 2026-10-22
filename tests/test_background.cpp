@@ -11,7 +11,7 @@ TEST_CASE("backgrounds: built-in presets, static and animated") {
     REQUIRE_MESSAGE(p, name);
     CHECK_FALSE_MESSAGE(p->animated, name);
   }
-  for (auto name : {"waves", "aurora", "nebula", "bokeh", "starfield"}) {
+  for (auto name : {"waves", "aurora", "nebula", "bokeh", "starfield", "warp"}) {
     const auto* p = pb::findBackgroundPreset(name);
     REQUIRE_MESSAGE(p, name);
     CHECK_MESSAGE(p->animated, name);

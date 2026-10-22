@@ -219,7 +219,7 @@ std::string defaultConfigText() {
 #
 # Built-in presets (all use color and color2):
 #   still:    gradient, vignette, grain, dots, spotlight
-#   animated: waves, aurora, nebula, bokeh, starfield
+#   animated: waves, aurora, nebula, bokeh, starfield, warp
 # shader = aurora
 #
 # Or a file: a complete "#version 410 core" fragment shader writing

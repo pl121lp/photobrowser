@@ -71,3 +71,23 @@ Both reach the 60 Hz panel's limit. The NVIDIA GPU halves CPU time per frame and
 far more GPU headroom (useful for high-refresh monitors or heavy shaders); its few
 20–24 ms frames are likely the PRIME copy to the Intel-driven panel. Select it with
 `[display] gpu = discrete`.
+
+### Background shader GPU cost (2026-10-21, Intel UHD 630, fullscreen 4K)
+
+`--bench` now also reports the background pass's GPU time (GL timer query).
+Budget: the whole frame must fit in 16.7 ms; keep backgrounds around 4–5 ms (p50)
+on this GPU. A do-nothing animated shader costs 1.7 ms (pure 4K fill).
+
+| Preset | p50 | p99 |
+|---|---|---|
+| gradient / vignette / spotlight / waves | 2.3–2.5 ms | 4.0 ms |
+| dots / grain | 2.6–2.9 ms | 4.5–5.7 ms |
+| aurora | 4.2 ms | 7.7 ms |
+| starfield | 4.3 ms | 7.3 ms |
+| warp | 4.4 ms | 7.5–8.8 ms |
+| bokeh | 4.5 ms | 7.4 ms |
+| nebula | 6.6 ms | 9.0 ms (occasional dropped frame) |
+
+Warp went from 6.4 to 4.4 ms by skipping the streak math for pixels that are not
+on a streak (early `continue`), fewer layers and a cheaper hash; replacing `atan`
+saved only ~0.5 ms. Measure before optimizing shaders.

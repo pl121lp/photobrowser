@@ -6,6 +6,7 @@
 namespace pb {
 
 BackgroundRenderer::~BackgroundRenderer() {
+  if (queries_[0]) gl::DeleteQueries(3, queries_);
   if (vao_) gl::DeleteVertexArrays(1, &vao_);
   if (program_) gl::DeleteProgram(program_);
 }
@@ -34,7 +35,27 @@ void BackgroundRenderer::draw(Vec2d viewportPx, double timeSeconds) {
   gl::Uniform3f(uColor_, color_[0], color_[1], color_[2]);
   gl::Uniform3f(uColor2_, color2_[0], color2_[1], color2_[2]);
   gl::BindVertexArray(vao_);
+  if (timing_) {
+    if (!queries_[0]) gl::GenQueries(3, queries_);
+    gl::BeginQuery(GL_TIME_ELAPSED, queries_[queryNext_]);
+  }
   gl::DrawArrays(GL_TRIANGLES, 0, 3);
+  if (timing_) {
+    gl::EndQuery(GL_TIME_ELAPSED);
+    queryNext_ = (queryNext_ + 1) % 3;
+    ++queriesIssued_;
+  }
+}
+
+std::optional<double> BackgroundRenderer::takeGpuMs() {
+  if (!timing_ || queriesIssued_ < 3) return std::nullopt;
+  const GLuint q = queries_[queryNext_];  // oldest in the ring
+  GLint ready = 0;
+  gl::GetQueryObjectiv(q, GL_QUERY_RESULT_AVAILABLE, &ready);
+  if (!ready) return std::nullopt;
+  GLuint64 ns = 0;
+  gl::GetQueryObjectui64v(q, GL_QUERY_RESULT, &ns);
+  return double(ns) * 1e-6;
 }
 
 }  // namespace pb

@@ -44,6 +44,12 @@ namespace pb::gl {
   X(PFNGLUNIFORM1FPROC, Uniform1f)                                 \
   X(PFNGLUNIFORM3FPROC, Uniform3f)                                 \
   X(PFNGLDRAWARRAYSPROC, DrawArrays)                               \
+  X(PFNGLGENQUERIESPROC, GenQueries)                               \
+  X(PFNGLDELETEQUERIESPROC, DeleteQueries)                         \
+  X(PFNGLBEGINQUERYPROC, BeginQuery)                               \
+  X(PFNGLENDQUERYPROC, EndQuery)                                   \
+  X(PFNGLGETQUERYOBJECTIVPROC, GetQueryObjectiv)                   \
+  X(PFNGLGETQUERYOBJECTUI64VPROC, GetQueryObjectui64v)             \
   X(PFNGLGENVERTEXARRAYSPROC, GenVertexArrays)                     \
   X(PFNGLBINDVERTEXARRAYPROC, BindVertexArray)                     \
   X(PFNGLDELETEVERTEXARRAYSPROC, DeleteVertexArrays)               \

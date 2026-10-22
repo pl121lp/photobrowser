@@ -91,7 +91,7 @@ Built-in background presets (in `shaders/backgrounds/`, compiled into the progra
 
 | Still | Animated |
 |---|---|
-| `gradient`, `vignette`, `grain`, `dots`, `spotlight` | `waves`, `aurora`, `nebula`, `bokeh`, `starfield` |
+| `gradient`, `vignette`, `grain`, `dots`, `spotlight` | `waves`, `aurora`, `nebula`, `bokeh`, `starfield`, `warp` |
 
 Animated backgrounds redraw continuously (a little more power); still ones don't.
 Your own shader is a complete `#version 410 core` fragment shader writing
