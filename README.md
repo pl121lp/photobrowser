@@ -15,8 +15,10 @@ Design documents: [docs/spec.md](docs/spec.md), [docs/architecture.md](docs/arch
 | SDL3 | `sudo apt install libsdl3-dev` | via vcpkg (`vcpkg.json`) |
 | libjpeg-turbo | `sudo apt install libturbojpeg0-dev` | via vcpkg (`vcpkg.json`) |
 | FFmpeg (optional, video plugin) | `sudo apt install libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev` | vcpkg `ffmpeg` (with `avformat`, `avcodec`, `swscale`, `swresample`) |
+| libcurl (optional, maptiles plugin) | `sudo apt install libcurl4-openssl-dev` | vcpkg `curl` |
 
-Everything else (doctest, Khronos GL headers) is vendored in `third_party/`.
+Everything else (doctest, Khronos GL headers, stb_image v2.30 — public domain / MIT) is
+vendored in `third_party/`.
 Without SDL3/libjpeg-turbo the core library and its tests still build. Plugins build
 only when their dependencies are found (`-DPB_BUILD_PLUGINS=OFF` skips them all); the
 program itself never needs them.
@@ -155,6 +157,7 @@ mistakes in the settings file are reported with the line number.
 | `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
 | `F5` | screensaver: tours random photos, flying between them; videos (with the plugin) play by themselves and the tour waits for them to end (any click, scroll or key stops it) |
 | `F6` | next background: solid, each built-in preset, your shader file, then solid again |
+| `M` | map: where the open photo was taken, or the visible photos (needs the `maptiles` plugin, see below) |
 | `Q` | quit |
 
 ## Plugins
@@ -165,6 +168,7 @@ line. Design and API: [docs/architecture.md §13](docs/architecture.md#13-plugin
 
 | Plugin | Needs | What it does |
 |---|---|---|
+| `maptiles` | libcurl (see Dependencies) | Map tiles for the map view (`M`): OpenStreetMap by default, cached on disk. See [Map](#map). |
 | `video` | FFmpeg (see Dependencies) | `.mp4 .mov .m4v .mkv .webm .avi .3gp` join the grid as their first frame with a play badge. Open one (double-click) and click it to play with sound, click again to pause; at the end a click plays it again. HDR phone videos are tone-mapped. No seeking yet. |
 
 ```sh
@@ -174,6 +178,41 @@ build/linux-release/photobrowse ~/Pictures --plugin video
 Enabling or disabling a plugin that adds file types re-indexes the library once.
 Video dates come from the file's UTC creation time shown in this computer's time zone,
 so clips filmed in another time zone sort a few hours off from the photos around them.
+
+## Map
+
+`M` slides in a street map on the right showing where the open photo was taken (the
+map flies from place to place as you step through photos), or a dot for every visible
+photo in the grid (the map fits itself to them once the grid rests). Drag, wheel and
+double-click move the map; `M` or `Esc` closes it. It needs a tile plugin:
+
+```sh
+build/linux-release/photobrowse ~/Pictures --plugin maptiles
+```
+
+Settings go in the `[map]` and `[plugin.maptiles]` sections of the config file:
+
+```ini
+[map]
+width = 0.4        # fraction of the window
+photo_zoom = 15    # zoom for one photo (2-19)
+
+[plugin.maptiles]
+# url = https://tile.openstreetmap.org/{z}/{x}/{y}.png   ({key} is replaced by api_key)
+# api_key =
+# attribution = © OpenStreetMap contributors
+# max_zoom = 19
+# disk_cache = 500   (MB, shared by all libraries, in the cache folder's maptiles/)
+```
+
+- **OpenStreetMap's tile servers are run by volunteers.** The plugin follows their
+  [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) (identifying
+  User-Agent, disk cache, at most two connections, no prefetching, the attribution on
+  the map), but for heavy use set `url` to a provider with your own key.
+- **Privacy:** tile requests tell the tile server roughly where the photos you are
+  looking at were taken. Tiles are requested only while the map is open.
+- Without a connection, tiles already in the cache still show; if nothing can be shown
+  the map closes again with a message.
 
 ## Performance testing
 

@@ -214,6 +214,24 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     else()
       message(STATUS "FFmpeg development files not found: the video plugin will not be built.")
     endif()
+
+    # Map tiles (M): HTTP(S) with libcurl, PNG/JPEG decoding with the vendored stb_image.
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+      pb_add_plugin(pb_maptiles_plugin maptiles
+        plugins/maptiles/maptiles_plugin.cpp
+        plugins/maptiles/maptiles_util.cpp)
+      target_include_directories(pb_maptiles_plugin PRIVATE "${CMAKE_SOURCE_DIR}/third_party/stb")
+      target_compile_definitions(pb_maptiles_plugin PRIVATE PB_VERSION="${PROJECT_VERSION}")
+      target_link_libraries(pb_maptiles_plugin PRIVATE CURL::libcurl Threads::Threads)
+      add_dependencies(photobrowse_plugins pb_maptiles_plugin)
+      add_dependencies(pb_tests pb_maptiles_plugin)
+      target_sources(pb_tests PRIVATE tests/test_maptiles.cpp plugins/maptiles/maptiles_util.cpp)
+      target_link_libraries(pb_tests PRIVATE CURL::libcurl)
+      target_compile_definitions(pb_tests PRIVATE PB_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+    else()
+      message(STATUS "libcurl development files not found: the maptiles plugin will not be built.")
+    endif()
   endif()
 
   add_executable(photobrowse
