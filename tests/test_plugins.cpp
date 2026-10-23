@@ -9,6 +9,7 @@
 #include "library/media_format.h"
 #include "library/scanner.h"
 #include "platform/dynlib.h"
+#include "plugin/photobrowse_plugin.h"
 #include "plugin/plugin_host.h"
 #include "test_util.h"
 
@@ -281,5 +282,49 @@ TEST_CASE("video plugin: still, metadata and playback of a sample clip") {
   std::this_thread::sleep_for(300ms);
   CHECK(player->frame()->serial == pausedAt);
   player.reset();  // closes without waiting for the decode thread
+}
+
+// Regression: libswscale's unscaled YUV->RGBA path writes whole 16-pixel blocks, so a
+// width that isn't a multiple of 16 used to overrun the tightly packed buffer by up to
+// 32 bytes (heap corruption). tests/data/odd200x88.mp4: 200x88, yuv420p.
+TEST_CASE("video plugin: stills never write past the image buffer") {
+  constexpr size_t kGuard = 256;
+  struct Buf {
+    std::vector<uint8_t> bytes;
+    size_t size = 0;
+  };
+  auto alloc = [](void* ctx, uint32_t w, uint32_t h) -> uint8_t* {
+    auto* b = static_cast<Buf*>(ctx);
+    b->size = size_t(w) * h * 4;
+    b->bytes.assign(b->size + kGuard, 0xA5);
+    return b->bytes.data();
+  };
+  std::string error;
+  void* lib = pb::openLibrary(fs::path(PB_TEST_PLUGIN_DIR) / pb::sharedLibraryName("video"), error);
+  REQUIRE(lib);
+  auto entry = reinterpret_cast<PbPluginEntry>(pb::librarySymbol(lib, PB_PLUGIN_ENTRY_NAME));
+  REQUIRE(entry);
+  PbHost host{};
+  host.abi_version = PB_PLUGIN_ABI_VERSION;
+  host.struct_size = sizeof host;
+  host.log = [](void*, int, const char*) {};
+  host.setting = [](void*, const char*) -> const char* { return nullptr; };
+  const PbPlugin* p = entry(&host);
+  REQUIRE(p);
+  const std::string clip = (fs::path(PB_TEST_DATA_DIR) / "odd200x88.mp4").string();
+  for (uint32_t edge : {100u, 200u, 1000u}) {
+    CAPTURE(edge);
+    Buf b;
+    PbImageOut out{&b, alloc};
+    REQUIRE(p->decode_still(p->self, clip.c_str(), edge, &out));
+    REQUIRE(b.size > 0);
+    size_t overrun = 0;
+    for (size_t i = b.size; i < b.bytes.size(); ++i) {
+      if (b.bytes[i] != 0xA5) overrun = i - b.size + 1;
+    }
+    CHECK(overrun == 0);
+  }
+  if (p->destroy) p->destroy(p->self);
+  pb::closeLibrary(lib);
 }
 #endif

@@ -164,6 +164,9 @@ CodecPtr openDecoder(const AVStream* st, int threads) {
 
 // HDR (HLG / PQ, BT.2020) is tone-mapped so SDR reference white (203 nits) stays white
 // and highlights roll off smoothly; SDR video converts directly.
+// libswscale may store whole SIMD blocks past the end of a row (its unscaled YUV->RGB
+// path works in 16-pixel steps), so it always writes into this class's padded buffer,
+// never straight into `out`: a width like 1080 used to overrun the heap by 32 bytes.
 class ColorConverter {
  public:
   // Writes w x h RGBA (tightly packed) scaled from the frame.
@@ -180,36 +183,39 @@ class ColorConverter {
     if (cs == AVCOL_SPC_BT2020_CL) cs = AVCOL_SPC_BT2020_NCL;
     sws_setColorspaceDetails(sws_.get(), sws_getCoefficients(cs), f->color_range == AVCOL_RANGE_JPEG,
                              sws_getCoefficients(SWS_CS_DEFAULT), 1, 0, 1 << 16, 1 << 16);
+    const size_t stride = paddedWidth(w) * (hdr ? 6 : 4);  // bytes per scaled row
+    scaled_.resize(stride * h + kSlack);
+    uint8_t* data[4] = {scaled_.data(), nullptr, nullptr, nullptr};
+    int lines[4] = {int(stride), 0, 0, 0};
+    sws_scale(sws_.get(), f->data, f->linesize, 0, f->height, data, lines);
     if (!hdr) {
-      uint8_t* data[4] = {out, nullptr, nullptr, nullptr};
-      int lines[4] = {int(w * 4), 0, 0, 0};
-      sws_scale(sws_.get(), f->data, f->linesize, 0, f->height, data, lines);
-      for (size_t i = 3; i < size_t(w) * h * 4; i += 4) out[i] = 255;
+      for (uint32_t y = 0; y < h; ++y, out += size_t(w) * 4) {
+        std::memcpy(out, scaled_.data() + y * stride, size_t(w) * 4);
+        for (size_t i = 3; i < size_t(w) * 4; i += 4) out[i] = 255;
+      }
       return true;
     }
-    rgb48_.resize(size_t(w) * h * 3);
-    uint8_t* data[4] = {reinterpret_cast<uint8_t*>(rgb48_.data()), nullptr, nullptr, nullptr};
-    int lines[4] = {int(w * 6), 0, 0, 0};
-    sws_scale(sws_.get(), f->data, f->linesize, 0, f->height, data, lines);
     buildLuts(trc);
     const bool wide = f->color_primaries == AVCOL_PRI_BT2020;
     static constexpr float k2020to709[9] = {1.6605f, -0.5876f, -0.0728f, -0.1246f, 1.1329f,
                                             -0.0083f, -0.0182f, -0.1006f, 1.1187f};
     const float scale = float(kOutLut - 1) / kMaxLinear;
-    const uint16_t* src = rgb48_.data();
-    for (size_t i = 0, n = size_t(w) * h; i < n; ++i, src += 3, out += 4) {
-      const float r = toLinear_[src[0] >> 6], g = toLinear_[src[1] >> 6], b = toLinear_[src[2] >> 6];
-      float c[3] = {r, g, b};
-      if (wide) {
-        c[0] = k2020to709[0] * r + k2020to709[1] * g + k2020to709[2] * b;
-        c[1] = k2020to709[3] * r + k2020to709[4] * g + k2020to709[5] * b;
-        c[2] = k2020to709[6] * r + k2020to709[7] * g + k2020to709[8] * b;
+    for (uint32_t y = 0; y < h; ++y) {
+      const auto* src = reinterpret_cast<const uint16_t*>(scaled_.data() + y * stride);
+      for (uint32_t x = 0; x < w; ++x, src += 3, out += 4) {
+        const float r = toLinear_[src[0] >> 6], g = toLinear_[src[1] >> 6], b = toLinear_[src[2] >> 6];
+        float c[3] = {r, g, b};
+        if (wide) {
+          c[0] = k2020to709[0] * r + k2020to709[1] * g + k2020to709[2] * b;
+          c[1] = k2020to709[3] * r + k2020to709[4] * g + k2020to709[5] * b;
+          c[2] = k2020to709[6] * r + k2020to709[7] * g + k2020to709[8] * b;
+        }
+        for (int k = 0; k < 3; ++k) {
+          const float v = std::clamp(c[k], 0.0f, kMaxLinear);
+          out[k] = toSrgb_[size_t(v * scale)];
+        }
+        out[3] = 255;
       }
-      for (int k = 0; k < 3; ++k) {
-        const float v = std::clamp(c[k], 0.0f, kMaxLinear);
-        out[k] = toSrgb_[size_t(v * scale)];
-      }
-      out[3] = 255;
     }
     return true;
   }
@@ -218,6 +224,9 @@ class ColorConverter {
   static constexpr size_t kInLut = 1024;   // 10-bit signal
   static constexpr size_t kOutLut = 65536;
   static constexpr float kMaxLinear = 50.0f;  // relative to SDR white (PQ peaks at 10000 / 203)
+  static constexpr size_t kSlack = 256;       // bytes after the last row, for good measure
+
+  static size_t paddedWidth(uint32_t w) { return (size_t(w) + 31) & ~size_t(31); }  // pixels
 
   void buildLuts(int trc) {
     if (lutTrc_ == trc) return;
@@ -251,7 +260,7 @@ class ColorConverter {
   }
 
   std::unique_ptr<SwsContext, SwsFree> sws_;
-  std::vector<uint16_t> rgb48_;
+  std::vector<uint8_t> scaled_;  // padded rows: RGBA, or RGB48 for HDR
   int lutTrc_ = -1;
   std::vector<float> toLinear_;
   std::vector<uint8_t> toSrgb_;

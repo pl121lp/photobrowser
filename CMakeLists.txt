@@ -136,7 +136,8 @@ add_executable(pb_tests
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
 target_compile_definitions(pb_tests PRIVATE PB_TEST_PHOTOS_DIR="${CMAKE_SOURCE_DIR}/photos"
-                                           PB_TEST_PLUGIN_DIR="${PB_PLUGIN_DIR}")
+                                           PB_TEST_PLUGIN_DIR="${PB_PLUGIN_DIR}"
+                                           PB_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 pb_add_plugin(pb_test_plugin testfake tests/plugins/test_plugin.c)
 pb_add_plugin(pb_test_plugin_v1 testfake_v1 tests/plugins/test_plugin.c)  # version-1-sized table
 target_compile_definitions(pb_test_plugin_v1 PRIVATE PB_TEST_V1_SIZE)
@@ -229,7 +230,6 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
       add_dependencies(pb_tests pb_maptiles_plugin)
       target_sources(pb_tests PRIVATE tests/test_maptiles.cpp plugins/maptiles/maptiles_util.cpp)
       target_link_libraries(pb_tests PRIVATE CURL::libcurl)
-      target_compile_definitions(pb_tests PRIVATE PB_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
     else()
       message(STATUS "libcurl development files not found: the maptiles plugin will not be built.")
     endif()
