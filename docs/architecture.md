@@ -31,7 +31,11 @@ src/
   platform/   Paths        per-user cache dir (XDG_CACHE_HOME / %LOCALAPPDATA%), UTF-8 paths
               DynLib       dlopen / LoadLibrary for plugins
   plugin/     photobrowse_plugin.h  the plugin C ABI (the only header plugins include)
-              PluginHost   loads plugins; adapts them to MediaHandler and Player
+              PluginHost   loads plugins; adapts them to MediaHandler, Player and TileSource
+  map/        Mercator     Web Mercator maths, tile keys and ranges, tile level
+              MapCamera    map view: pan/zoom/momentum, fly path (van Wijk & Nuij), fit
+              TileSet      wanted tiles, ancestor fallback, slots + LRU, retries
+              MapView      M: slide/split layout, input routing, single/grid dots, notices
   view/       Camera       center (double world coords) + zoom; screen<->world
               Motion       momentum (exponential friction), eased tweens, smooth zoom
               Input        drag/click/double-click detection -> Camera commands
@@ -49,11 +53,13 @@ src/
               Residency    decides desired level per visible photo, requests loads,
                            owns GPU slot allocation and LRU eviction
   gfx/        GL loader, Shader, PagedTexture (texture-array atlas pages),
-              TileRenderer (instanced draw), Uploader (budgeted per-frame uploads)
+              TileRenderer (instanced draw), Uploader (budgeted per-frame uploads),
+              MapRenderer (instanced signed-distance map dots)
+  app/        MapTiles     map tile fetches on their own 2 threads, budgeted uploads
 shaders/      tile.vert / tile.frag (embedded into the binary at build time)
 tests/        unit tests for pure logic
 tools/        make_test_library.(sh|py) — synthetic 10k library via links
-plugins/      optional plugins, one folder each (video/: FFmpeg)
+plugins/      optional plugins, one folder each (video/: FFmpeg; maptiles/: libcurl)
 ```
 
 Dependency direction: `app → view, layout, stream, gfx, library`; `stream → cache,
@@ -282,8 +288,10 @@ the core's C++ changes freely. The library exports one function:
 const PbPlugin* pb_plugin_entry(const PbHost* host);
 ```
 
-- `PbHost` (host → plugin): logging and an **audio output** (float PCM streams, backed
-  by SDL3 in the app). Host services are callable from any thread.
+- `PbHost` (host → plugin): logging, an **audio output** (float PCM streams, backed
+  by SDL3 in the app), the plugin's **settings** (`setting(key)`: its
+  `[plugin.<name>]` config section) and a per-user **cache directory**. Host services
+  are callable from any thread.
 - `PbPlugin` (plugin → host): name/version, the **file extensions** it handles, and
   function pointers in two groups:
   - *Media* — `probe` (display size, capture time) and `decode_still` (an upright RGBA
@@ -295,9 +303,14 @@ const PbPlugin* pb_plugin_entry(const PbHost* host);
     aren't re-uploaded), and `player_active` (the host keeps redrawing while true).
     Called on the main thread and must return immediately: players run their own
     threads for I/O and decoding.
+  - *Map tiles* (optional, version 2) — `tile_get(z, x, y)` fills a 256×256 RGBA
+    Web Mercator tile and returns OK / MISSING / OFFLINE / REFUSED / ERROR, plus
+    `tile_attribution` and the zoom range. Called on the host's two map tile threads;
+    may block on the network.
   - `destroy` — stop all plugin threads before unload.
-- Versioning: `PB_PLUGIN_ABI_VERSION` plus `struct_size` in each table; structs only
-  grow at the end. A mismatching plugin is refused with a clear message.
+- Versioning: `PB_PLUGIN_ABI_VERSION` (now 2) plus `struct_size` in each table; structs
+  only grow at the end. A plugin built for another version is refused with a clear
+  message; a version-2 table only as long as version 1's simply has no tile source.
 
 **How the core uses a plugin** (`PluginHost`, GL- and SDL-free, unit-tested with a
 fake plugin in `tests/plugins/`):
@@ -311,6 +324,11 @@ fake plugin in `tests/plugins/`):
   A click on the open item (`Interaction::takeActivation`) goes to the player; its
   frames are uploaded through the upload ring into one live texture that replaces the
   still image while it has frames. Closing the item closes the player.
+- The first plugin with `tile_get` is the map's `TileSource` (a second one is ignored
+  with a warning). `MapTiles` asks it for tiles on a dedicated pool of two threads
+  (never the photo decoders), cancels tiles no longer wanted, and uploads results into
+  one 4096² page of 256-px slots (`TileSet`: LRU, blurry ancestor until loaded). The
+  host checks every tile (256×256, known status) before the core sees it.
 
 **Rules for plugins.** Same performance rules as the core: no I/O or decoding on the
 main thread; player calls return in microseconds; never block the render thread on
@@ -334,6 +352,12 @@ swresample). Extensions `.mp4 .mov .m4v .mkv .webm .avi .3gp`.
   BT.2020 → BT.709 in linear light.
 - Cost: 1080p30 10-bit AV1 HDR ≈ 2 CPU cores (decoder threads + colour conversion),
   only while a video plays.
+
+**Map tiles plugin** (`plugins/maptiles`, libcurl + vendored stb_image). URL template
+(OSM by default), disk cache under `<cache>/photobrowse/maptiles/<hash of URL>/z/x/y`
+with an expiry sidecar (`Cache-Control: max-age`, else 7 days), LRU-trimmed to
+`disk_cache` MB; stale tiles are served when offline; 60 s back-off after 403/429;
+identifying User-Agent. Details and policy notes: [map-spec.md §5.5](map-spec.md).
 
 **Future plugin candidates.** Other image formats (HEIC/AVIF, RAW, PNG), metadata and
 search back-ends (SQLite + FTS5, keywords), face/place clustering, super-resolution

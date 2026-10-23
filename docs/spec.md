@@ -71,7 +71,8 @@ the primary requirement; features come second.
 | `+` / `-` | Zoom in/out around screen center. |
 | `Home` | Return to the start view (`[view] start_at` photo at the `start_focus` zoom; centre photo with its neighbours by default). |
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). The app starts fullscreen unless `[display] fullscreen = false` or `--windowed`. |
-| `Esc` | Close the help; otherwise leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
+| `Esc` | Close the help; otherwise close the map; otherwise leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
+| `M` | Toggle the **map** (needs a map tile plugin): see [map-spec.md](map-spec.md). |
 | `Q` / window close | Quit. |
 | `F1` | Toggle **help**: a centered panel listing every key and mouse binding (shrinks to fit small windows). `Esc` also closes it. Off by default. |
 | `F2` | Toggle photo info: while a photo is fully open in whole-photo view, a bottom-left panel shows its file name, its folder within the library (photos in subfolders), width × height (megapixels), date taken (EXIF; file modification date if none), file size and, when the EXIF has one, the GPS position (decimal degrees N/S, E/W, and altitude in metres if recorded). GPS is read at indexing time and kept in the catalog (format version 4; an older catalog is re-indexed once). Off by default. |
@@ -140,6 +141,9 @@ one in the whole-photo view and click it to play with sound; click again to paus
 the end a click plays it again. Leaving the photo stops it. HDR phone videos are
 tone-mapped to look right on a normal display. No seeking (yet).
 
+**Map tiles plugin** (`--plugin maptiles`, needs libcurl): OpenStreetMap tiles for the
+map view (`M`, [map-spec.md](map-spec.md)), cached on disk.
+
 ## 4. Performance targets (v1)
 Reference machine (the dev laptop, worst case): **3840×2160 @ 60 Hz on the integrated
 Intel UHD 630**; library on internal NVMe SSD. If it's smooth there it's smooth on the
@@ -189,6 +193,8 @@ Decided by the user:
   enabled by a command-line parameter; the app must run without knowing any plugin.
 - First plugin: video. Still thumbnail in the grid; in focus, left click starts / stops
   playback; no seeking for now.
+- Map view (`M`): OpenStreetMap raster tiles via a plugin, fly between locations;
+  decisions in [map-spec.md §8](map-spec.md).
 
 Calls made by Claude (open to change):
 - Key bindings; double-click / zoom-past-max / `Enter` open whole-photo view.

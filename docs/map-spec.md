@@ -1,8 +1,19 @@
 # PhotoBrowse — Map View Spec
 
-Status: **specified, not implemented** (2026-10-22). Self-contained: everything decided
-about the map feature is here, so implementation can start from this file plus
+Status: **implemented** (2026-10-22, plan `docs/plans/2026-10-22-map-view.md`).
+Self-contained: everything decided about the map feature is here, together with
 `docs/spec.md`, `docs/architecture.md` (§13 Plugins) and `CLAUDE.md`.
+
+Deviations and choices made while implementing:
+- Dot colour fixed `#e8452c` (§9 open question); dots are 13 px (single) and 8 px
+  (grid) at display scale 1, including their white ring.
+- The panel background, the 1-px separator and the tile drawing use scissored clears
+  and the existing `TileRenderer`; `MapRenderer` draws only the dots and halo.
+- `[map] open = on` (start with the map shown) is a documented setting, not hidden.
+- At most 4 map tile uploads per frame (≈1.4 MB with mips).
+- Backstop tiles while loading: level 2 and three levels above the visible one.
+- Windows: libcurl comes from vcpkg `curl` like FFmpeg for the video plugin; it is not
+  in `vcpkg.json` (the plugin is optional).
 
 ## 1. Intent
 

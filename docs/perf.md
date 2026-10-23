@@ -181,3 +181,20 @@ Of the shipped 15.4 ms at zoom 3 on the Intel GPU, EASU itself is ~9 ms (12 texe
 fetches and 12 weighted taps per pixel); the perceptual-space sqrt is free. The cost
 only matters while a zoomed photo moves: a still photo is not redrawn. On the
 integrated GPU, panning a photo zoomed past 1:1 with FSR on can fall below 60 fps.
+
+## 2026-10-22 — Map view (M)
+
+Release builds, fullscreen 3840×2160 on the Intel UHD (CML GT2), the 1115-photo sample
+library (`photos/`, recursive), `--bench` two runs each. "Map open": `[map] open = on`
+with `--plugin maptiles`, OSM tiles from the disk cache (warmed by earlier runs); the
+bench's zoom-out and flings change the visible photos (dots every frame, refits at
+rest), its whole-photo steps fly the map between locations. Frame interval in ms.
+
+| Build / setting | p50 | p95 | p99 | max | frames > 20 ms |
+|---|---|---|---|---|---|
+| base `87600be` | 16.66–16.68 | 17.49–17.62 | 18.00 | 19.93–31.61 | 1, 0 |
+| map branch, map closed (plugin loaded) | 16.67–16.69 | 17.61–17.62 | 17.92–18.26 | 18.59–18.93 | 0, 0 |
+| map branch, map open | 16.68–16.69 | 17.54–17.60 | 17.87–18.06 | 18.40–18.50 | 0, 0 |
+
+No measurable cost. The map page (one 4096² page, ~85 MB with mips) is created by the
+idle prewarm when a tile source is loaded and comes out of the `gpu_memory` budget.

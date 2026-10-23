@@ -10,13 +10,14 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
   shader effects) slot in.
 - `docs/plans/` — implementation plans.
 - `docs/perf.md` — benchmark method, results, and the causes of past hitches.
-- `docs/map-spec.md` — map view (`M`): decisions and architecture, not yet implemented.
+- `docs/map-spec.md` — map view (`M`): decisions and architecture (implemented; see its status line).
 
 ## Module map
 - `src/app/config` user settings (config.ini) — new settings go there with a
   documented entry in `defaultConfigText()` and a test.
 - `src/core` geometry, levels, frame stats · `src/view` camera, motion, interaction,
-  bench script · `src/layout` layouts and crop/fit math · `src/library` EXIF, catalog,
+  bench script · `src/map` map view logic (Mercator, map camera + fly path, tile set,
+  `MapView`; pb_core) · `src/layout` layouts and crop/fit math · `src/library` EXIF, catalog,
   scanner, indexer (decode helpers) · `src/cache` l0.pack + per-level JPEG cache ·
   `src/stream` job system, residency (VRAM slots/budget) · `src/imaging` TurboJPEG,
   resize · `src/app` options, library indexing, streamer (GL-free, via `TextureSink`),
@@ -27,7 +28,8 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
   1-9), spliced into `tile.frag` and numbered in `src/gfx/tile_renderer.cpp`. Keep animated ones cheap: benchmark at 4K.
 - `src/plugin` the plugin C ABI (`photobrowse_plugin.h`) and `PluginHost` ·
   `plugins/<name>/` optional plugins (shared libraries, built into `<build>/plugins/`;
-  `video` uses FFmpeg) · `tests/plugins/` fake plugin for host tests.
+  `video` uses FFmpeg, `maptiles` libcurl + `third_party/stb`) · `tests/plugins/` fake
+  plugin for host tests (also built as `testfake_v1`, a version-1-sized table).
 - Libraries: `pb_core` (no deps) → `pb_imaging` (+turbojpeg) → `pb_app` (no SDL/GL)
   → `pb_gfx` + `photobrowse` exe (SDL3, GL).
 
