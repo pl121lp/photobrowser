@@ -159,3 +159,25 @@ after alike (start of the run).
 Follow-up: rounding the letterboxed photo itself (two more ALU ops per pixel).
 Intel UHD, letterbox + corner_radius 0.06 + warp background, two runs: p50
 16.67–16.69, p95 17.52–17.63, p99 18.13–18.20 ms, 0 and 2 frames > 20 ms — unchanged.
+
+## 2026-10-22 — Photo effect 9: FSR upscale
+
+GPU time of the open photo's draw call alone (GL timer query, median of 300 frames),
+release build, 2432×1520 window, photo open in whole-photo view; effects only apply
+to that one tile. Zoom 1 = fit (photo 1938×1459 px, minified: RCAS only); zoom 3 =
+photo enlarged past 1:1 (covers the window: EASU + RCAS).
+
+| GPU | Effect | zoom 1 | zoom 3 |
+|---|---|---|---|
+| Intel UHD (CML GT2) | none | 3.4 ms | 2.7 ms |
+| Intel UHD (CML GT2) | 1 sharpen | 5.8 ms | 4.0 ms |
+| Intel UHD (CML GT2) | 9 FSR, first port (EASU ×5 for RCAS on output pixels) | 6.6 ms | 49.0 ms |
+| Intel UHD (CML GT2) | 9 FSR, EASU ×1 + RCAS on its 4 centre texels | 5.8 ms | 17.3 ms |
+| Intel UHD (CML GT2) | 9 FSR, same, RCAS limit on luma (shipped) | 5.7 ms | 15.4 ms |
+| RTX 2080 Super Max-Q | none | — | 0.1 ms |
+| RTX 2080 Super Max-Q | 9 FSR (shipped) | — | 0.9 ms |
+
+Of the shipped 15.4 ms at zoom 3 on the Intel GPU, EASU itself is ~9 ms (12 texel
+fetches and 12 weighted taps per pixel); the perceptual-space sqrt is free. The cost
+only matters while a zoomed photo moves: a still photo is not redrawn. On the
+integrated GPU, panning a photo zoomed past 1:1 with FSR on can fall below 60 fps.

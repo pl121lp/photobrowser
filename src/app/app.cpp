@@ -59,7 +59,7 @@ std::optional<Key> mapKey(SDL_Keycode k) {
   }
 }
 
-// Photo effect for keys 0-8 (top row or keypad); -1 for any other key.
+// Photo effect for keys 0-9 (top row or keypad); -1 for any other key.
 int photoEffectKey(SDL_Keycode k) {
   if (k >= SDLK_0 && k <= SDLK_0 + TileRenderer::kPhotoEffects) return int(k - SDLK_0);
   if (k == SDLK_KP_0) return 0;

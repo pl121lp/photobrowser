@@ -175,8 +175,8 @@ Rect buildPhotoInfo(const PhotoInfo& p, const FontInfo& font, double scale, Vec2
 
 std::string photoEffectLabel(int effect) {
   // Same order as the shaders in src/gfx/tile_renderer.cpp.
-  constexpr const char* kNames[] = {"Sharpen",   "Sobel edges",   "Saturation", "Black & white",
-                                    "Posterize", "Pencil sketch", "Oil paint",  "Tilt-shift"};
+  constexpr const char* kNames[] = {"Sharpen",   "Sobel edges",   "Saturation", "Black & white", "Posterize",
+                                    "Pencil sketch", "Oil paint", "Tilt-shift", "FSR upscale"};
   if (effect < 1 || effect > int(std::size(kNames))) return {};
   return std::to_string(effect) + ": " + kNames[effect - 1];
 }
@@ -208,7 +208,7 @@ std::vector<HelpEntry> helpEntries() {
       {"+ / -", "zoom in / out"},
       {"Home", "back to the start view"},
       {"Enter", "open the centered photo whole"},
-      {"1 - 8 / 0", "whole-photo view: photo effect (name top right) / none"},
+      {"1 - 9 / 0", "whole-photo view: photo effect (name top right) / none"},
       {"Esc", "close help, leave whole-photo view, then fullscreen"},
       {"Q", "quit"},
       {"", ""},

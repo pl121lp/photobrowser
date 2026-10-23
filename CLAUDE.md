@@ -24,7 +24,7 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
   upload ring, tile renderer · `shaders/` GLSL (embedded at build time); `shaders/backgrounds/*.frag` are the
   background presets, picked up automatically by name (add one + its name in
   `src/app/background_presets.cpp`); `shaders/photo/*.frag` are the photo effects (keys
-  1-8), spliced into `tile.frag` and numbered in `src/gfx/tile_renderer.cpp`. Keep animated ones cheap: benchmark at 4K.
+  1-9), spliced into `tile.frag` and numbered in `src/gfx/tile_renderer.cpp`. Keep animated ones cheap: benchmark at 4K.
 - `src/plugin` the plugin C ABI (`photobrowse_plugin.h`) and `PluginHost` ·
   `plugins/<name>/` optional plugins (shared libraries, built into `<build>/plugins/`;
   `video` uses FFmpeg) · `tests/plugins/` fake plugin for host tests.

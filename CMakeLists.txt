@@ -176,7 +176,7 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     "${CMAKE_SOURCE_DIR}/shaders/overlay.frag"
     "${CMAKE_SOURCE_DIR}/shaders/fullscreen.vert"
   )
-  # Photo effects (keys 1-8 on the open photo), spliced into tile.frag; listed by number
+  # Photo effects (keys 1-9 on the open photo), spliced into tile.frag; listed by number
   # in src/gfx/tile_renderer.cpp.
   file(GLOB PB_PHOTO_SHADERS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/shaders/photo/*.frag")
   pb_embed_shaders(pb_gfx "${CMAKE_CURRENT_BINARY_DIR}/generated/photo_shaders.h" ${PB_PHOTO_SHADERS})

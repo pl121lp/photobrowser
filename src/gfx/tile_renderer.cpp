@@ -16,7 +16,7 @@ namespace {
 // Same order as the labels in src/view/overlay.cpp.
 constexpr const char* kPhotoEffectSources[] = {
     kShader_sharpen_frag, kShader_sobel_frag, kShader_saturate_frag, kShader_bw_frag,
-    kShader_posterize_frag, kShader_sketch_frag, kShader_oilpaint_frag, kShader_tiltshift_frag,
+    kShader_posterize_frag, kShader_sketch_frag, kShader_oilpaint_frag, kShader_tiltshift_frag, kShader_fsr_frag,
 };
 static_assert(std::size(kPhotoEffectSources) == TileRenderer::kPhotoEffects);
 

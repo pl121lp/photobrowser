@@ -61,7 +61,7 @@ class Interaction {
   // True once per click on the open photo in whole-photo view (e.g. play / pause).
   bool takeActivation() { return std::exchange(activated_, false); }
 
-  // Shader effect on the open photo (keys 0-8; 0 = none). Ignored (false) unless a photo
+  // Shader effect on the open photo (keys 0-9; 0 = none). Ignored (false) unless a photo
   // is open or opening; leaving the whole-photo view resets it to 0.
   bool setPhotoEffect(int effect);
   int photoEffect() const { return photoEffect_; }

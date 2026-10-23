@@ -251,7 +251,8 @@ TEST_CASE("photo effect: label per effect, none for 0 or unknown") {
   CHECK(pb::photoEffectLabel(6) == "6: Pencil sketch");
   CHECK(pb::photoEffectLabel(7) == "7: Oil paint");
   CHECK(pb::photoEffectLabel(8) == "8: Tilt-shift");
-  CHECK(pb::photoEffectLabel(9).empty());
+  CHECK(pb::photoEffectLabel(9) == "9: FSR upscale");
+  CHECK(pb::photoEffectLabel(10).empty());
   CHECK(pb::photoEffectLabel(-1).empty());
 }
 
