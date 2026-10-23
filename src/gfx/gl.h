@@ -14,6 +14,7 @@ namespace pb::gl {
   X(PFNGLCLEARPROC, Clear)                                         \
   X(PFNGLENABLEPROC, Enable)                                       \
   X(PFNGLDISABLEPROC, Disable)                                     \
+  X(PFNGLSCISSORPROC, Scissor)                                     \
   X(PFNGLBLENDFUNCPROC, BlendFunc)                                 \
   X(PFNGLGENTEXTURESPROC, GenTextures)                             \
   X(PFNGLDELETETEXTURESPROC, DeleteTextures)                       \

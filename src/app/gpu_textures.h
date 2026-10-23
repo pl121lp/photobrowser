@@ -4,6 +4,7 @@
 #include <memory>
 #include <utility>
 
+#include "app/map_tiles.h"
 #include "app/streamer.h"
 #include "gfx/paged_texture.h"
 
@@ -12,7 +13,7 @@ namespace pb {
 // OpenGL implementation of TextureSink: paged atlases for levels 0..4 (page textures
 // from a pre-allocated pool), fixed-capacity full-resolution textures, and a
 // placeholder for photos with nothing loaded.
-class GpuTextures final : public TextureSink {
+class GpuTextures final : public TextureSink, public MapTileSink {
  public:
   GpuTextures();
   ~GpuTextures() override;
@@ -29,6 +30,12 @@ class GpuTextures final : public TextureSink {
   Vec2d fullCapacity() const override { return fullCapacity_; }
   UvRect beginFull(int index, uint32_t w, uint32_t h) override;
   void uploadFullRows(int index, int mip, uint32_t y0, uint32_t rows, const Image& m) override;
+
+  // Map tiles: one page of 256-px slots, created by prewarm (first) once wanted.
+  void wantMapPage() { mapWanted_ = true; }
+  bool mapPageReady() const override { return mapTiles_.texture(0) != 0; }
+  void uploadMapTile(Vec2d origin, const std::vector<Image>& mips) override;
+  GLuint mapTexture() const { return mapTiles_.texture(0); }
 
   GLuint texture(const TexRef& r) const;
   // Live content (a plugin player's current frame): one texture, refilled when
@@ -48,6 +55,8 @@ class GpuTextures final : public TextureSink {
 
   UploadRing ring_;
   std::array<std::unique_ptr<PagedTexture>, kLevelCount> levels_;
+  PagedTexture mapTiles_{256, ring_};
+  bool mapWanted_ = false;
   std::vector<GLuint> pool_;  // free page textures
   size_t pagesCreated_ = 0;
   std::array<FullTexture, Streamer::kFullSlots> full_{};

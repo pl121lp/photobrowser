@@ -180,6 +180,7 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     src/gfx/tile_renderer.cpp
     src/gfx/overlay_renderer.cpp
     src/gfx/background_renderer.cpp
+    src/gfx/map_renderer.cpp
   )
   target_include_directories(pb_gfx PUBLIC third_party/khronos)
   target_link_libraries(pb_gfx PUBLIC pb_imaging)
@@ -189,6 +190,8 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     "${CMAKE_SOURCE_DIR}/shaders/overlay.vert"
     "${CMAKE_SOURCE_DIR}/shaders/overlay.frag"
     "${CMAKE_SOURCE_DIR}/shaders/fullscreen.vert"
+    "${CMAKE_SOURCE_DIR}/shaders/map_dot.vert"
+    "${CMAKE_SOURCE_DIR}/shaders/map_dot.frag"
   )
   # Photo effects (keys 1-9 on the open photo), spliced into tile.frag; listed by number
   # in src/gfx/tile_renderer.cpp.

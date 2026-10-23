@@ -17,6 +17,7 @@ GpuTextures::~GpuTextures() {
       if (GLuint t = levels_[size_t(l)]->releasePage(p)) pool_.push_back(t);
     }
   }
+  if (GLuint t = mapTiles_.releasePage(0)) pool_.push_back(t);
   if (!pool_.empty()) gl::DeleteTextures(GLsizei(pool_.size()), pool_.data());
   for (auto& f : full_) {
     if (f.tex) gl::DeleteTextures(1, &f.tex);
@@ -59,6 +60,10 @@ void GpuTextures::releaseLive() {
 
 bool GpuTextures::prewarm(size_t pages, Vec2d viewport) {
   fullCapacity_ = {std::max(fullCapacity_.x, viewport.x), std::max(fullCapacity_.y, viewport.y)};
+  if (mapWanted_ && !mapPageReady()) {
+    mapTiles_.addPage(0, createPageTexture());
+    return true;
+  }
   for (int i = 0; i < Streamer::kFullSlots; ++i) {
     if (ensureFull(i, uint32_t(viewport.x), uint32_t(viewport.y))) return true;
   }
@@ -89,6 +94,12 @@ void GpuTextures::releasePage(int level, uint16_t page) {
 void GpuTextures::upload(int level, uint16_t page, Vec2d origin, const std::vector<Image>& mips) {
   const auto t0 = std::chrono::steady_clock::now();
   levels_[size_t(level)]->upload(page, origin, mips);
+  uploadMs_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+}
+
+void GpuTextures::uploadMapTile(Vec2d origin, const std::vector<Image>& mips) {
+  const auto t0 = std::chrono::steady_clock::now();
+  mapTiles_.upload(0, origin, mips);
   uploadMs_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 }
 
