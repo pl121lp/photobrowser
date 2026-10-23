@@ -151,9 +151,21 @@ HandlePtr stillHandle(heif_context* ctx, uint32_t minLongEdge) {
   return pick >= 0 ? std::move(thumbs[size_t(pick)]) : std::move(primary);
 }
 
+// Streaming calls only decode, and index workers exit after the first run: drop the
+// calling thread's cached file so it is not held for the whole session.
+void forgetThisThread() {
+  std::lock_guard lock(g_cacheMutex);
+  g_cache.erase(std::this_thread::get_id());
+}
+
+struct CacheRelease {
+  ~CacheRelease() { forgetThisThread(); }
+};
+
 int decodeStill(void*, const char* path, uint32_t minLongEdge, PbImageOut* out) {
   heif_context* ctx = contextFor(path);
   if (!ctx) return 0;
+  CacheRelease release;  // runs after the handle and image below are released
   HandlePtr handle = stillHandle(ctx, minLongEdge);
   if (!handle) return 0;
   heif_image* raw = nullptr;  // default options: irot / imir applied, so upright
@@ -218,7 +230,12 @@ PbPlugin kPlugin = {
 extern "C" PB_PLUGIN_EXPORT const PbPlugin* pb_plugin_entry(const PbHost* host) {
   if (!host || host->abi_version != PB_PLUGIN_ABI_VERSION) return nullptr;
   g_host = host;
-  heif_init(nullptr);  // loads libheif's decoder plugins (e.g. libde265)
+  const heif_error initErr = heif_init(nullptr);  // loads libheif's decoder plugins (e.g. libde265)
+  if (initErr.code != heif_error_Ok) {
+    logMsg(PB_LOG_ERROR, (std::string("libheif failed to initialise: ") + (initErr.message ? initErr.message : "")).c_str());
+    kPlugin.extensions = nullptr;
+    return &kPlugin;
+  }
   if (!heif_have_decoder_for_format(heif_compression_HEVC)) {
     logMsg(PB_LOG_ERROR,
            "libheif has no HEVC decoder; install libheif-plugin-libde265 (Linux) or a libheif with libde265");

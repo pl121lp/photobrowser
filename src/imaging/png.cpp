@@ -10,6 +10,13 @@ namespace pb {
 
 std::optional<Image> decodePng(std::span<const uint8_t> data) {
   if (data.empty() || data.size() > size_t(INT32_MAX)) return std::nullopt;
+  // IHDR is the first chunk: signature (8), length (4), "IHDR" (4), then width and height.
+  if (data.size() >= 24) {
+    auto be32 = [&](size_t o) {
+      return (uint32_t(data[o]) << 24) | (uint32_t(data[o + 1]) << 16) | (uint32_t(data[o + 2]) << 8) | data[o + 3];
+    };
+    if (uint64_t(be32(16)) * be32(20) > kMaxPngPixels) return std::nullopt;
+  }
   int w = 0, h = 0, comp = 0;
   stbi_uc* px = stbi_load_from_memory(data.data(), int(data.size()), &w, &h, &comp, 4);
   if (!px) return std::nullopt;

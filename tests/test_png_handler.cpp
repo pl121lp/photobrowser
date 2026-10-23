@@ -108,3 +108,32 @@ TEST_CASE("png handler: missing file") {
   CHECK_FALSE(h.probe("/nonexistent/none.png"));
   CHECK_FALSE(h.decodeStill("/nonexistent/none.png", 0));
 }
+
+namespace {
+// A tiny valid PNG whose IHDR claims w x h (CRCs are not checked by the parser).
+std::vector<uint8_t> pngClaiming(uint32_t w, uint32_t h) {
+  auto png = pbtest::makePng(2, 2, pixels(2, 2));
+  std::vector<uint8_t> dims;
+  put32be(dims, w);
+  put32be(dims, h);
+  std::copy(dims.begin(), dims.end(), png.begin() + 16);
+  return png;
+}
+}  // namespace
+
+TEST_CASE("png handler: oversized and zero-sized IHDR are rejected") {
+  pbtest::TempDir dir;
+  pb::PngHandler h;
+  const auto write = [&](const char* name, const std::vector<uint8_t>& png) {
+    const auto path = dir.path / name;
+    pbtest::writeFile(path, std::string(png.begin(), png.end()));
+    return path;
+  };
+  const auto big = write("big.png", pngClaiming(20000, 20000));
+  CHECK_FALSE(h.probe(big));
+  CHECK_FALSE(h.decodeStill(big, 0));
+  CHECK_FALSE(pb::decodePng(pngClaiming(20000, 20000)));
+  const auto zero = write("zero.png", pngClaiming(0, 5));
+  CHECK_FALSE(h.probe(zero));
+  CHECK_FALSE(h.decodeStill(zero, 0));
+}

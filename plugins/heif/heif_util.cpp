@@ -11,11 +11,21 @@ std::span<const uint8_t> exifTiffFromItem(std::span<const uint8_t> item) {
   if (item.size() < 4) return {};
   const uint64_t offset = (uint64_t(item[0]) << 24) | (uint64_t(item[1]) << 16) | (uint64_t(item[2]) << 8) | item[3];
   if (offset > item.size() - 4) return {};
-  const auto tiff = item.subspan(4 + size_t(offset));
-  if (tiff.size() < 4) return {};
-  const bool ii = tiff[0] == 'I' && tiff[1] == 'I' && tiff[2] == 42 && tiff[3] == 0;
-  const bool mm = tiff[0] == 'M' && tiff[1] == 'M' && tiff[2] == 0 && tiff[3] == 42;
-  return ii || mm ? tiff : std::span<const uint8_t>{};
+  auto tiff = item.subspan(4 + size_t(offset));
+  const auto isTiff = [](std::span<const uint8_t> s) {
+    if (s.size() < 4) return false;
+    const bool ii = s[0] == 'I' && s[1] == 'I' && s[2] == 42 && s[3] == 0;
+    const bool mm = s[0] == 'M' && s[1] == 'M' && s[2] == 0 && s[3] == 42;
+    return ii || mm;
+  };
+  if (isTiff(tiff)) return tiff;
+  // Some writers leave offset 0 and keep the "Exif\0\0" prefix in the payload.
+  static constexpr uint8_t kExifPrefix[6] = {'E', 'x', 'i', 'f', 0, 0};
+  if (tiff.size() > 6 && std::equal(std::begin(kExifPrefix), std::end(kExifPrefix), tiff.begin())) {
+    tiff = tiff.subspan(6);
+    if (isTiff(tiff)) return tiff;
+  }
+  return {};
 }
 
 int chooseThumbnail(std::span<const std::pair<uint32_t, uint32_t>> thumbSizes, uint32_t minLongEdge) {
