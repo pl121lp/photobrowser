@@ -312,7 +312,7 @@ const PbPlugin* pb_plugin_entry(const PbHost* host);
     `tile_attribution` and the zoom range. Called on the host's two map tile threads;
     may block on the network.
   - `destroy` — stop all plugin threads before unload.
-- Versioning: `PB_PLUGIN_ABI_VERSION` (now 4; 3 added GPS to `PbMediaInfo`, 4 added `player_progress`) plus `struct_size` in each table; structs
+- Versioning: `PB_PLUGIN_ABI_VERSION` (now 5; 3 added GPS to `PbMediaInfo`, 4 added `player_progress`, 5 added `parse_exif` to `PbHost`) plus `struct_size` in each table; structs
   only grow at the end. A plugin built for another version is refused with a clear
   message; a version-2 table only as long as version 1's simply has no tile source.
 

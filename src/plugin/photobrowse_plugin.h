@@ -27,13 +27,14 @@
 #ifndef PHOTOBROWSE_PLUGIN_H
 #define PHOTOBROWSE_PLUGIN_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define PB_PLUGIN_ABI_VERSION 4u
+#define PB_PLUGIN_ABI_VERSION 5u
 #define PB_PLUGIN_ENTRY_NAME "pb_plugin_entry"
 
 #if defined(_WIN32)
@@ -47,6 +48,7 @@ extern "C" {
 enum PbLogLevel { PB_LOG_INFO = 0, PB_LOG_WARNING = 1, PB_LOG_ERROR = 2 };
 
 typedef struct PbAudioOut PbAudioOut; /* opaque, owned by the host */
+typedef struct PbMediaInfo PbMediaInfo;
 
 typedef struct PbHost {
   uint32_t abi_version; /* PB_PLUGIN_ABI_VERSION of the host */
@@ -71,11 +73,17 @@ typedef struct PbHost {
   /* Per-user cache root (UTF-8, exists), shared by all libraries, e.g.
    * ~/.cache/photobrowse. A plugin keeps its files in a subfolder named after itself. */
   const char* cache_dir;
+
+  /* ---- Since version 5 ---- */
+  /* Parses a TIFF/EXIF block (starting at "II*\0" or "MM\0*") and sets taken_at and the
+   * GPS fields of *out (width/height untouched). 1 if the block was valid, else 0.
+   * Thread-safe; callable from probe. */
+  int (*parse_exif)(void* ctx, const uint8_t* tiff, size_t size, PbMediaInfo* out);
 } PbHost;
 
 /* ---- Media: still images for the grid --------------------------------------------- */
 
-typedef struct PbMediaInfo {
+struct PbMediaInfo {
   uint32_t width, height; /* as displayed (after any rotation), in pixels */
   int64_t taken_at;       /* capture time, seconds since 1970 in local wall-clock time
                            * (like EXIF DateTimeOriginal); 0 = unknown (file time is used) */
@@ -84,7 +92,7 @@ typedef struct PbMediaInfo {
   int32_t has_altitude;       /* nonzero: altitude is set (only with has_gps) */
   double latitude, longitude; /* WGS 84 degrees, north / east positive */
   double altitude;            /* meters above sea level */
-} PbMediaInfo;
+};
 
 /* Destination for decoded pixels: alloc returns a buffer of width*height*4 bytes
  * (RGBA, 8 bits per channel, sRGB, rows top to bottom, tightly packed) or NULL. Call

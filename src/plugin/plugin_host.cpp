@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "library/exif.h"
 #include "platform/dynlib.h"
 #include "platform/paths.h"
 #include "plugin/photobrowse_plugin.h"
@@ -235,6 +236,22 @@ std::optional<std::string> PluginHost::load(const std::string& nameOrPath, const
     return it == section->second.end() ? nullptr : it->second.c_str();
   };
   h.cache_dir = cacheDirUtf8_.empty() ? nullptr : cacheDirUtf8_.c_str();
+  h.parse_exif = [](void*, const uint8_t* tiff, size_t size, PbMediaInfo* out) -> int {
+    if (!tiff || !out) return 0;
+    const auto info = parseExifBlock({tiff, size});
+    if (!info) return 0;
+    if (info->dateTimeOriginal) {
+      if (const auto t = parseExifDateTime(*info->dateTimeOriginal)) out->taken_at = *t;
+    }
+    if (info->gps) {
+      out->has_gps = 1;
+      out->latitude = info->gps->lat;
+      out->longitude = info->gps->lon;
+      out->has_altitude = info->gps->altitude ? 1 : 0;
+      if (info->gps->altitude) out->altitude = *info->gps->altitude;
+    }
+    return 1;
+  };
 
   l->api = entry(&l->host);
   if (!l->api) return "plugin " + toUtf8(path) + " declined to load (incompatible version?)";

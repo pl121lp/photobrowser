@@ -46,6 +46,40 @@ inline std::vector<uint8_t> readFile(const std::string& path, size_t maxBytes = 
   return data;
 }
 
+// Big-endian TIFF block with DateTimeOriginal "2026:06:16 21:56:20" and GPS 33 deg 52' 30" S,
+// 151 deg 12' 36" W, 122.5 m below sea level.
+inline std::vector<uint8_t> makeDateGpsTiff() {
+  std::vector<uint8_t> t = {'M', 'M', 0, 42};
+  auto be16 = [&](uint16_t x) { t.push_back(uint8_t(x >> 8)); t.push_back(uint8_t(x)); };
+  auto be32 = [&](uint32_t x) { be16(uint16_t(x >> 16)); be16(uint16_t(x)); };
+  auto entry = [&](uint16_t tag, uint16_t type, uint32_t count, uint32_t value) {
+    be16(tag); be16(type); be32(count); be32(value);
+  };
+  auto rat = [&](uint32_t n, uint32_t d) { be32(n); be32(d); };
+  be32(8);
+  be16(2);
+  entry(0x8769, 4, 1, 38);  // ExifIFD
+  entry(0x8825, 4, 1, 76);  // GPS IFD
+  be32(0);
+  be16(1);  // ExifIFD at 38
+  entry(0x9003, 2, 20, 56);
+  be32(0);
+  for (char c : std::string("2026:06:16 21:56:20")) t.push_back(uint8_t(c));
+  t.push_back(0);  // date at 56..76
+  be16(6);         // GPS IFD at 76
+  entry(1, 2, 2, uint32_t('S') << 24);
+  entry(2, 5, 3, 154);
+  entry(3, 2, 2, uint32_t('W') << 24);
+  entry(4, 5, 3, 178);
+  entry(5, 1, 1, 1u << 24);
+  entry(6, 5, 1, 202);
+  be32(0);
+  rat(33, 1); rat(52, 1); rat(3000, 100);
+  rat(151, 1); rat(12, 1); rat(36, 1);
+  rat(1225, 10);
+  return t;
+}
+
 // A valid 8-bit RGBA PNG (rgba holds w*h*4 bytes): IHDR, optional eXIf (a bare TIFF block),
 // one IDAT with a zlib stream of stored deflate blocks, IEND; real CRC-32s and Adler-32.
 inline std::vector<uint8_t> makePng(uint32_t w, uint32_t h, const std::vector<uint8_t>& rgba,

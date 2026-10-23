@@ -6,6 +6,7 @@
 #include "app/library_index.h"
 #include "library/catalog.h"
 #include "library/indexer.h"
+#include "library/exif.h"
 #include "library/media_format.h"
 #include "library/scanner.h"
 #include "platform/dynlib.h"
@@ -166,6 +167,24 @@ TEST_CASE("plugins: built-in formats come first and join the signature") {
   REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
   CHECK(host.formats().signature() == ".fake .png (core png 1, testfake 1.0)");
   CHECK(host.formats().find("a.PNG") == &builtin);
+}
+
+TEST_CASE("plugins: parse_exif gives plugins date and GPS") {
+  pb::PluginHost host;
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  const pb::MediaHandler* h = host.formats().find("x.fake");
+  REQUIRE(h);
+  pbtest::TempDir dir;
+  const auto tiff = pbtest::makeDateGpsTiff();
+  pbtest::writeFile(dir.path / "e.fake", std::string(tiff.begin(), tiff.end()));
+  auto probe = h->probe(dir.path / "e.fake");
+  REQUIRE(probe);
+  CHECK(probe->takenAt == *pb::parseExifDateTime("2026:06:16 21:56:20"));
+  REQUIRE(probe->gps);
+  CHECK(probe->gps->lat == doctest::Approx(-33.875));
+  CHECK(probe->gps->lon == doctest::Approx(-151.21));
+  REQUIRE(probe->gps->altitude);
+  CHECK(*probe->gps->altitude == doctest::Approx(-122.5));
 }
 
 TEST_CASE("plugins: load the test plugin and use its formats and players") {

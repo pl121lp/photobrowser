@@ -31,13 +31,26 @@ static int firstByte(const char* path) {
 
 static int probe(void* self, const char* path, PbMediaInfo* out) {
   (void)self;
-  if (firstByte(path) < 0) return 0;
+  const int first = firstByte(path);
+  if (first < 0) return 0;
   out->width = 40;
   out->height = 20;
   out->taken_at = 1234;
   out->has_gps = 1;
   out->latitude = -33.5;
   out->longitude = 151.25;
+  /* A TIFF block ("MM"/"II") goes through the host's EXIF parser. */
+  if ((first == 'M' || first == 'I') && g_host->struct_size >= offsetof(PbHost, parse_exif) + sizeof g_host->parse_exif) {
+    FILE* f = fopen(path, "rb");
+    if (f) {
+      uint8_t buf[512];
+      const size_t n = fread(buf, 1, sizeof buf, f);
+      fclose(f);
+      out->has_gps = 0;
+      out->taken_at = 0;
+      g_host->parse_exif(g_host->ctx, buf, n, out);
+    }
+  }
   return 1;
 }
 
