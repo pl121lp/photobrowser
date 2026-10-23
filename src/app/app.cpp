@@ -59,7 +59,7 @@ std::optional<Key> mapKey(SDL_Keycode k) {
   }
 }
 
-// Photo effect for keys 0-3 (top row or keypad); -1 for any other key.
+// Photo effect for keys 0-8 (top row or keypad); -1 for any other key.
 int photoEffectKey(SDL_Keycode k) {
   if (k >= SDLK_0 && k <= SDLK_0 + TileRenderer::kPhotoEffects) return int(k - SDLK_0);
   if (k == SDLK_KP_0) return 0;
@@ -589,7 +589,7 @@ int App::run(const Options& options) {
         overlay.draw(camera.viewport, overlayQuads);
       }
 
-      // Photo effect (keys 1-3): its name in the top-right corner while one is on.
+      // Photo effect (number keys): its name in the top-right corner while one is on.
       if (const std::string label = photoEffectLabel(ui.photoEffect()); !label.empty()) {
         overlayQuads.clear();
         buildPhotoEffectLabel(label, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,

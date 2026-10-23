@@ -1,6 +1,6 @@
 // Photo effect 2: Sobel edge detection, edges white on black.
-// No #version: spliced into tile.frag, which provides effectStep().
-float sobelLuma(sampler2D tex, vec2 uv) { return dot(texture(tex, uv).rgb, vec3(0.2126, 0.7152, 0.0722)); }
+// No #version: spliced into tile.frag, which provides effectStep() and effectSample().
+float sobelLuma(sampler2D tex, vec2 uv) { return dot(effectSample(tex, uv), vec3(0.2126, 0.7152, 0.0722)); }
 
 vec3 photoEffect(sampler2D tex, vec2 uv, vec3 c) {
   vec2 d = effectStep(tex, uv);

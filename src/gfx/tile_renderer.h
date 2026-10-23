@@ -22,7 +22,7 @@ struct TileInstance {
 class TileRenderer {
  public:
   // Photo effects (shaders/photo/*.frag), numbered from 1; 0 = none.
-  static constexpr int kPhotoEffects = 3;
+  static constexpr int kPhotoEffects = 8;
 
   ~TileRenderer();
   bool init();

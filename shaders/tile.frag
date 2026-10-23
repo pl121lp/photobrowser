@@ -5,6 +5,7 @@ flat in vec3 vParams;
 in vec2 vLocal;
 flat in vec2 vHalf;
 flat in vec4 vContent;
+flat in vec4 vUvBounds, vUvPrevBounds;
 
 uniform float uCornerRadius;  // fraction of the tile's shorter side; 0 = square
 uniform float uTransparentBars;  // 1 = letterbox bars transparent, 0 = black
@@ -14,13 +15,28 @@ uniform sampler2D uTexPrev;
 
 out vec4 fragColor;
 
-// Neighbour offset for photo effects: one screen pixel, at least one texel of the level.
+// Helpers for photo effects. effectBounds: the photo's rect in the texture being filtered,
+// set before each photoEffect() call.
+vec4 effectBounds;
+
+// Neighbour offset: one screen pixel, at least one texel of the level.
 vec2 effectStep(sampler2D tex, vec2 uv) {
   return max(fwidth(uv), 1.0 / vec2(textureSize(tex, 0)));
 }
 
-// Photo effect (shaders/photo/*.frag, keys 1-3 on the open photo): the renderer inserts
-// `#define PHOTO_EFFECT` and the effect's `vec3 photoEffect(sampler2D, vec2, vec3)` here.
+// texture(), clamped to the photo so neighbours never come from the next slot of the page.
+vec3 effectSample(sampler2D tex, vec2 uv) {
+  vec2 inset = 0.5 / vec2(textureSize(tex, 0));
+  vec2 lo = min(effectBounds.xy, effectBounds.zw) + inset, hi = max(effectBounds.xy, effectBounds.zw) - inset;
+  return texture(tex, clamp(uv, lo, hi)).rgb;
+}
+
+// Position in the drawn photo: -1..1 from left to right and top to bottom.
+vec2 effectPos() { return vLocal / vHalf; }
+
+// Photo effect (shaders/photo/*.frag, number keys on the open photo): the renderer inserts
+// `#define PHOTO_EFFECT` and the effect's `vec3 photoEffect(sampler2D tex, vec2 uv, vec3 c)`
+// here; `c` is the plain sample at `uv`.
 //@photo_effect
 
 void main() {
@@ -28,8 +44,12 @@ void main() {
   vec4 cur = texture(uTex, vUv);
   vec4 prev = texture(uTexPrev, vUvPrev);
 #ifdef PHOTO_EFFECT
+  effectBounds = vUvBounds;
   cur.rgb = photoEffect(uTex, vUv, cur.rgb);
-  prev.rgb = photoEffect(uTexPrev, vUvPrev, prev.rgb);
+  if (vParams.x < 1.0) {  // flat, so the branch is uniform per tile: derivatives stay valid
+    effectBounds = vUvPrevBounds;
+    prev.rgb = photoEffect(uTexPrev, vUvPrev, prev.rgb);
+  }
 #endif
   vec3 c = mix(prev.rgb, cur.rgb, vParams.x) * (1.0 - vParams.y);
   // Letterbox: black outside the image area (a full-tile area costs nothing visible).

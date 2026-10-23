@@ -14,6 +14,7 @@ flat out vec3 vParams;
 out vec2 vLocal;       // px from the tile centre
 flat out vec2 vHalf;   // tile half size, px
 flat out vec4 vContent;  // image area, px from the tile centre: x0, y0, x1, y1
+flat out vec4 vUvBounds, vUvPrevBounds;  // the tile's rect in uTex / uTexPrev (photo effects)
 
 void main() {
   vec2 corner = vec2(gl_VertexID & 1, gl_VertexID >> 1);
@@ -26,4 +27,6 @@ void main() {
   vHalf = abs(aRect.zw - aRect.xy) * 0.5;
   vLocal = (corner - 0.5) * (aRect.zw - aRect.xy);
   vContent = (aContent - 0.5) * (aRect.zw - aRect.xy).xyxy;
+  vUvBounds = aUv;
+  vUvPrevBounds = aUvPrev;
 }

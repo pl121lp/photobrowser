@@ -13,7 +13,11 @@ namespace pb {
 namespace {
 
 // Effect sources by number (TileRenderer::kPhotoEffects of them, from 1).
-constexpr const char* kPhotoEffectSources[] = {kShader_sharpen_frag, kShader_sobel_frag, kShader_saturate_frag};
+// Same order as the labels in src/view/overlay.cpp.
+constexpr const char* kPhotoEffectSources[] = {
+    kShader_sharpen_frag, kShader_sobel_frag, kShader_saturate_frag, kShader_bw_frag,
+    kShader_posterize_frag, kShader_sketch_frag, kShader_oilpaint_frag, kShader_tiltshift_frag,
+};
 static_assert(std::size(kPhotoEffectSources) == TileRenderer::kPhotoEffects);
 
 // tile.frag with the effect spliced in at its `//@photo_effect` marker.

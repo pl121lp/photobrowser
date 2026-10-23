@@ -246,7 +246,12 @@ TEST_CASE("photo effect: label per effect, none for 0 or unknown") {
   CHECK(pb::photoEffectLabel(1) == "1: Sharpen");
   CHECK(pb::photoEffectLabel(2) == "2: Sobel edges");
   CHECK(pb::photoEffectLabel(3) == "3: Saturation");
-  CHECK(pb::photoEffectLabel(4).empty());
+  CHECK(pb::photoEffectLabel(4) == "4: Black & white");
+  CHECK(pb::photoEffectLabel(5) == "5: Posterize");
+  CHECK(pb::photoEffectLabel(6) == "6: Pencil sketch");
+  CHECK(pb::photoEffectLabel(7) == "7: Oil paint");
+  CHECK(pb::photoEffectLabel(8) == "8: Tilt-shift");
+  CHECK(pb::photoEffectLabel(9).empty());
   CHECK(pb::photoEffectLabel(-1).empty());
 }
 
