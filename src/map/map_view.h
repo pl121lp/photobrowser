@@ -38,6 +38,7 @@ class MapView {
     std::optional<GeoPos> photoGps;      // its position, if any
     std::span<const GeoPos> visibleGps;  // grid: GPS of the visible photos (any order, duplicates ok)
     bool gridMoving = false;             // the content is moving
+    bool frozen = false;                 // keep showing what was shown (screensaver between photos)
   };
 
   explicit MapView(MapSettings s = {});

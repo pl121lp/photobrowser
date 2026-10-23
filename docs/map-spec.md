@@ -97,6 +97,9 @@ Pointer events over the map panel go to the map, everything else to the content:
   flies in to `photo_zoom` during the slide-in.
 - If the user has panned or zoomed the map manually, the next photo change still
   flies to the new photo (manual view is not sticky in single-photo mode).
+- Screensaver: while it flies through the grid to the next photo, the map keeps the
+  last photo's dot and view (no grid dots, no auto-fit); once the next photo opens the
+  map flies to it as above.
 - Photo without GPS: the map keeps its last view, dimmed, with a centred message
   "No location for this item". The next photo with GPS flies from there.
 

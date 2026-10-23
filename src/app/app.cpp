@@ -512,7 +512,7 @@ int App::run(const Options& options) {
         if (const auto o = ui.opened(); o && session.streamer && *o < session.lib.catalog.order.size()) {
           subject.photo = *o;
           subject.photoGps = session.lib.catalog.photos[session.lib.catalog.order[*o]].gps;
-        } else if (map.shown() && session.streamer) {
+        } else if (map.shown() && session.streamer && !screensaver.active()) {
           visiblePositions.clear();
           layout->visible(camera.visibleWorld(), visiblePositions);
           for (const uint32_t p : visiblePositions) {
@@ -522,6 +522,8 @@ int App::run(const Options& options) {
           subject.visibleGps = visibleGps;
         }
         subject.gridMoving = !ui.idle();
+        // Screensaver between photos: the map stays on the last one until the next opens.
+        subject.frozen = screensaver.active() && !subject.photo;
         map.update(seconds(now), dt, windowPx, uiScale, subject, mapTiles ? mapTiles->pending() : 0);
         const Rect content = map.contentRect(windowPx);
         if (const Vec2d size{content.width(), content.height()}; size != camera.viewport) ui.setViewport(size);

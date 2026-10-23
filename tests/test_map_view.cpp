@@ -356,3 +356,34 @@ TEST_CASE("map view: two offline results with nothing good close the map without
   CHECK_FALSE(f.map.isOpen());
   CHECK(f.map.takeNotice() == pb::MapNotice::NoInternet);
 }
+
+TEST_CASE("map view: a frozen subject keeps the dots and the view until the next photo opens") {
+  Fixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.run(5.5);  // arrived, pulse over
+  const pb::Vec2d c = f.map.camera().center;
+  // The screensaver closes the photo and flies through the grid: the map holds still.
+  const std::vector<pb::GeoPos> passing = {kRome, kBergen};
+  f.subject = {};
+  f.subject.visibleGps = passing;
+  f.subject.gridMoving = true;
+  f.subject.frozen = true;
+  f.run(1);
+  f.subject.gridMoving = false;
+  f.run(1);
+  CHECK(f.map.singleMode());
+  CHECK(f.map.dots().size() == 1);
+  CHECK(f.map.camera().center == c);
+  CHECK_FALSE(f.map.camera().flying());
+  CHECK_FALSE(f.map.animating(f.t));
+  // Arrived at the next photo: the map flies there as usual.
+  f.subject = {};
+  f.subject.photo = 2;
+  f.subject.photoGps = kRome;
+  f.step();
+  CHECK(f.map.camera().flying());
+  f.run(3.1);
+  checkCentre(f.map, kRome);
+}

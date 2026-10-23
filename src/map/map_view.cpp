@@ -149,7 +149,9 @@ void MapView::update(double t, double dt, Vec2d window, double uiScale, const Su
   slide_ = std::clamp(slideTween_.value(t), 0.0, 1.0);
   cam_.viewport = {panelWidth(window), window.y};
   cam_.uiScale = uiScale;
-  if (open_) {
+  if (open_ && s.frozen && !starting_) {
+    refitDue_ = false;  // dots and view stay as they are
+  } else if (open_) {
     if (s.photo) {
       updateSingle(t, s);
     } else {
