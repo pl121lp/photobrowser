@@ -198,3 +198,24 @@ rest), its whole-photo steps fly the map between locations. Frame interval in ms
 
 No measurable cost. The map page (one 4096² page, ~85 MB with mips) is created by the
 idle prewarm when a tile source is loaded and comes out of the `gpu_memory` budget.
+
+## 2026-10-23 — Video HDR tone mapping (spline curve, threaded)
+
+The HLG tone curve changed from "reference white = SDR white, shoulder above 75 %" to
+libplacebo's spline (videos were too bright, skies white). Measured per frame on the
+decode thread's colour conversion (`ColorConverter::convert`: swscale to RGB48, tone
+map, rotation), release flags (`-O3`), decoded 1080p HLG frames from the sample
+library, 16-thread laptop CPU, mean of 40:
+
+| Clip | before | after |
+|---|---|---|
+| 1920×1080 portrait (rotated 90°) | 28.6 ms | 16.9 ms |
+| 1920×1080 landscape | 21.6 ms | 15.6 ms |
+
+Before, a portrait frame was close to a 30 fps frame's 33 ms on one thread. The new
+curve alone is slower per pixel (13.7 → 20.7 ms single-threaded, after making its
+arithmetic vectorizable in 256-pixel chunks; written as one pass per pixel it was
+34 ms). It is now done in the same pass as the rotation (saves a 6 ms pass) and split
+across up to 3 helper threads; swscale's 7 ms is what remains. Stills (indexing) stay
+single-threaded, since several are decoded at once. Grid `--bench` is not affected
+(no video playback in it).

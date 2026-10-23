@@ -70,6 +70,9 @@ QuickResult quickIndex(const fs::path& root, const ScanEntry& e, const MediaForm
   rec.takenAt = e.mtime;
   rec.key = cacheKey(toUtf8(abs), e.size, e.mtime);
   if (const MediaHandler* handler = formats.find(e.relPath)) {
+    // The plugin's name and version are part of the key: an upgraded plugin may decode
+    // differently, so its cached stills must not be reused.
+    rec.key = cacheKey(toUtf8(abs) + '\n' + std::string(formats.origin(e.relPath)), e.size, e.mtime);
     quickIndexWithHandler(abs, *handler, q);
     return q;
   }

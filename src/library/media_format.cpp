@@ -35,6 +35,15 @@ const MediaHandler* MediaFormats::find(std::string_view path) const {
   return nullptr;
 }
 
+std::string_view MediaFormats::origin(std::string_view path) const {
+  if (handlers_.empty()) return {};
+  const std::string e = lowerExtension(path);
+  for (const Entry& h : handlers_) {
+    if (h.ext == e) return h.origin;
+  }
+  return {};
+}
+
 bool MediaFormats::accepts(std::string_view path) const {
   const std::string e = lowerExtension(path);
   return e == ".jpg" || e == ".jpeg" || find(path);

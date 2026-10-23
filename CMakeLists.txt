@@ -132,6 +132,7 @@ add_executable(pb_tests
   tests/test_tile_set.cpp
   tests/test_map_view.cpp
   tests/test_iso6709.cpp
+  tests/test_tonemap.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)

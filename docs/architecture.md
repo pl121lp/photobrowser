@@ -348,12 +348,17 @@ swresample). Extensions `.mp4 .mov .m4v .mkv .webm .avi .3gp`.
   frames; `player_frame` shows the newest frame whose time has come. The clock is wall
   time from the first decoded frame, paused with the player. A click plays / pauses;
   at the end a click restarts. No seeking yet. Nothing is read until the first click.
-- HDR (HLG / PQ, BT.2020 — e.g. Pixel phone videos) is tone-mapped to SDR with lookup
-  tables: SDR reference white (203 nits) stays white, highlights roll off above 75 % of
-  that white;
-  BT.2020 → BT.709 in linear light.
-- Cost: 1080p30 10-bit AV1 HDR ≈ 2 CPU cores (decoder threads + colour conversion),
-  only while a video plays.
+- HDR (HLG / PQ, BT.2020 — e.g. Pixel phone videos) is tone-mapped to SDR in
+  `plugins/video/tonemap.h`: libplacebo's default "spline" curve (what mpv shows) with a
+  fixed knee, from a 1000-nit peak to SDR white, on luminance with RGB scaled together
+  (bright skies keep their colour); HLG's OOTF on luminance; BT.2020 → BT.709 in linear
+  light; out-of-gamut colours pulled towards grey. Lookup tables, chunked so the
+  arithmetic vectorizes; rotation happens in the same pass. During playback the rows are
+  split over up to 3 helper threads (`RowPool`).
+- Cost: 1080p30 10-bit HDR ≈ 2 CPU cores (decoder threads + colour conversion), only
+  while a video plays; the conversion is ~16 ms per frame (see perf.md).
+- Thumbnail cache keys of plugin files include the plugin's name and version, so an
+  upgraded plugin's stills are never mixed with ones an older version made.
 
 **Map tiles plugin** (`plugins/maptiles`, libcurl + vendored stb_image). URL template
 (OSM by default), disk cache under `<cache>/photobrowse/maptiles/<hash of URL>/z/x/y`

@@ -100,6 +100,21 @@ TEST_CASE("media formats: indexer uses the handler for size, date and thumbnails
   CHECK(full->w == 30);
 }
 
+TEST_CASE("media formats: a plugin upgrade gives its files new thumbnail cache keys") {
+  pbtest::TempDir dir;
+  pbtest::writeFile(dir.path / "v.mp4", "ok");
+  FakeHandler h;
+  pb::MediaFormats v1, v1again, v2;
+  v1.add(".mp4", &h, "video 1.1");
+  v1again.add(".mp4", &h, "video 1.1");
+  v2.add(".mp4", &h, "video 1.2");
+  const auto scan = pb::scanFolder(dir.path, v1);
+  REQUIRE(scan.size() == 1);
+  const uint64_t k1 = pb::quickIndex(dir.path, scan[0], v1).rec.key;
+  CHECK(pb::quickIndex(dir.path, scan[0], v1again).rec.key == k1);
+  CHECK(pb::quickIndex(dir.path, scan[0], v2).rec.key != k1);  // stale stills are not reused
+}
+
 TEST_CASE("media formats: catalog remembers its formats; warm load requires the same set") {
   pbtest::TempDir photos, cache;
   fs::copy_file(pbtest::photo("PXL_20260321_003010085.jpg"), photos.path / "p.jpg");

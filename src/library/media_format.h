@@ -39,6 +39,8 @@ class MediaFormats {
   void add(std::string ext, const MediaHandler* handler, std::string origin = {});
   // Handler for a path's extension; nullptr for JPEG and unknown types.
   const MediaHandler* find(std::string_view path) const;
+  // Who handles a path's extension (the `origin` given to add); "" if none.
+  std::string_view origin(std::string_view path) const;
   bool accepts(std::string_view path) const;  // JPEG or a registered extension
   // Stable text naming the registered extensions and their origins ("" if none);
   // stored with the catalog so enabling, disabling or upgrading a plugin re-indexes

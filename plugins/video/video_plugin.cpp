@@ -13,6 +13,7 @@
 #include <cstring>
 #include <ctime>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -30,6 +31,7 @@ extern "C" {
 }
 
 #include "iso6709.h"
+#include "tonemap.h"
 
 #include "plugin/photobrowse_plugin.h"
 
@@ -162,15 +164,89 @@ CodecPtr openDecoder(const AVStream* st, int threads) {
 
 // ---- Colour: decoded frame -> RGBA8 sRGB ---------------------------------------------
 
-// HDR (HLG / PQ, BT.2020) is tone-mapped so SDR reference white (203 nits) stays white
-// and highlights roll off smoothly; SDR video converts directly.
+// Runs fn(begin, end) over [0, n) split between the calling thread and a few helper
+// threads (kept for the converter's lifetime). Tone-mapping a 1080p frame takes ~20 ms
+// on one core, too close to a 30 fps frame for one thread.
+class RowPool {
+ public:
+  explicit RowPool(unsigned helpers) {
+    for (unsigned i = 0; i < helpers; ++i) threads_.emplace_back([this, i] { work(i + 1); });
+  }
+  ~RowPool() {
+    {
+      std::lock_guard lock(m_);
+      quit_ = true;
+    }
+    cv_.notify_all();
+    for (auto& t : threads_) t.join();
+  }
+
+  template <class Fn>
+  void run(uint32_t n, Fn&& fn) {
+    const std::function<void(uint32_t, uint32_t)> job = fn;
+    {
+      std::lock_guard lock(m_);
+      job_ = &job;
+      n_ = n;
+      pending_ = unsigned(threads_.size());
+      ++generation_;
+    }
+    cv_.notify_all();
+    const auto [b, e] = part(0, n);
+    job(b, e);
+    std::unique_lock lock(m_);
+    done_.wait(lock, [&] { return pending_ == 0; });
+    job_ = nullptr;
+  }
+
+ private:
+  std::pair<uint32_t, uint32_t> part(unsigned i, uint32_t n) const {
+    const auto parts = uint64_t(threads_.size() + 1);
+    return {uint32_t(n * i / parts), uint32_t(n * (i + 1) / parts)};
+  }
+
+  void work(unsigned i) {
+    uint64_t seen = 0;
+    std::unique_lock lock(m_);
+    while (true) {
+      cv_.wait(lock, [&] { return quit_ || generation_ != seen; });
+      if (quit_) return;
+      seen = generation_;
+      const auto* job = job_;
+      const auto [b, e] = part(i, n_);
+      lock.unlock();
+      (*job)(b, e);
+      lock.lock();
+      if (--pending_ == 0) done_.notify_one();
+    }
+  }
+
+  std::mutex m_;
+  std::condition_variable cv_, done_;
+  const std::function<void(uint32_t, uint32_t)>* job_ = nullptr;
+  uint32_t n_ = 0;
+  unsigned pending_ = 0;
+  uint64_t generation_ = 0;
+  bool quit_ = false;
+  std::vector<std::thread> threads_;
+};
+
+// Decoded frames to upright RGBA. HDR (HLG / PQ) is tone-mapped (tonemap.h); SDR
+// video converts directly.
 // libswscale may store whole SIMD blocks past the end of a row (its unscaled YUV->RGB
 // path works in 16-pixel steps), so it always writes into this class's padded buffer,
 // never straight into `out`: a width like 1080 used to overrun the heap by 32 bytes.
 class ColorConverter {
  public:
-  // Writes w x h RGBA (tightly packed) scaled from the frame.
-  bool convert(const AVFrame* f, uint32_t w, uint32_t h, uint8_t* out, bool still) {
+  // `helpers`: extra threads for the per-pixel work (playback); 0 for stills, which
+  // already run on several of the host's threads at once.
+  explicit ColorConverter(unsigned helpers = 0) {
+    if (helpers) pool_ = std::make_unique<RowPool>(helpers);
+  }
+
+  // Scales the frame to w x h, rotates it clockwise by `rotation` (0/90/180/270) and
+  // writes it to `out` (tightly packed; h x w when rotated by 90 or 270).
+  bool convert(const AVFrame* f, uint32_t w, uint32_t h, int rotation, uint8_t* out, bool still) {
     const auto trc = f->color_trc;
     const bool hdr = trc == AVCOL_TRC_ARIB_STD_B67 || trc == AVCOL_TRC_SMPTE2084;
     const AVPixelFormat dst = hdr ? AV_PIX_FMT_RGB48 : AV_PIX_FMT_RGBA;
@@ -188,100 +264,63 @@ class ColorConverter {
     uint8_t* data[4] = {scaled_.data(), nullptr, nullptr, nullptr};
     int lines[4] = {int(stride), 0, 0, 0};
     sws_scale(sws_.get(), f->data, f->linesize, 0, f->height, data, lines);
-    if (!hdr) {
-      for (uint32_t y = 0; y < h; ++y, out += size_t(w) * 4) {
-        std::memcpy(out, scaled_.data() + y * stride, size_t(w) * 4);
-        for (size_t i = 3; i < size_t(w) * 4; i += 4) out[i] = 255;
-      }
-      return true;
-    }
-    buildLuts(trc);
+
     const bool wide = f->color_primaries == AVCOL_PRI_BT2020;
-    static constexpr float k2020to709[9] = {1.6605f, -0.5876f, -0.0728f, -0.1246f, 1.1329f,
-                                            -0.0083f, -0.0182f, -0.1006f, 1.1187f};
-    const float scale = float(kOutLut - 1) / kMaxLinear;
-    for (uint32_t y = 0; y < h; ++y) {
-      const auto* src = reinterpret_cast<const uint16_t*>(scaled_.data() + y * stride);
-      for (uint32_t x = 0; x < w; ++x, src += 3, out += 4) {
-        const float r = toLinear_[src[0] >> 6], g = toLinear_[src[1] >> 6], b = toLinear_[src[2] >> 6];
-        float c[3] = {r, g, b};
-        if (wide) {
-          c[0] = k2020to709[0] * r + k2020to709[1] * g + k2020to709[2] * b;
-          c[1] = k2020to709[3] * r + k2020to709[4] * g + k2020to709[5] * b;
-          c[2] = k2020to709[6] * r + k2020to709[7] * g + k2020to709[8] * b;
-        }
-        for (int k = 0; k < 3; ++k) {
-          const float v = std::clamp(c[k], 0.0f, kMaxLinear);
-          out[k] = toSrgb_[size_t(v * scale)];
-        }
-        out[3] = 255;
+    const auto transfer = trc == AVCOL_TRC_ARIB_STD_B67 ? pbvideo::HdrTransfer::Hlg : pbvideo::HdrTransfer::Pq;
+    if (hdr && (!tonemap_ || tonemapTrc_ != trc || tonemapWide_ != wide)) {
+      tonemap_ = std::make_unique<pbvideo::HdrToSdr>(transfer, wide);
+      tonemapTrc_ = trc;
+      tonemapWide_ = wide;
+    }
+    // Where source row y starts in `out`, and the step between its pixels.
+    auto placement = [&](uint32_t y) -> std::pair<ptrdiff_t, ptrdiff_t> {
+      switch (rotation) {
+        case 90: return {ptrdiff_t(h - 1 - y), ptrdiff_t(h)};
+        case 180: return {ptrdiff_t(h - 1 - y) * w + (w - 1), -1};
+        case 270: return {ptrdiff_t(w - 1) * h + y, -ptrdiff_t(h)};
+        default: return {ptrdiff_t(y) * w, 1};
       }
+    };
+    auto rows = [&](uint32_t begin, uint32_t end) {
+      for (uint32_t y = begin; y < end; ++y) {
+        const uint8_t* src = scaled_.data() + y * stride;
+        const auto [start, step] = placement(y);
+        uint8_t* dst = out + start * 4;
+        if (hdr) {
+          tonemap_->mapRow(reinterpret_cast<const uint16_t*>(src), dst, w, step);
+        } else if (step == 1) {
+          std::memcpy(dst, src, size_t(w) * 4);
+          for (size_t i = 3; i < size_t(w) * 4; i += 4) dst[i] = 255;
+        } else {
+          for (uint32_t x = 0; x < w; ++x, src += 4, dst += 4 * step) {
+            dst[0] = src[0];
+            dst[1] = src[1];
+            dst[2] = src[2];
+            dst[3] = 255;
+          }
+        }
+      }
+    };
+    if (pool_) {
+      pool_->run(h, rows);
+    } else {
+      rows(0, h);
     }
     return true;
   }
 
  private:
-  static constexpr size_t kInLut = 1024;   // 10-bit signal
-  static constexpr size_t kOutLut = 65536;
-  static constexpr float kMaxLinear = 50.0f;  // relative to SDR white (PQ peaks at 10000 / 203)
-  static constexpr size_t kSlack = 256;       // bytes after the last row, for good measure
+  static constexpr size_t kSlack = 256;  // bytes after the last row, for good measure
 
   static size_t paddedWidth(uint32_t w) { return (size_t(w) + 31) & ~size_t(31); }  // pixels
 
-  void buildLuts(int trc) {
-    if (lutTrc_ == trc) return;
-    lutTrc_ = trc;
-    toLinear_.resize(kInLut);
-    for (size_t i = 0; i < kInLut; ++i) {
-      const double e = double(i) / double(kInLut - 1);
-      double nits;
-      if (trc == AVCOL_TRC_ARIB_STD_B67) {
-        // HLG inverse OETF, then the OOTF for a 1000-nit display (gamma 1.2).
-        constexpr double a = 0.17883277, b = 0.28466892, c = 0.55991073;
-        const double scene = e <= 0.5 ? e * e / 3.0 : (std::exp((e - c) / a) + b) / 12.0;
-        nits = 1000.0 * std::pow(scene, 1.2);
-      } else {
-        // PQ (SMPTE ST 2084) EOTF.
-        constexpr double m1 = 0.1593017578125, m2 = 78.84375, c1 = 0.8359375, c2 = 18.8515625, c3 = 18.6875;
-        const double p = std::pow(e, 1.0 / m2);
-        nits = 10000.0 * std::pow(std::max(p - c1, 0.0) / (c2 - c3 * p), 1.0 / m1);
-      }
-      toLinear_[i] = float(nits / 203.0);
-    }
-    toSrgb_.resize(kOutLut);
-    for (size_t i = 0; i < kOutLut; ++i) {
-      const double x = double(i) / double(kOutLut - 1) * kMaxLinear;
-      // Identity up to the knee, then an exponential shoulder approaching white.
-      constexpr double knee = 0.75;
-      const double y = x <= knee ? x : knee + (1 - knee) * (1 - std::exp(-(x - knee) / (1 - knee)));
-      const double s = y <= 0.0031308 ? 12.92 * y : 1.055 * std::pow(y, 1 / 2.4) - 0.055;
-      toSrgb_[i] = uint8_t(std::lround(std::clamp(s, 0.0, 1.0) * 255));
-    }
-  }
-
   std::unique_ptr<SwsContext, SwsFree> sws_;
   std::vector<uint8_t> scaled_;  // padded rows: RGBA, or RGB48 for HDR
-  int lutTrc_ = -1;
-  std::vector<float> toLinear_;
-  std::vector<uint8_t> toSrgb_;
+  std::unique_ptr<pbvideo::HdrToSdr> tonemap_;
+  int tonemapTrc_ = -1;
+  bool tonemapWide_ = false;
+  std::unique_ptr<RowPool> pool_;
 };
-
-// Rotates RGBA w x h clockwise by `deg` (0/90/180/270) into dst.
-void rotateRgba(const uint8_t* src, uint32_t w, uint32_t h, int deg, uint8_t* dst) {
-  const auto* s = reinterpret_cast<const uint32_t*>(src);
-  auto* d = reinterpret_cast<uint32_t*>(dst);
-  for (uint32_t y = 0; y < h; ++y) {
-    for (uint32_t x = 0; x < w; ++x) {
-      const uint32_t p = s[size_t(y) * w + x];
-      switch (deg) {
-        case 90: d[size_t(x) * h + (h - 1 - y)] = p; break;
-        case 180: d[size_t(h - 1 - y) * w + (w - 1 - x)] = p; break;
-        case 270: d[size_t(w - 1 - x) * h + y] = p; break;
-        default: d[size_t(y) * w + x] = p; break;
-      }
-    }
-  }
-}
 
 // Semi-transparent disc with a play triangle in the middle, anti-aliased.
 void drawPlayBadge(uint8_t* rgba, uint32_t w, uint32_t h) {
@@ -319,16 +358,6 @@ void fitSize(const Source& s, uint32_t longEdge, uint32_t& w, uint32_t& h) {
   const double k = std::min(1.0, double(std::max(longEdge, 1u)) / natural);
   w = std::max(1u, uint32_t(std::lround(s.width * k)));
   h = std::max(1u, uint32_t(std::lround(s.height * k)));
-}
-
-// Converts a decoded frame to upright RGBA of the source's pre-rotation size w x h.
-bool frameToRgba(ColorConverter& cc, const Source& s, const AVFrame* f, uint32_t w, uint32_t h,
-                 std::vector<uint8_t>& scratch, uint8_t* out, bool still) {
-  if (s.rotation == 0) return cc.convert(f, w, h, out, still);
-  scratch.resize(size_t(w) * h * 4);
-  if (!cc.convert(f, w, h, scratch.data(), still)) return false;
-  rotateRgba(scratch.data(), w, h, s.rotation, out);
-  return true;
 }
 
 // ---- Stills -----------------------------------------------------------------------------
@@ -393,8 +422,7 @@ int decodeStill(void*, const char* path, uint32_t minLongEdge, PbImageOut* out) 
   uint8_t* px = out->alloc(out->ctx, dw, dh);
   if (!px) return 0;
   ColorConverter cc;
-  std::vector<uint8_t> scratch;
-  if (!frameToRgba(cc, *s, frame.get(), w, h, scratch, px, true)) return 0;
+  if (!cc.convert(frame.get(), w, h, s->rotation, px, true)) return 0;
   drawPlayBadge(px, dw, dh);
   return 1;
 }
@@ -485,8 +513,7 @@ void playLoop(std::shared_ptr<PlayState> st) {
     st->h = s->rotation % 180 ? w : h;
   }
   const double timeBase = av_q2d(s->videoStream()->time_base);
-  ColorConverter cc;
-  std::vector<uint8_t> scratch;
+  ColorConverter cc(std::clamp(std::thread::hardware_concurrency() / 4, 1u, 3u));
   std::vector<float> samples;
   std::deque<PacketPtr> videoPackets;
   PacketPtr pkt(av_packet_alloc());
@@ -548,7 +575,7 @@ void playLoop(std::shared_ptr<PlayState> st) {
         vf.rgba.resize(size_t(w) * h * 4);
         const int64_t ts = frame->best_effort_timestamp;
         vf.pts = ts == AV_NOPTS_VALUE ? 0 : ts * timeBase;
-        if (frameToRgba(cc, *s, frame.get(), w, h, scratch, vf.rgba.data(), false)) {
+        if (cc.convert(frame.get(), w, h, s->rotation, vf.rgba.data(), false)) {
           std::lock_guard lock(st->m);
           if (!st->clockStarted) {
             // The clock starts with the first frame so opening the file costs no frames.
@@ -700,7 +727,7 @@ const PbPlugin kPlugin = {
     PB_PLUGIN_ABI_VERSION,
     sizeof(PbPlugin),
     "video",
-    "1.1",
+    "1.2",
     "Video files (FFmpeg): first frame in the grid, click to play / pause in whole-photo view",
     nullptr,
     kExtensions,
