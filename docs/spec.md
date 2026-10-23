@@ -171,6 +171,8 @@ that size is deferred (see architecture §10).
    clusters by trip/day, etc.
 5. **Shader special effects** — post-processing and per-photo effects (motion blur,
    vignette, film grain, color grading, transitions).
+6. **Map view** — `M` shows where photos were taken on an OpenStreetMap map beside
+   the photo or grid (tiles from a plugin). Fully specified in `docs/map-spec.md`.
 
 ## 6. Decisions log
 Decided by the user:

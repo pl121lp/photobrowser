@@ -10,6 +10,7 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
   shader effects) slot in.
 - `docs/plans/` — implementation plans.
 - `docs/perf.md` — benchmark method, results, and the causes of past hitches.
+- `docs/map-spec.md` — map view (`M`): decisions and architecture, not yet implemented.
 
 ## Module map
 - `src/app/config` user settings (config.ini) — new settings go there with a
