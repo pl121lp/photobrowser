@@ -249,6 +249,37 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "performance.gpu_memory") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 256 || *d > 16384) warn(key + " must be between 256 and 16384 MB; clamped");
+        c.gpuMemoryMB = int(std::clamp(*d, 256.0, 16384.0));
+      } else {
+        bad("a number of MB");
+      }
+    } else if (key == "performance.disk_cache") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 0.25 || *d > 1000) warn(key + " must be between 0.25 and 1000 GB; clamped");
+        c.diskCacheGB = std::clamp(*d, 0.25, 1000.0);
+      } else {
+        bad("a number of GB");
+      }
+    } else if (key == "performance.cache_dir") {
+      c.cacheDir = value.empty() ? fs::path{} : expandPath(value);
+    } else if (key == "performance.decode_threads") {
+      if (value == "auto") {
+        c.decodeThreads = 0;
+      } else if (auto d = parseNumber(value); d && *d == std::floor(*d)) {
+        if (*d < 1 || *d > 32) warn(key + " must be auto or between 1 and 32; clamped");
+        c.decodeThreads = int(std::clamp(*d, 1.0, 32.0));
+      } else {
+        bad("auto or a whole number");
+      }
+    } else if (key == "performance.vsync") {
+      if (auto b = parseBool(value)) {
+        c.vsync = *b;
+      } else {
+        bad("on/off");
+      }
     } else if (key == "screensaver.enabled") {
       if (auto b = parseBool(value)) {
         c.screensaver = *b;
@@ -353,6 +384,24 @@ std::string defaultConfigText() {
 #   discrete   : the dedicated GPU (more headroom: high-refresh monitors, heavy shaders)
 # Linux only; on Windows use Settings > System > Display > Graphics.
 # gpu = auto
+
+[performance]
+# GPU memory for photo images, in MB. More keeps more photos sharp when zooming
+# around; less leaves room for other programs (256 to 16384).
+# gpu_memory = 640
+# Size limit of the thumbnail cache on disk, in GB (0.25 to 1000). Trimmed at startup,
+# least recently used first.
+# disk_cache = 4
+# Where the cache goes (empty = the per-user cache folder, e.g. ~/.cache/photobrowse).
+# The --cache-dir option wins.
+# cache_dir =
+# Threads decoding photos while you browse: auto (2 to 4, depending on the CPU) or a
+# number (1 to 32). More load faster but compete with drawing; indexing a new library
+# always uses all cores.
+# decode_threads = auto
+# Wait for the display refresh (smooth, no tearing). off = draw as fast as possible
+# (only useful for measuring).
+# vsync = on
 
 [screensaver]
 # Screensaver mode (F5 toggles; any click, scroll or key stops it): flies to a random
@@ -462,6 +511,7 @@ void applyOptions(Config& config, const Options& options) {
   if (options.photoDir) config.photoFolder = *options.photoDir;
   if (options.stats) config.stats = true;
   if (options.windowed) config.fullscreen = false;
+  if (options.cacheDir) config.cacheDir = *options.cacheDir;
 }
 
 }  // namespace pb

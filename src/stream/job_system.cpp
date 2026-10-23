@@ -1,7 +1,6 @@
 #include "stream/job_system.h"
 
 #include <algorithm>
-#include <cstdlib>
 
 #include "platform/paths.h"
 
@@ -9,12 +8,10 @@ namespace pb {
 
 unsigned defaultWorkerCount() { return std::max(2u, std::thread::hardware_concurrency() - 1); }
 
-unsigned streamingWorkerCount() {
+unsigned streamingWorkerCount(unsigned configured) {
+  if (configured > 0) return configured;
   // More decoders compete with the (often integrated) GPU for memory bandwidth
   // and with the render thread for CPU; measured smoother frames with 4 than 15.
-  if (const char* env = std::getenv("PB_WORKERS")) {
-    if (const int n = std::atoi(env); n > 0) return unsigned(n);
-  }
   return std::clamp(std::thread::hardware_concurrency() / 4, 2u, 4u);
 }
 

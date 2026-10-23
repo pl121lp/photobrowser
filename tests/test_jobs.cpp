@@ -96,3 +96,11 @@ TEST_CASE("jobs: streaming pool is small so decoding cannot starve rendering") {
   CHECK(pb::streamingWorkerCount() >= 2);
   CHECK(pb::streamingWorkerCount() <= 4);
 }
+
+TEST_CASE("jobs: streaming worker count is configurable, auto stays in 2..4") {
+  CHECK(pb::streamingWorkerCount(3) == 3);
+  CHECK(pb::streamingWorkerCount(1) == 1);
+  const unsigned automatic = pb::streamingWorkerCount(0);
+  CHECK(automatic >= 2);
+  CHECK(automatic <= 4);
+}

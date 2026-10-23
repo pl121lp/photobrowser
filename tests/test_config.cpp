@@ -341,3 +341,56 @@ TEST_CASE("config: letterbox bars black or transparent") {
   CHECK(hasWarning(bad, "line 2"));
   CHECK(pb::defaultConfigText().find("# letterbox_bars = black\n") != std::string::npos);
 }
+
+TEST_CASE("config: performance settings default to the built-in values") {
+  const pb::Config c;
+  CHECK(c.gpuMemoryMB == 640);
+  CHECK(c.diskCacheGB == doctest::Approx(4));
+  CHECK(c.cacheDir.empty());
+  CHECK(c.decodeThreads == 0);  // auto
+  CHECK(c.vsync);
+}
+
+TEST_CASE("config: performance settings parse, clamp and report mistakes") {
+  auto r = pb::parseConfig(
+      "[performance]\ngpu_memory = 1024\ndisk_cache = 0.5\ncache_dir = /tmp/pbc\ndecode_threads = 6\nvsync = off\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.gpuMemoryMB == 1024);
+  CHECK(r.config.diskCacheGB == doctest::Approx(0.5));
+  CHECK(r.config.cacheDir == std::filesystem::path("/tmp/pbc"));
+  CHECK(r.config.decodeThreads == 6);
+  CHECK_FALSE(r.config.vsync);
+  CHECK(pb::parseConfig("[performance]\ndecode_threads = auto\n").config.decodeThreads == 0);
+
+  auto clamped = pb::parseConfig("[performance]\ngpu_memory = 10\ndisk_cache = 0\ndecode_threads = 500\n");
+  CHECK(clamped.config.gpuMemoryMB == 256);
+  CHECK(clamped.config.diskCacheGB == doctest::Approx(0.25));
+  CHECK(clamped.config.decodeThreads == 32);
+  CHECK(hasWarning(clamped, "line 2"));
+  CHECK(hasWarning(clamped, "line 3"));
+  CHECK(hasWarning(clamped, "line 4"));
+
+  auto bad = pb::parseConfig("[performance]\ngpu_memory = lots\ndecode_threads = many\nvsync = sometimes\n");
+  CHECK(bad.config.gpuMemoryMB == 640);
+  CHECK(bad.config.decodeThreads == 0);
+  CHECK(bad.config.vsync);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(hasWarning(bad, "line 3"));
+  CHECK(hasWarning(bad, "line 4"));
+
+  const std::string text = pb::defaultConfigText();
+  for (auto line : {"# gpu_memory = 640\n", "# disk_cache = 4\n", "# cache_dir =\n", "# decode_threads = auto\n",
+                    "# vsync = on\n"}) {
+    CHECK(text.find(line) != std::string::npos);
+  }
+}
+
+TEST_CASE("config: --cache-dir wins over cache_dir") {
+  pb::Config c = pb::parseConfig("[performance]\ncache_dir = /from/config\n").config;
+  pb::Options o;
+  pb::applyOptions(c, o);
+  CHECK(c.cacheDir == std::filesystem::path("/from/config"));
+  o.cacheDir = "/from/cli";
+  pb::applyOptions(c, o);
+  CHECK(c.cacheDir == std::filesystem::path("/from/cli"));
+}

@@ -36,8 +36,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr size_t kVramBudget = size_t(640) << 20;
-constexpr uint64_t kDiskCacheCap = uint64_t(4) << 30;
 constexpr int64_t kBackgroundPriority = int64_t(1) << 40;
 
 void* glProc(const char* name) { return reinterpret_cast<void*>(SDL_GL_GetProcAddress(name)); }
@@ -119,7 +117,9 @@ int App::run(const Options& options) {
     std::fprintf(stderr, "photobrowse: photo folder '%s' does not exist\n", toUtf8(config.photoFolder).c_str());
     return 2;
   }
-  const fs::path libDir = libraryCacheDir(options.cacheDir ? fs::absolute(*options.cacheDir) : defaultCacheRoot(), root);
+  const size_t vramBudget = size_t(config.gpuMemoryMB) << 20;
+  const auto diskCacheCap = uint64_t(config.diskCacheGB * double(uint64_t(1) << 30));
+  const fs::path libDir = libraryCacheDir(config.cacheDir.empty() ? defaultCacheRoot() : fs::absolute(config.cacheDir), root);
   if (options.rebuildCache) fs::remove_all(libDir, ec);
   fs::create_directories(libDir, ec);
 
@@ -183,7 +183,11 @@ int App::run(const Options& options) {
     SDL_Quit();
     return 1;
   }
-  if (!SDL_GL_SetSwapInterval(-1)) SDL_GL_SetSwapInterval(1);
+  if (!config.vsync) {
+    SDL_GL_SetSwapInterval(0);
+  } else if (!SDL_GL_SetSwapInterval(-1)) {
+    SDL_GL_SetSwapInterval(1);  // no adaptive vsync
+  }
   std::printf("OpenGL: %s (%s)\n", reinterpret_cast<const char*>(gl::GetString(GL_RENDERER)),
               reinterpret_cast<const char*>(gl::GetString(GL_VERSION)));
   gl::Enable(GL_FRAMEBUFFER_SRGB);
@@ -195,7 +199,7 @@ int App::run(const Options& options) {
     ThumbCache thumbs(libDir);
     Session session;
     auto stopBackground = std::make_shared<std::atomic<bool>>(false);  // set on quit
-    auto jobs = std::make_unique<JobSystem>(streamingWorkerCount());
+    auto jobs = std::make_unique<JobSystem>(streamingWorkerCount(unsigned(config.decodeThreads)));
     std::unique_ptr<JobSystem> indexJobs;  // all cores, only while first-run indexing
     std::unique_ptr<Indexer> indexer;
     GpuTextures textures;
@@ -282,7 +286,7 @@ int App::run(const Options& options) {
       ui.resetView();
       const size_t l0Pages = (session.lib.catalog.photos.size() + 16383) / 16384;
       const size_t fullReserve = size_t(Streamer::kFullSlots) * 3840 * 2880 * 4 * 4 / 3;
-      const size_t budget = kVramBudget - std::min(kVramBudget / 2, l0Pages * kPageBytes + fullReserve);
+      const size_t budget = vramBudget - std::min(vramBudget / 2, l0Pages * kPageBytes + fullReserve);
       prewarmPages = l0Pages + budget / kPageBytes;
       session.streamer =
           std::make_unique<Streamer>(session.lib.catalog, root, thumbs, *jobs, textures, budget, formats);
@@ -299,9 +303,9 @@ int App::run(const Options& options) {
       // Pick up folder changes for the next launch; trim the disk cache.
       auto snapshot = std::make_shared<LibraryState>(session.lib);
       jobs->submit(kBackgroundPriority, [root, libDir, snapshot, stop = stopBackground, &thumbs, &formats,
-                                         recursive = config.recursive] {
+                                         recursive = config.recursive, diskCacheCap] {
         refreshLibrary(root, libDir, *snapshot, thumbs, stop.get(), formats, recursive);
-        if (!*stop) thumbs.sweep(kDiskCacheCap);
+        if (!*stop) thumbs.sweep(diskCacheCap);
       });
     } else {
       indexJobs = std::make_unique<JobSystem>(defaultWorkerCount());
@@ -538,7 +542,7 @@ int App::run(const Options& options) {
         os.p99Ms = history.percentile(99);
         os.jobs = st.pendingJobs;
         os.vramMB = double(st.vramBytes) / (1 << 20);
-        os.budgetMB = double(kVramBudget >> 20);
+        os.budgetMB = double(vramBudget >> 20);
         os.photos = session.lib.catalog.order.size();
         os.tiles = draws.size();
         os.tilePx = layout->count() ? layout->place(0).photo.width() * camera.scale : 0;

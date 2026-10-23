@@ -224,6 +224,10 @@ Calls made by Claude (open to change):
   letterbox shows each photo whole inside its square with black bars; opening a photo
   then grows from the letterboxed photo. Done in the tile shader (image-area mask), so
   it composes with rounded corners and plugin content.
+- `[performance]` exposes the built-in tuning values without changing them:
+  `gpu_memory` (MB, default 640), `disk_cache` (GB, default 4), `cache_dir` (default
+  per-user cache; `--cache-dir` wins), `decode_threads` (default auto = 2–4; replaces
+  the `PB_WORKERS` environment variable), `vsync` (default on, adaptive if available).
 - `[view] letterbox_bars = black | transparent` (default black): with transparent the
   bars are see-through, so letterboxed photos float on the background. Same mask in
   the tile shader, applied to alpha; tile draws blend (no measurable cost, as for

@@ -18,7 +18,9 @@ struct CancelToken {
 };
 
 unsigned defaultWorkerCount();    // max(2, hardware threads - 1): bulk indexing
-unsigned streamingWorkerCount();  // 2..4: loads while browsing (PB_WORKERS overrides)
+// Loads while browsing: `configured` threads ([performance] decode_threads), or for
+// 0 (auto) 2..4 depending on the CPU.
+unsigned streamingWorkerCount(unsigned configured = 0);
 
 // Fixed pool of worker threads running prioritized jobs (lower priority value first,
 // FIFO among equal priorities).

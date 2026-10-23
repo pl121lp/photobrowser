@@ -3,8 +3,8 @@
 How to measure: `photobrowse <folder> --bench` runs a scripted 10.5 s tour in
 fullscreen (zoom out to the whole grid, two flings, zoom into detail, whole-photo
 view, step ×3, leave) and prints frame-interval percentiles. Frames with > 20 ms of
-CPU work are listed with a phase breakdown. `PB_WORKERS=<n>` overrides the number of
-streaming decode threads. Build with the `linux-release` preset.
+CPU work are listed with a phase breakdown. `[performance] decode_threads` (formerly
+the `PB_WORKERS` environment variable) sets the number of streaming decode threads. Build with the `linux-release` preset.
 
 "Frame interval" is the time between successive `SwapWindow` returns. With vsync at
 60 Hz it is 16.7 ms ± ~1 ms of measurement jitter; a dropped frame shows as ~33 ms,

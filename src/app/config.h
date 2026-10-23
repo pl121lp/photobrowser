@@ -67,6 +67,13 @@ struct Config {
   double backgroundDensity = 1.0;  // star/light count multiplier (0.1..4): warp, starfield, bokeh
   std::map<std::string, PresetColors> presetColors;  // by preset name
   GpuPreference gpu = GpuPreference::Auto;
+  // [performance]
+  int gpuMemoryMB = 640;         // GPU memory budget for photo textures (256..16384)
+  double diskCacheGB = 4;        // thumbnail cache size cap on disk (0.25..1000)
+  std::filesystem::path cacheDir;  // cache root; empty = per-user default (--cache-dir wins)
+  int decodeThreads = 0;         // threads decoding while browsing; 0 = auto (2..4)
+  bool vsync = true;             // sync to the display refresh (adaptive if available)
+
   bool screensaver = false;      // start in screensaver mode (F5 toggles)
   double screensaverHold = 30;   // seconds on each photo (1..3600)
   double screensaverSlowZoom = 1;  // zoom reached by the end of each hold (1 = off, max 2)

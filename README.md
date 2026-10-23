@@ -45,7 +45,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | Option | |
 |---|---|
 | `--config <file>` | settings file to use instead of the default location |
-| `--cache-dir <dir>` | thumbnail cache root (default: `$XDG_CACHE_HOME` or `~/.cache`; `%LOCALAPPDATA%` on Windows) |
+| `--cache-dir <dir>` | thumbnail cache root (default: `[performance] cache_dir`, else `$XDG_CACHE_HOME` or `~/.cache`; `%LOCALAPPDATA%` on Windows) |
 | `--rebuild-cache` | discard this library's cache and re-index |
 | `--layout square-crop` | layout mode (only one so far) |
 | `--windowed` | start in a window instead of fullscreen (overrides `[display] fullscreen`) |
@@ -88,6 +88,13 @@ graph = false              # frame-time graph in the fullscreen panel
 [display]
 fullscreen = true          # start fullscreen (--windowed starts in a window)
 gpu = auto                 # auto | integrated | discrete (laptops with two GPUs, Linux)
+
+[performance]
+gpu_memory = 640           # MB of GPU memory for photo images (256 to 16384)
+disk_cache = 4             # GB limit of the thumbnail cache on disk (trimmed at startup)
+cache_dir =                # cache location; empty = per-user default (--cache-dir wins)
+decode_threads = auto      # threads decoding while browsing: auto (2-4) or 1 to 32
+vsync = on                 # off = draw as fast as possible (for measuring only)
 
 [screensaver]
 enabled = off              # on = start in screensaver mode (F5 toggles)
