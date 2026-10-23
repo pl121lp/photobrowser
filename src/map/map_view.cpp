@@ -63,15 +63,28 @@ Vec2d MapView::toPanel(Vec2d px) const {
   return {px.x - p.x0, px.y - p.y0};
 }
 
+namespace {
+constexpr double kClickSlopPx = 4;
+constexpr double kDotHitPx = 10;  // grid dot radius incl. ring (6) plus slack, at display scale 1
+const std::vector<uint32_t> kNoPhotos;
+}  // namespace
+
 bool MapView::pointerDown(Vec2d px, double t) {
   if (!shown() || !panelRect(window_).contains(px)) return false;
   captured_ = true;
+  pointer_.reset();
+  pressAt_ = px;
+  const auto dot = dotAt(px);
+  pressPhotos_ = dot ? dotPhotos_[*dot] : std::vector<uint32_t>{};
   cam_.onPointerDown(toPanel(px), t);
   return true;
 }
 
 bool MapView::pointerMove(Vec2d px, double t) {
-  if (!captured_) return false;
+  if (!captured_) {  // hover: remembered, but the content gets the event too
+    pointer_ = shown() && panelRect(window_).contains(px) ? std::optional(px) : std::nullopt;
+    return false;
+  }
   cam_.onPointerMove(toPanel(px), t);
   return true;
 }
@@ -79,8 +92,42 @@ bool MapView::pointerMove(Vec2d px, double t) {
 bool MapView::pointerUp(Vec2d px, double t) {
   if (!captured_) return false;
   captured_ = false;
+  if (!pressPhotos_.empty() && length(px - pressAt_) < kClickSlopPx) clicked_ = std::move(pressPhotos_);
+  pressPhotos_.clear();
+  pointer_ = panelRect(window_).contains(px) ? std::optional(px) : std::nullopt;
   cam_.onPointerUp(toPanel(px), t);
   return true;
+}
+
+void MapView::pointerLeave() { pointer_.reset(); }
+
+const std::vector<uint32_t>& MapView::dotPhotos(size_t dot) const {
+  return dot < dotPhotos_.size() ? dotPhotos_[dot] : kNoPhotos;
+}
+
+const std::vector<uint32_t>& MapView::hoveredPhotos() const {
+  return hoveredDot_ ? dotPhotos(*hoveredDot_) : kNoPhotos;
+}
+
+Vec2d MapView::dotScreen(size_t dot) const {
+  Vec2d d = dots_[dot];
+  d.x -= std::round(d.x - cam_.center.x);  // the copy of the world nearest the view
+  const Rect p = panelRect(window_);
+  return cam_.worldToScreen(d) + Vec2d{p.x0, p.y0};
+}
+
+std::optional<size_t> MapView::dotAt(Vec2d px) const {
+  if (single_ || !shown()) return std::nullopt;
+  std::optional<size_t> best;
+  double bestD = kDotHitPx * uiScale_;
+  for (size_t i = 0; i < dots_.size(); ++i) {
+    const double d = length(dotScreen(i) - px);
+    if (d <= bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return best;
 }
 
 bool MapView::wheel(Vec2d px, double notches) {
@@ -100,6 +147,7 @@ void MapView::updateSingle(double t, const Subject& s) {
   single_ = true;
   photo_ = s.photo;
   dots_.clear();
+  dotPhotos_.clear();
   if (at) dots_.push_back(*at);
   if (!changed || !at) return;
   if (starting_) cam_.jumpTo(*at, kOpenZoom);
@@ -116,12 +164,24 @@ void MapView::updateGrid(double t, const Subject& s) {
   single_ = false;
   photo_.reset();
   pulsePending_ = false;
-  dots_.clear();
-  for (const GeoPos& g : s.visibleGps) {
-    if (auto w = toWorld(g)) dots_.push_back(*w);
+  // One dot per position, remembering the photos taken there.
+  std::vector<std::pair<Vec2d, uint32_t>> located;
+  for (size_t i = 0; i < s.visibleGps.size(); ++i) {
+    if (auto w = toWorld(s.visibleGps[i])) located.emplace_back(*w, i < s.visiblePos.size() ? s.visiblePos[i] : 0);
   }
-  std::sort(dots_.begin(), dots_.end(), [](Vec2d a, Vec2d b) { return a.x != b.x ? a.x < b.x : a.y < b.y; });
-  dots_.erase(std::unique(dots_.begin(), dots_.end()), dots_.end());
+  std::sort(located.begin(), located.end(), [](const auto& a, const auto& b) {
+    return a.first.x != b.first.x ? a.first.x < b.first.x : a.first.y != b.first.y ? a.first.y < b.first.y
+                                                                                   : a.second < b.second;
+  });
+  dots_.clear();
+  dotPhotos_.clear();
+  for (const auto& [w, pos] : located) {
+    if (dots_.empty() || dots_.back() != w) {
+      dots_.push_back(w);
+      dotPhotos_.emplace_back();
+    }
+    if (!s.visiblePos.empty()) dotPhotos_.back().push_back(pos);
+  }
 
   if (starting_) {
     const auto v = fit();
@@ -149,6 +209,7 @@ void MapView::update(double t, double dt, Vec2d window, double uiScale, const Su
   slide_ = std::clamp(slideTween_.value(t), 0.0, 1.0);
   cam_.viewport = {panelWidth(window), window.y};
   cam_.uiScale = uiScale;
+  uiScale_ = uiScale;
   if (open_ && s.frozen && !starting_) {
     refitDue_ = false;  // dots and view stay as they are
   } else if (open_) {
@@ -165,6 +226,18 @@ void MapView::update(double t, double dt, Vec2d window, double uiScale, const Su
   if (pulsePending_ && cam_.idle()) {
     pulsePending_ = false;
     pulseStart_ = t;
+  }
+
+  // Linking the grid and the map (grid only): the dot under the pointer, else the dot of
+  // the photo under the pointer.
+  hoveredDot_ = pointer_ && !captured_ && open_ ? dotAt(*pointer_) : std::nullopt;
+  highlightedDot_ = hoveredDot_;
+  if (!highlightedDot_ && s.hoveredPhoto && !single_) {
+    for (size_t i = 0; i < dotPhotos_.size() && !highlightedDot_; ++i) {
+      if (std::find(dotPhotos_[i].begin(), dotPhotos_[i].end(), *s.hoveredPhoto) != dotPhotos_[i].end()) {
+        highlightedDot_ = i;
+      }
+    }
   }
 
   // No internet: offline results and nothing good, once everything asked has failed or

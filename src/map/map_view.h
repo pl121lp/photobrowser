@@ -5,6 +5,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "core/geom.h"
@@ -37,6 +38,8 @@ class MapView {
     std::optional<uint32_t> photo;       // open photo (layout position); nullopt = grid
     std::optional<GeoPos> photoGps;      // its position, if any
     std::span<const GeoPos> visibleGps;  // grid: GPS of the visible photos (any order, duplicates ok)
+    std::span<const uint32_t> visiblePos;  // their layout positions, same order (empty: unknown)
+    std::optional<uint32_t> hoveredPhoto;  // grid: the photo under the pointer (highlights its dot)
     bool gridMoving = false;             // the content is moving
     bool frozen = false;                 // keep showing what was shown (screensaver between photos)
   };
@@ -58,12 +61,22 @@ class MapView {
   bool pointerMove(Vec2d px, double t);
   bool pointerUp(Vec2d px, double t);
   bool wheel(Vec2d px, double notches);
+  void pointerLeave();  // the pointer left the window: nothing hovered
 
   void update(double t, double dt, Vec2d window, double uiScale, const Subject& s, size_t tilesPending);
   void tileResults(std::span<const TileStatus> results);
   std::optional<MapNotice> takeNotice();
 
   const std::vector<Vec2d>& dots() const { return dots_; }  // world positions, deduplicated
+  // Grid: layout positions of the photos a dot stands for (photos taken at one spot share a dot).
+  const std::vector<uint32_t>& dotPhotos(size_t dot) const;
+  Vec2d dotScreen(size_t dot) const;  // window px, on the copy of the world nearest the view
+  // Grid only (nothing while a photo is open): the dot hovered on the map, or the dot of
+  // the photo hovered in the grid; the photos of the dot hovered on the map; the photos of
+  // a dot clicked on the map (once).
+  std::optional<size_t> highlightedDot() const { return highlightedDot_; }
+  const std::vector<uint32_t>& hoveredPhotos() const;
+  std::vector<uint32_t> takeClickedPhotos() { return std::exchange(clicked_, {}); }
   bool singleMode() const { return single_; }
   std::optional<double> pulse(double t) const;  // halo phase 0..1 while pulsing
   std::string_view status() const;              // "" or why there are no dots
@@ -80,6 +93,7 @@ class MapView {
   void updateSingle(double t, const Subject& s);
   void updateGrid(double t, const Subject& s);
   std::optional<MapCamera::View> fit() const;
+  std::optional<size_t> dotAt(Vec2d px) const;  // grid dot under window px
 
   MapSettings settings_;
   MapCamera cam_;
@@ -94,6 +108,12 @@ class MapView {
   bool single_ = false;
   std::optional<uint32_t> photo_;
   std::vector<Vec2d> dots_;
+  std::vector<std::vector<uint32_t>> dotPhotos_;  // per dot (grid)
+  std::optional<Vec2d> pointer_;                  // over the panel, not dragging
+  std::optional<size_t> hoveredDot_, highlightedDot_;
+  Vec2d pressAt_;
+  std::vector<uint32_t> pressPhotos_, clicked_;
+  double uiScale_ = 1;
   bool noDots_ = false;
   bool pulsePending_ = false;
   double pulseStart_ = -1e9;

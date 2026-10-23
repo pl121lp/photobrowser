@@ -88,6 +88,10 @@ Rect buildMapStatus(std::string_view text, const FontInfo& font, double scale, c
 Rect buildAttribution(std::string_view text, const FontInfo& font, double scale, const Rect& area,
                       std::vector<OverlayQuad>& out);
 
+// A frame of `thickness` px just outside `r` (e.g. around a highlighted photo): four bars.
+void buildFrame(const Rect& r, double thickness, const float color[4], const FontInfo& font,
+                std::vector<OverlayQuad>& out);
+
 // Help (F1): every key and mouse binding. An entry with an empty key and action is a gap.
 struct HelpEntry {
   std::string key, action;

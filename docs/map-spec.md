@@ -44,7 +44,7 @@ JPEGs have a position.
 - Google Maps (API key + billing account, session tokens, strict caching terms).
 - Offline maps / an offline fallback basemap.
 - Place names, address lookup (reverse geocoding), search on the map.
-- Clicking or hovering dots to act on photos (see §12, later extras).
+- (Clicking and hovering dots was a non-goal of v1; added 2026-10-23, see §3.5.)
 
 ## 3. The experience
 
@@ -116,6 +116,11 @@ Pointer events over the map panel go to the map, everything else to the content:
   next grid move), then auto-fit resumes.
 - No visible photo has GPS: keep the last view, dimmed, message "No locations among
   the visible photos".
+- **Linking grid and map** (added 2026-10-23; grid only, off while a photo is open):
+  hovering a dot dims the other photos and puts a subtle white frame around the photo(s)
+  taken there, enlarges the dot and shows a pointing hand; clicking it opens that photo
+  (of several at one spot: the one nearest the grid's centre), after which the map flies
+  to it as in §3.4. Hovering a photo in the grid enlarges its dot.
 
 ### 3.6 Errors
 Shown as a message panel centred near the top of the window for 4 s (new overlay
@@ -408,9 +413,7 @@ Ordered roughly by value for effort.
 2. **Trip path**: connect the visible photos in time order with a line coloured by
    date (shows the route of a trip, e.g. a road trip).
 3. **Clustering**: zoomed out, merge nearby dots into one bubble with a count.
-4. **Two-way linking**: hovering a dot highlights its photo in the grid; clicking a
-   dot glides the grid to that photo (or opens it); hovering a photo highlights its
-   dot.
+4. ~~**Two-way linking**~~: done (§3.5).
 5. **View direction cone**: draw a wedge for the direction the camera faced, from
    EXIF `GPSImgDirection` (tags 16/17; present in the Pixel photos). Needs the parser
    and a catalog field (format bump).

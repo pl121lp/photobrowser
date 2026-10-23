@@ -244,6 +244,11 @@ int App::run(const Options& options) {
     std::vector<MapDot> mapDots;
     std::vector<uint32_t> visiblePositions;
     std::vector<GeoPos> visibleGps;
+    std::vector<uint32_t> visibleGpsPos;     // layout positions of visibleGps
+    std::optional<Vec2d> pointerPx;          // mouse in the window (hover links grid and map)
+    std::vector<OverlayQuad> highlightFrames;
+    SDL_Cursor* handCursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
+    bool handShown = false;
     bool mapTilesCancelled = true;
     std::string notice;
     uint64_t noticeUntil = 0;
@@ -411,9 +416,14 @@ int App::run(const Options& options) {
             break;
           case SDL_EVENT_MOUSE_MOTION: {
             const Vec2d p = px(ev.motion.x, ev.motion.y);
+            pointerPx = p;
             if (!map.pointerMove(p, t)) ui.onPointerMove(p, t);
             break;
           }
+          case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+            pointerPx.reset();
+            map.pointerLeave();
+            break;
           case SDL_EVENT_MOUSE_WHEEL: {
             setScreensaver(false);
             const float dy = ev.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -ev.wheel.y : ev.wheel.y;
@@ -509,6 +519,7 @@ int App::run(const Options& options) {
       {
         MapView::Subject subject;
         visibleGps.clear();
+        visibleGpsPos.clear();
         if (const auto o = ui.opened(); o && session.streamer && *o < session.lib.catalog.order.size()) {
           subject.photo = *o;
           subject.photoGps = session.lib.catalog.photos[session.lib.catalog.order[*o]].gps;
@@ -517,9 +528,17 @@ int App::run(const Options& options) {
           layout->visible(camera.visibleWorld(), visiblePositions);
           for (const uint32_t p : visiblePositions) {
             if (p >= session.lib.catalog.order.size()) continue;
-            if (const auto& g = session.lib.catalog.photos[session.lib.catalog.order[p]].gps) visibleGps.push_back(*g);
+            if (const auto& g = session.lib.catalog.photos[session.lib.catalog.order[p]].gps) {
+              visibleGps.push_back(*g);
+              visibleGpsPos.push_back(p);
+            }
           }
           subject.visibleGps = visibleGps;
+          subject.visiblePos = visibleGpsPos;
+          // The grid photo under the pointer highlights its dot.
+          if (pointerPx && map.contentRect(windowPx).contains(*pointerPx)) {
+            subject.hoveredPhoto = layout->hit(camera.screenToWorld(*pointerPx));
+          }
         }
         subject.gridMoving = !ui.idle();
         // Screensaver between photos: the map stays on the last one until the next opens.
@@ -527,6 +546,19 @@ int App::run(const Options& options) {
         map.update(seconds(now), dt, windowPx, uiScale, subject, mapTiles ? mapTiles->pending() : 0);
         const Rect content = map.contentRect(windowPx);
         if (const Vec2d size{content.width(), content.height()}; size != camera.viewport) ui.setViewport(size);
+        // A click on a dot opens its photo (of several taken there: the one nearest the grid's centre).
+        if (const auto clicked = map.takeClickedPhotos(); !clicked.empty() && !ui.opened()) {
+          const auto nearest = std::min_element(clicked.begin(), clicked.end(), [&](uint32_t a, uint32_t b) {
+            return length(layout->place(a).cell.center() - camera.center) <
+                   length(layout->place(b).cell.center() - camera.center);
+          });
+          if (*nearest < layout->count()) ui.openPhoto(*nearest, seconds(now));
+        }
+        // A pointing hand over a dot that can be clicked.
+        if (const bool hand = !map.hoveredPhotos().empty(); hand != handShown && handCursor) {
+          SDL_SetCursor(hand ? handCursor : SDL_GetDefaultCursor());
+          handShown = hand;
+        }
         for (auto n = map.takeNotice(); n; n = map.takeNotice()) {
           notice = std::string(mapNoticeText(*n));
           noticeUntil = now + kNoticeNs;
@@ -593,6 +625,9 @@ int App::run(const Options& options) {
         textures.endFrame();
         tStream = SDL_GetTicksNS();
         keyed.clear();
+        highlightFrames.clear();
+        // Photos of the dot hovered on the map: the others dim, these get a subtle frame.
+        const std::vector<uint32_t>& highlighted = ui.focused() ? std::vector<uint32_t>{} : map.hoveredPhotos();
         std::optional<std::pair<uint64_t, TileInstance>> focusedTile;
         for (const TileDraw& d : draws) {
           const PhotoRecord& rec = session.lib.catalog.photos[d.id];
@@ -637,6 +672,14 @@ int App::run(const Options& options) {
             if (ti.alpha <= 0) continue;
           } else if (ui.focused()) {
             ti.dim = float(0.85 * ui.focusProgress());
+          } else if (!highlighted.empty()) {
+            if (std::find(highlighted.begin(), highlighted.end(), d.pos) == highlighted.end()) {
+              ti.dim = 0.5f;
+            } else {
+              const Rect shown = config.letterbox ? fitRect({a.x, a.y, b.x, b.y}, rec.aspect()) : Rect{a.x, a.y, b.x, b.y};
+              const float frame[4] = {1, 1, 1, 0.7f};
+              buildFrame(shown, 2 * uiScale, frame, overlayFont, highlightFrames);
+            }
           }
           keyed.emplace_back(key, ti);
         }
@@ -648,6 +691,7 @@ int App::run(const Options& options) {
           renderer.draw(GLuint(keyed[i].first >> 32), GLuint(keyed[i].first & 0xffffffffu), batch);
           i = j;
         }
+        overlay.draw(windowPx, highlightFrames);
         if (focusedTile) {
           const uint64_t key = focusedTile->first;
           renderer.draw(GLuint(key >> 32), GLuint(key & 0xffffffffu), std::span(&focusedTile->second, 1),
@@ -681,17 +725,22 @@ int App::run(const Options& options) {
         renderer.setTransparentBars(config.letterbox && config.transparentBars);
         mapDots.clear();
         const auto dotColor = toLinear(kDotColor);
-        const MapCamera& mc = map.camera();
         const bool single = map.singleMode();
         const std::optional<double> pulse = map.pulse(seconds(now));
-        for (Vec2d d : map.dots()) {
-          d.x -= std::round(d.x - mc.center.x);  // the copy of the world nearest the view
-          const Vec2d s = mc.worldToScreen(d) + Vec2d{panel.x0, panel.y0};
+        const std::optional<size_t> highlightedDot = map.highlightedDot();
+        for (size_t i = 0; i < map.dots().size(); ++i) {
+          if (i == highlightedDot) continue;  // drawn last, on top
+          const Vec2d s = map.dotScreen(i);
           mapDots.push_back({{float(s.x), float(s.y)},
                              float((single ? 5 : 4.5) * uiScale),
                              float(1.5 * uiScale),
                              {dotColor[0], dotColor[1], dotColor[2], 1},
                              single && pulse ? float(std::max(*pulse, 1e-3)) : 0.0f});
+        }
+        if (highlightedDot && *highlightedDot < map.dots().size()) {  // larger, with a thicker ring
+          const Vec2d s = map.dotScreen(*highlightedDot);
+          mapDots.push_back({{float(s.x), float(s.y)}, float(7 * uiScale), float(2.5 * uiScale),
+                             {dotColor[0], dotColor[1], dotColor[2], 1}, 0.0f});
         }
         mapRenderer.draw(windowPx, mapDots);
         // Separator: one dark device pixel along the panel's left edge.
@@ -829,6 +878,8 @@ int App::run(const Options& options) {
     // window goes away first so quitting never looks frozen.
     SDL_HideWindow(window);
     mapTiles.reset();
+    SDL_SetCursor(SDL_GetDefaultCursor());
+    if (handCursor) SDL_DestroyCursor(handCursor);
     player.reset();
     session.streamer.reset();
     indexer.reset();

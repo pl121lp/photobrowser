@@ -263,6 +263,15 @@ Rect buildAttribution(std::string_view text, const FontInfo& font, double scale,
   return textPanel(text, font, scale, {area.x1 - margin - size.x, area.y1 - margin - size.y}, pad, 0.6f, out);
 }
 
+void buildFrame(const Rect& r, double thickness, const float color[4], const FontInfo& font,
+                std::vector<OverlayQuad>& out) {
+  const double t = thickness;
+  for (const Rect& bar : {Rect{r.x0 - t, r.y0 - t, r.x1 + t, r.y0}, Rect{r.x0 - t, r.y1, r.x1 + t, r.y1 + t},
+                          Rect{r.x0 - t, r.y0, r.x0, r.y1}, Rect{r.x1, r.y0, r.x1 + t, r.y1}}) {
+    out.push_back(solid(OverlayQuad::Kind::Panel, bar, font, color[0], color[1], color[2], color[3]));
+  }
+}
+
 std::vector<HelpEntry> helpEntries() {
   return {
       {"F1", "show / hide this help"},
@@ -291,6 +300,7 @@ std::vector<HelpEntry> helpEntries() {
       {"Right-click", "reset a zoomed photo to fit"},
       {"Click open photo", "plugin action, e.g. play / pause a video"},
       {"On the map", "drag pans, wheel zooms, double-click zooms in"},
+      {"Map dot", "hover: show its photos in the grid; click: open the photo"},
   };
 }
 

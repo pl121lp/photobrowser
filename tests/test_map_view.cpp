@@ -387,3 +387,91 @@ TEST_CASE("map view: a frozen subject keeps the dots and the view until the next
   f.run(3.1);
   checkCentre(f.map, kRome);
 }
+
+namespace {
+// Grid fixture with photos at layout positions 10 (Oslo), 11 (Bergen), 12 (Oslo again).
+struct GridFixture : Fixture {
+  std::vector<pb::GeoPos> gps = {kOslo, kBergen, kOslo};
+  std::vector<uint32_t> pos = {10, 11, 12};
+  GridFixture() {
+    subject.visibleGps = gps;
+    subject.visiblePos = pos;
+    open();
+  }
+  size_t dotOf(const pb::GeoPos& g) const {
+    const pb::Vec2d w = *pb::toWorld(g);
+    for (size_t i = 0; i < map.dots().size(); ++i) {
+      if (length(map.dots()[i] - w) < 1e-12) return i;
+    }
+    FAIL("no dot at that position");
+    return 0;
+  }
+};
+}  // namespace
+
+TEST_CASE("map view: dots remember their photos") {
+  GridFixture f;
+  REQUIRE(f.map.dots().size() == 2);
+  CHECK(f.map.dotPhotos(f.dotOf(kOslo)) == std::vector<uint32_t>{10, 12});
+  CHECK(f.map.dotPhotos(f.dotOf(kBergen)) == std::vector<uint32_t>{11});
+}
+
+TEST_CASE("map view: hovering a dot highlights its photos") {
+  GridFixture f;
+  const pb::Vec2d at = f.map.dotScreen(f.dotOf(kOslo));
+  CHECK(f.map.panelRect(f.window).contains(at));
+  CHECK_FALSE(f.map.pointerMove(at + pb::Vec2d{3, 2}, f.t));  // hover only: the content still gets it
+  f.step();
+  CHECK(f.map.highlightedDot() == f.dotOf(kOslo));
+  CHECK(f.map.hoveredPhotos() == std::vector<uint32_t>{10, 12});
+  f.map.pointerMove(at + pb::Vec2d{60, 60}, f.t);
+  f.step();
+  CHECK(f.map.hoveredPhotos().empty());
+  CHECK_FALSE(f.map.highlightedDot());
+  f.map.pointerMove(at, f.t);
+  f.step();
+  f.map.pointerLeave();
+  f.step();
+  CHECK(f.map.hoveredPhotos().empty());
+}
+
+TEST_CASE("map view: clicking a dot asks for its photos; dragging does not") {
+  GridFixture f;
+  const pb::Vec2d at = f.map.dotScreen(f.dotOf(kBergen));
+  CHECK(f.map.pointerDown(at, f.t));
+  CHECK(f.map.pointerUp(at + pb::Vec2d{1, 0}, f.t + 0.1));
+  CHECK(f.map.takeClickedPhotos() == std::vector<uint32_t>{11});
+  CHECK(f.map.takeClickedPhotos().empty());
+  f.t += 1;
+  CHECK(f.map.pointerDown(at, f.t));
+  f.map.pointerMove(at + pb::Vec2d{40, 0}, f.t + 0.2);
+  f.map.pointerUp(at + pb::Vec2d{40, 0}, f.t + 0.4);
+  CHECK(f.map.takeClickedPhotos().empty());
+}
+
+TEST_CASE("map view: hovering a photo highlights its dot") {
+  GridFixture f;
+  f.subject.hoveredPhoto = 12;
+  f.step();
+  CHECK(f.map.highlightedDot() == f.dotOf(kOslo));
+  CHECK(f.map.hoveredPhotos().empty());  // only hovering a dot highlights photos
+  f.subject.hoveredPhoto = 99;  // no location
+  f.step();
+  CHECK_FALSE(f.map.highlightedDot());
+}
+
+TEST_CASE("map view: no dot hover or click while a photo is open") {
+  GridFixture f;
+  const pb::Vec2d at = f.map.dotScreen(f.dotOf(kOslo));
+  f.subject.photo = 10;
+  f.subject.photoGps = kOslo;
+  f.run(4);
+  f.map.pointerMove(f.map.dotScreen(0), f.t);
+  f.step();
+  CHECK(f.map.hoveredPhotos().empty());
+  CHECK_FALSE(f.map.highlightedDot());
+  f.map.pointerDown(f.map.dotScreen(0), f.t);
+  f.map.pointerUp(f.map.dotScreen(0), f.t + 0.1);
+  CHECK(f.map.takeClickedPhotos().empty());
+  (void)at;
+}

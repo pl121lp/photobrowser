@@ -196,7 +196,7 @@ TEST_CASE("help: lists every key binding in printable ASCII") {
     return std::any_of(entries.begin(), entries.end(), [&](const pb::HelpEntry& e) { return e.key == key; });
   };
   for (auto key : {"F1", "F2", "F3", "F5", "F6", "F11 / F", "Arrows", "+ / -", "Home", "Enter", "Esc", "Q", "Drag",
-                   "Wheel", "Double-click", "Right-click", "M", "On the map"}) {
+                   "Wheel", "Double-click", "Right-click", "M", "On the map", "Map dot"}) {
     CHECK_MESSAGE(has(key), key);
   }
   for (const auto& e : entries) {
@@ -369,4 +369,20 @@ TEST_CASE("overlay: photo effect label right edge follows the given viewport") {
   std::vector<pb::OverlayQuad> q;
   const pb::Rect panel = pb::buildPhotoEffectLabel("1: Sharpen", kFont, 1.5, {600, 800}, q);
   CHECK(panel.x1 == doctest::Approx(600 - 16 * 1.5));
+}
+
+TEST_CASE("overlay: frame is four thin bars just outside the rect") {
+  std::vector<pb::OverlayQuad> q;
+  const float white[4] = {1, 1, 1, 0.8f};
+  pb::buildFrame({100, 100, 200, 150}, 2, white, kFont, q);
+  REQUIRE(q.size() == 4);
+  pb::Rect all = q[0].rect;
+  for (const auto& b : q) {
+    all = {std::min(all.x0, b.rect.x0), std::min(all.y0, b.rect.y0), std::max(all.x1, b.rect.x1),
+           std::max(all.y1, b.rect.y1)};
+    CHECK(std::min(b.rect.width(), b.rect.height()) == doctest::Approx(2));
+    CHECK_FALSE(b.rect.intersects({102, 102, 198, 148}));  // the photo itself stays clear
+    CHECK(b.color[3] == 0.8f);
+  }
+  CHECK(all == pb::Rect{98, 98, 202, 152});
 }
