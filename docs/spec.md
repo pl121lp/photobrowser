@@ -206,6 +206,9 @@ Calls made by Claude (open to change):
   time zone (EXIF times are local wall-clock).
 - Screensaver: `F5`, off by default (`[screensaver] enabled`), hold time measured from
   when the photo is fully open; user input stops it rather than fighting it.
+- `[view] corner_radius` (default 0 = square): a fraction of each photo's shorter side,
+  so corners look the same at every zoom; applies to every tile (photos, video stills
+  and playing video, whole-photo view). Computed in the tile shader; no extra passes.
 - Screensaver `slow_zoom` and `photo_only` are off by default; the zoom is steady in
   log scale over the whole hold, about the photo's centre; "hidden" photos fade to the
   background (not to black), only while a photo is open.

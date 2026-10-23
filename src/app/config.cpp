@@ -139,6 +139,13 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "view.corner_radius") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 0 || *d > 0.5) warn(key + " must be between 0 and 0.5; clamped");
+        c.cornerRadius = std::clamp(*d, 0.0, 0.5);
+      } else {
+        bad("a number");
+      }
     } else if (key == "view.max_photo_zoom") {
       if (auto d = parseNumber(value)) {
         if (*d < 1 || *d > 16) warn(key + " must be between 1 and 16; clamped");
@@ -259,6 +266,9 @@ std::string defaultConfigText() {
 [view]
 # Space around each photo, as a fraction of a photo's size (0 to 0.2). 0 = no gaps.
 # gap = 0.03
+# Rounded photo (and video) corners: radius as a fraction of a photo's shorter side.
+# 0 = square corners, 0.05 = subtle, 0.5 = fully round ends.
+# corner_radius = 0
 # Maximum enlargement in whole-photo view, relative to fit-to-window (1 to 16).
 # max_photo_zoom = 4
 

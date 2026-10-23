@@ -201,6 +201,7 @@ int App::run(const Options& options) {
     TileRenderer renderer;
     OverlayRenderer overlay;
     if (!renderer.init() || !overlay.init()) exitCode = 1;
+    renderer.setCornerRadius(float(config.cornerRadius));
     BackgroundRenderer background;
     // The user's shader file is read once here; F6 switches without file I/O.
     const std::string userShader = toUtf8(config.backgroundShader);

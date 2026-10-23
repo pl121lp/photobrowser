@@ -122,3 +122,19 @@ RTX 2080 Super Max-Q, 3840×2160 fullscreen, 288-photo warm library, two runs ea
 
 No measurable difference; the few > 20 ms intervals appear in both builds (the known
 PRIME/display-copy variance; CPU work stayed under 4 ms after).
+
+## 2026-10-22 — Rounded corners (`[view] corner_radius`)
+
+The tile fragment shader computes a rounded-rectangle signed distance (a few ALU ops,
+one pixel of anti-aliasing); with a radius > 0 tile draws blend. Release builds,
+3840×2160 fullscreen, 288-photo warm library, two runs each.
+
+| GPU | Build / setting | p50 | p95 | p99 | frames > 20 ms |
+|---|---|---|---|---|---|
+| RTX 2080 Super Max-Q | before | 16.67 | 17.60–17.61 | 18.06–18.08 | 2, 2 |
+| RTX 2080 Super Max-Q | after, radius 0 | 16.65–16.67 | 17.61–17.63 | 18.05–18.33 | 1, 1 |
+| RTX 2080 Super Max-Q | after, radius 0.08 | 16.66–16.67 | 17.62 | 18.01–18.03 | 1, 1 |
+| Intel UHD (CML GT2) | after, radius 0 | 16.67–16.70 | 17.67–17.70 | 18.07–18.09 | 2, 2 |
+| Intel UHD (CML GT2) | after, radius 0.08 | 16.69 | 17.57–17.59 | 17.93–18.05 | 1, 0 |
+
+No measurable cost, including on the integrated reference GPU with blending on.

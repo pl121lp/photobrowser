@@ -72,6 +72,7 @@ folder = ~/Pictures        # photo folder (the command-line folder wins)
 
 [view]
 gap = 0.03                 # space around photos, 0 = none, max 0.2
+corner_radius = 0          # rounded corners: fraction of the shorter side, 0.05 = subtle, max 0.5
 max_photo_zoom = 4         # focused-photo zoom limit, relative to fit (1 to 16)
 
 [stats]

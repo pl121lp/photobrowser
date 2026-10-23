@@ -258,3 +258,18 @@ TEST_CASE("config: screensaver slow zoom and photo only") {
   CHECK(text.find("# photo_only = off") != std::string::npos);
   CHECK(pb::parseConfig(text).warnings.empty());
 }
+
+TEST_CASE("config: corner radius") {
+  CHECK(pb::Config{}.cornerRadius == 0);
+  auto r = pb::parseConfig("[view]\ncorner_radius = 0.06\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.cornerRadius == doctest::Approx(0.06));
+  auto clamped = pb::parseConfig("[view]\ncorner_radius = 0.9\n");
+  CHECK(clamped.config.cornerRadius == doctest::Approx(0.5));
+  CHECK(hasWarning(clamped, "line 2"));
+  CHECK(pb::parseConfig("[view]\ncorner_radius = -1\n").config.cornerRadius == 0);
+  auto bad = pb::parseConfig("[view]\ncorner_radius = round\n");
+  CHECK(bad.config.cornerRadius == 0);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# corner_radius = 0\n") != std::string::npos);
+}

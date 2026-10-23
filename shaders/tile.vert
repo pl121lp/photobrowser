@@ -10,6 +10,8 @@ uniform vec2 uViewport;
 out vec2 vUv;
 out vec2 vUvPrev;
 flat out vec3 vParams;
+out vec2 vLocal;       // px from the tile centre
+flat out vec2 vHalf;   // tile half size, px
 
 void main() {
   vec2 corner = vec2(gl_VertexID & 1, gl_VertexID >> 1);
@@ -19,4 +21,6 @@ void main() {
   vUv = mix(aUv.xy, aUv.zw, corner);
   vUvPrev = mix(aUvPrev.xy, aUvPrev.zw, corner);
   vParams = aParams;
+  vHalf = abs(aRect.zw - aRect.xy) * 0.5;
+  vLocal = (corner - 0.5) * (aRect.zw - aRect.xy);
 }
