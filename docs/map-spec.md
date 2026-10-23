@@ -5,7 +5,7 @@ Self-contained: everything decided about the map feature is here, together with
 `docs/spec.md`, `docs/architecture.md` (§13 Plugins) and `CLAUDE.md`.
 
 Deviations and choices made while implementing:
-- Dot colour fixed `#e8452c` (§9 open question); dots are 13 px (single) and 8 px
+- Dot colour fixed `#e8452c` (§9 open question); dots are 13 px (single) and 12 px
   (grid) at display scale 1, including their white ring.
 - The panel background, the 1-px separator and the tile drawing use scissored clears
   and the existing `TileRenderer`; `MapRenderer` draws only the dots and halo.
@@ -104,7 +104,7 @@ Pointer events over the map panel go to the map, everything else to the content:
   "No location for this item". The next photo with GPS flies from there.
 
 ### 3.5 Grid view (multiple photos)
-- Dots (smaller: about 8 px) for every **visible** photo with GPS. Visible = its cell
+- Dots (about 12 px) for every **visible** photo with GPS. Visible = its cell
   intersects the content area (from the layout, not the streamer's prefetch set).
   Photos at the same position draw one dot.
 - **Auto-fit**: the map fits the bounding box of the dots with 10% padding, at most

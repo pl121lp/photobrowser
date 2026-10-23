@@ -688,8 +688,8 @@ int App::run(const Options& options) {
           d.x -= std::round(d.x - mc.center.x);  // the copy of the world nearest the view
           const Vec2d s = mc.worldToScreen(d) + Vec2d{panel.x0, panel.y0};
           mapDots.push_back({{float(s.x), float(s.y)},
-                             float((single ? 5 : 3) * uiScale),
-                             float((single ? 1.5 : 1) * uiScale),
+                             float((single ? 5 : 4.5) * uiScale),
+                             float(1.5 * uiScale),
                              {dotColor[0], dotColor[1], dotColor[2], 1},
                              single && pulse ? float(std::max(*pulse, 1e-3)) : 0.0f});
         }
