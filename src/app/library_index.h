@@ -21,9 +21,9 @@ struct LibraryState {
 };
 
 // Catalog + L0 pack from a previous run, if both are present and valid and the
-// catalog was indexed with the same set of formats (plugins).
+// catalog was indexed with the same set of formats (plugins) and the same recursion.
 std::optional<LibraryState> loadWarm(const std::filesystem::path& libDir,
-                                     const MediaFormats& formats = MediaFormats::none());
+                                     const MediaFormats& formats = MediaFormats::none(), bool recursive = true);
 
 // Indexes one file: quick pass (embedded preview), falling back to a 1/8 decode.
 // Writes the L1 thumbnail to the cache. Returns the record and its L0 image.
@@ -35,7 +35,7 @@ std::pair<PhotoRecord, Image> indexOne(const std::filesystem::path& root, const 
 class Indexer {
  public:
   Indexer(std::filesystem::path root, std::filesystem::path libDir, JobSystem& jobs, const ThumbCache& thumbs,
-          const MediaFormats& formats = MediaFormats::none());
+          const MediaFormats& formats = MediaFormats::none(), bool recursive = true);
   ~Indexer();  // abandons queued work and waits for running jobs
   void start();
   uint32_t total() const { return total_; }
@@ -51,6 +51,7 @@ class Indexer {
   JobSystem& jobs_;
   const ThumbCache& thumbs_;
   const MediaFormats& formats_;
+  bool recursive_;
   std::mutex m_;
   std::vector<std::pair<PhotoRecord, Image>> results_;
   LibraryState state_;
@@ -65,6 +66,7 @@ class Indexer {
 // early without saving once *stop becomes true.
 bool refreshLibrary(const std::filesystem::path& root, const std::filesystem::path& libDir,
                     const LibraryState& current, const ThumbCache& thumbs,
-                    const std::atomic<bool>* stop = nullptr, const MediaFormats& formats = MediaFormats::none());
+                    const std::atomic<bool>* stop = nullptr, const MediaFormats& formats = MediaFormats::none(),
+                    bool recursive = true);
 
 }  // namespace pb

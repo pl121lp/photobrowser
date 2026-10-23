@@ -158,3 +158,17 @@ TEST_CASE("catalog: newest first is the exact reverse") {
   c.sortOrder(false);
   CHECK(c.order == std::vector<pb::PhotoId>{2, 1, 0});
 }
+
+TEST_CASE("catalog: remembers whether it was scanned recursively") {
+  pbtest::TempDir dir;
+  pb::Catalog c;
+  c.photos = {rec("a.jpg", 1)};
+  c.sortOrder();
+  for (bool recursive : {false, true}) {
+    c.recursive = recursive;
+    REQUIRE(pb::saveCatalog(c, dir.path / "catalog.bin"));
+    auto l = pb::loadCatalog(dir.path / "catalog.bin");
+    REQUIRE(l);
+    CHECK(l->recursive == recursive);
+  }
+}

@@ -318,3 +318,14 @@ TEST_CASE("config: start zoom") {
   CHECK(hasWarning(bad, "line 2"));
   CHECK(pb::defaultConfigText().find("# start_focus = focus\n") != std::string::npos);
 }
+
+TEST_CASE("config: recursive library scan") {
+  CHECK_FALSE(pb::Config{}.recursive);
+  auto r = pb::parseConfig("[library]\nrecursive = on\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.recursive);
+  auto bad = pb::parseConfig("[library]\nrecursive = deep\n");
+  CHECK_FALSE(bad.config.recursive);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# recursive = off\n") != std::string::npos);
+}

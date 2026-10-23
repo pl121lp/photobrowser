@@ -139,6 +139,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "library.recursive") {
+      if (auto b = parseBool(value)) {
+        c.recursive = *b;
+      } else {
+        bad("on/off");
+      }
     } else if (key == "library.sort") {
       if (value == "oldest_first" || value == "newest_first") {
         c.newestFirst = value == "newest_first";
@@ -289,8 +295,10 @@ std::string defaultConfigText() {
 # this file. Problems are reported on the terminal and the default is used.
 
 [library]
-# Folder with your photos (searched including subfolders). ~ means your home folder.
+# Folder with your photos. ~ means your home folder.
 # folder = photos
+# on = also find photos in the folder's subfolders (and theirs).
+# recursive = off
 # Order of the photos (by date taken), row by row from the top left.
 #   oldest_first : oldest photo first
 #   newest_first : newest photo first

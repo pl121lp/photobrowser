@@ -36,6 +36,7 @@ struct Catalog {
   std::vector<PhotoRecord> photos;  // index == PhotoId
   std::vector<PhotoId> order;       // layout order: (takenAt, relPath), broken excluded
   std::string formats;              // MediaFormats::signature() it was indexed with
+  bool recursive = true;            // whether subfolders were scanned
   void sortOrder(bool newestFirst = false);  // oldest first unless asked otherwise
 };
 

@@ -9,10 +9,11 @@ namespace pb {
 
 namespace fs = std::filesystem;
 
-std::vector<ScanEntry> scanFolder(const fs::path& root, const MediaFormats& formats) {
-  std::vector<ScanEntry> out;
+namespace {
+template <class Iterator>
+void collect(const fs::path& root, const MediaFormats& formats, std::vector<ScanEntry>& out) {
   std::error_code ec;
-  fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
+  Iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
   for (; !ec && it != end; it.increment(ec)) {
     const auto& entry = *it;
     std::error_code e2;
@@ -22,6 +23,16 @@ std::vector<ScanEntry> scanFolder(const fs::path& root, const MediaFormats& form
     const auto mt = entry.last_write_time(e2);
     if (e2) continue;
     out.push_back({toUtf8(entry.path().lexically_relative(root)), size, toUnixSeconds(mt)});
+  }
+}
+}  // namespace
+
+std::vector<ScanEntry> scanFolder(const fs::path& root, const MediaFormats& formats, bool recursive) {
+  std::vector<ScanEntry> out;
+  if (recursive) {
+    collect<fs::recursive_directory_iterator>(root, formats, out);
+  } else {
+    collect<fs::directory_iterator>(root, formats, out);
   }
   std::sort(out.begin(), out.end(), [](const ScanEntry& a, const ScanEntry& b) { return a.relPath < b.relPath; });
   return out;

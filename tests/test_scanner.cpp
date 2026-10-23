@@ -39,3 +39,14 @@ TEST_CASE("scanner: diff detects added, removed, changed") {
   CHECK_FALSE(diff.empty());
   CHECK(pb::diffCatalog(c, {{"a.jpg", 1, 1}, {"b.jpg", 2, 2}, {"d.jpg", 4, 4}}).empty());
 }
+
+TEST_CASE("scanner: non-recursive skips subfolders") {
+  pbtest::TempDir dir;
+  pbtest::writeFile(dir.path / "a.jpg", "1");
+  pbtest::writeFile(dir.path / "sub" / "b.jpg", "2");
+  pbtest::writeFile(dir.path / "sub" / "deeper" / "c.jpg", "3");
+  auto top = pb::scanFolder(dir.path, pb::MediaFormats::none(), false);
+  REQUIRE(top.size() == 1);
+  CHECK(top[0].relPath == "a.jpg");
+  CHECK(pb::scanFolder(dir.path, pb::MediaFormats::none(), true).size() == 3);
+}

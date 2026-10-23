@@ -9,7 +9,8 @@ namespace pb {
 std::string usage() {
   return "Usage: photobrowse [photo-folder] [options]\n"
          "\n"
-         "  photo-folder          folder with JPEG photos, scanned recursively\n"
+         "  photo-folder          folder with JPEG photos (subfolders too with\n"
+         "                        [library] recursive = on)\n"
          "                        (default: [library] folder in the config file, else ./photos)\n"
          "  --config <file>       settings file (default: ~/.config/photobrowse/config.ini,\n"
          "                        created with documented defaults on first run)\n"

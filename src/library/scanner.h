@@ -15,10 +15,10 @@ struct ScanEntry {
   int64_t mtime = 0;
 };
 
-// Recursive walk for .jpg/.jpeg and the extensions in `formats` (any case), sorted by
-// relPath. Unreadable entries skipped.
+// Finds .jpg/.jpeg and the extensions in `formats` (any case) in `root`, and in its
+// subfolders if `recursive`; sorted by relPath. Unreadable entries skipped.
 std::vector<ScanEntry> scanFolder(const std::filesystem::path& root,
-                                  const MediaFormats& formats = MediaFormats::none());
+                                  const MediaFormats& formats = MediaFormats::none(), bool recursive = true);
 
 struct ScanDiff {
   std::vector<ScanEntry> added;

@@ -69,6 +69,7 @@ On first run PhotoBrowse writes a documented settings file to
 ```ini
 [library]
 folder = ~/Pictures        # photo folder (the command-line folder wins)
+recursive = off            # on = include photos in subfolders (off = only the folder itself)
 sort = oldest_first        # oldest_first | newest_first
 
 [view]

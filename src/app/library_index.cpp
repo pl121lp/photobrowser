@@ -20,9 +20,9 @@ bool save(const fs::path& libDir, const LibraryState& st) {
 }
 }  // namespace
 
-std::optional<LibraryState> loadWarm(const fs::path& libDir, const MediaFormats& formats) {
+std::optional<LibraryState> loadWarm(const fs::path& libDir, const MediaFormats& formats, bool recursive) {
   auto catalog = loadCatalog(libDir / "catalog.bin");
-  if (!catalog || catalog->formats != formats.signature()) return std::nullopt;
+  if (!catalog || catalog->formats != formats.signature() || catalog->recursive != recursive) return std::nullopt;
   auto l0 = readL0Pack(libDir / "l0.pack");
   if (!l0) return std::nullopt;
   return LibraryState{std::move(*catalog), std::move(*l0)};
@@ -47,8 +47,13 @@ std::pair<PhotoRecord, Image> indexOne(const fs::path& root, const ScanEntry& e,
 }
 
 Indexer::Indexer(fs::path root, fs::path libDir, JobSystem& jobs, const ThumbCache& thumbs,
-                 const MediaFormats& formats)
-    : root_(std::move(root)), libDir_(std::move(libDir)), jobs_(jobs), thumbs_(thumbs), formats_(formats) {}
+                 const MediaFormats& formats, bool recursive)
+    : root_(std::move(root)),
+      libDir_(std::move(libDir)),
+      jobs_(jobs),
+      thumbs_(thumbs),
+      formats_(formats),
+      recursive_(recursive) {}
 
 Indexer::~Indexer() {
   cancelled_ = true;
@@ -62,7 +67,7 @@ void Indexer::start() {
       --outstanding_;
       return;
     }
-    auto scan = scanFolder(root_, formats_);
+    auto scan = scanFolder(root_, formats_, recursive_);
     total_ = uint32_t(scan.size());
     scanned_ = true;
     if (scan.empty()) {
@@ -104,6 +109,7 @@ void Indexer::finish() {
   }
   results_.clear();
   state_.catalog.formats = formats_.signature();
+  state_.catalog.recursive = recursive_;
   state_.catalog.sortOrder();
   fs::create_directories(libDir_);
   save(libDir_, state_);
@@ -116,10 +122,11 @@ LibraryState Indexer::take() {
 }
 
 bool refreshLibrary(const fs::path& root, const fs::path& libDir, const LibraryState& current,
-                    const ThumbCache& thumbs, const std::atomic<bool>* stop, const MediaFormats& formats) {
+                    const ThumbCache& thumbs, const std::atomic<bool>* stop, const MediaFormats& formats,
+                    bool recursive) {
   auto stopped = [&] { return stop && stop->load(); };
   if (stopped()) return false;
-  const auto scan = scanFolder(root, formats);
+  const auto scan = scanFolder(root, formats, recursive);
   const ScanDiff diff = diffCatalog(current.catalog, scan);
   if (diff.empty()) return false;
 
@@ -130,6 +137,7 @@ bool refreshLibrary(const fs::path& root, const fs::path& libDir, const LibraryS
 
   LibraryState next;
   next.catalog.formats = current.catalog.formats;
+  next.catalog.recursive = current.catalog.recursive;
   for (PhotoId id = 0; id < current.catalog.photos.size(); ++id) {
     if (drop.contains(id)) continue;
     const auto& rec = current.catalog.photos[id];

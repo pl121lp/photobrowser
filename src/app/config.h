@@ -48,6 +48,7 @@ struct PresetColors {
 struct Config {
   std::filesystem::path photoFolder = "photos";
   double gap = 0.03;  // per side, as a fraction of a photo; 0 = photos touch
+  bool recursive = false;    // [library] recursive: include photos in subfolders
   bool newestFirst = false;  // [library] sort: oldest_first (default) | newest_first
   StartAt startAt = StartAt::Center;
   StartZoom startZoom = StartZoom::Focus;  // [view] start_focus: focus | photo | full  // [view] start_at: photo the start view centres on

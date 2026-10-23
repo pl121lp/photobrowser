@@ -293,17 +293,18 @@ int App::run(const Options& options) {
       SDL_SetWindowTitle(window, title.c_str());
     };
 
-    if (auto warm = loadWarm(libDir, formats)) {
+    if (auto warm = loadWarm(libDir, formats, config.recursive)) {
       startSession(std::move(*warm));
       // Pick up folder changes for the next launch; trim the disk cache.
       auto snapshot = std::make_shared<LibraryState>(session.lib);
-      jobs->submit(kBackgroundPriority, [root, libDir, snapshot, stop = stopBackground, &thumbs, &formats] {
-        refreshLibrary(root, libDir, *snapshot, thumbs, stop.get(), formats);
+      jobs->submit(kBackgroundPriority, [root, libDir, snapshot, stop = stopBackground, &thumbs, &formats,
+                                         recursive = config.recursive] {
+        refreshLibrary(root, libDir, *snapshot, thumbs, stop.get(), formats, recursive);
         if (!*stop) thumbs.sweep(kDiskCacheCap);
       });
     } else {
       indexJobs = std::make_unique<JobSystem>(defaultWorkerCount());
-      indexer = std::make_unique<Indexer>(root, libDir, *indexJobs, thumbs, formats);
+      indexer = std::make_unique<Indexer>(root, libDir, *indexJobs, thumbs, formats, config.recursive);
       indexer->start();
     }
 

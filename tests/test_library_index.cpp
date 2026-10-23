@@ -122,3 +122,22 @@ TEST_CASE("library: refresh stops early when asked") {
   CHECK_FALSE(pb::refreshLibrary(lib.photos.path, lib.libDir(), st, thumbs, &stop));
   CHECK(pb::loadWarm(lib.libDir())->catalog.photos.size() == 1);  // nothing saved
 }
+
+TEST_CASE("library: recursive setting is part of the cache; changing it re-indexes") {
+  Lib lib({"PXL_20260321_003010085.jpg"});
+  fs::create_directories(lib.photos.path / "sub");
+  fs::copy_file(pbtest::photo("PXL_20260321_010024264.jpg"), lib.photos.path / "sub" / "x.jpg");
+  pb::JobSystem jobs(2);
+  pb::ThumbCache thumbs(lib.libDir());
+  {
+    pb::Indexer ix(lib.photos.path, lib.libDir(), jobs, thumbs, pb::MediaFormats::none(), false);
+    ix.start();
+    for (int i = 0; i < 2000 && !ix.finished(); ++i) std::this_thread::sleep_for(5ms);
+    REQUIRE(ix.finished());
+    auto st = ix.take();
+    CHECK(st.catalog.order.size() == 1);  // the subfolder photo is left out
+    CHECK_FALSE(st.catalog.recursive);
+  }
+  CHECK(pb::loadWarm(lib.libDir(), pb::MediaFormats::none(), false));
+  CHECK_FALSE(pb::loadWarm(lib.libDir(), pb::MediaFormats::none(), true));
+}

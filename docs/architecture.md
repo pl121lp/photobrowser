@@ -39,7 +39,7 @@ src/
   layout/     Layout       interface: cell rect + content placement per photo index
               SquareGrid   v1 implementation (square-crop)
   library/    Catalog      ordered vector<PhotoRecord>; persisted to cache
-              Scanner      recursive folder walk, change detection
+              Scanner      folder walk (recursive if [library] recursive), change detection
               Exif         minimal EXIF reader
               MediaFormats extension -> MediaHandler for non-JPEG files (from plugins)
   imaging/    JpegCodec    TurboJPEG wrapper: header read, scaled decode, encode
@@ -193,7 +193,7 @@ frame (10k: ~42 MB sequential read). Then a background re-scan records differenc
 which are merged on the **next** launch (no mid-session reshuffle).
 
 **First run** (also used for new files found on a later launch):
-1. *Scan*: recursive walk collecting `.jpg/.jpeg` path, size, mtime (seconds for 10k).
+1. *Scan*: folder walk (into subfolders with `recursive = on`) collecting `.jpg/.jpeg` path, size, mtime (seconds for 10k).
 2. *Quick pass* (workers, read only the first ~64 KB of each file): parse EXIF for
    `DateTimeOriginal`, orientation, dimensions, and the **embedded preview JPEG**
    (Pixel photos carry a ~380×507 one in APP1). Decode it → L0 + L1. ~30 KB read per

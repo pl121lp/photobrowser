@@ -112,7 +112,7 @@ way to see one photo whole:
 
 ### 3.5 First run vs. later runs
 - **First run** on a folder: the window opens immediately, the folder is scanned
-  (recursively, `.jpg`/`.jpeg`). A **quick pass** reads just the start of each file
+  (`.jpg`/`.jpeg`; subfolders too with `[library] recursive = on`). A **quick pass** reads just the start of each file
   (date + the small preview most cameras embed) so the whole grid fills in within
   seconds; sharper thumbnails are then generated in the background — **visible
   photos first** — with progress shown, and cached on disk. Browsing works throughout;
@@ -193,7 +193,9 @@ Calls made by Claude (open to change):
 - Max grid zoom = one cell fills the shorter window side.
 - Perf reference = 4K on the integrated Intel GPU; GPU budget 640 MB with soft fallback.
 - Folder changes apply on next launch.
-- Date fallback = file mtime; tie-break = file name; folder scan is recursive.
+- Date fallback = file mtime; tie-break = file name.
+- `[library] recursive` (user's call: default off = only the folder itself; on = all
+  subfolders). Stored with the catalog; changing it re-indexes once.
 - JPEG only in v1.
 - Cross-fade duration ~150 ms; click-to-center ~400 ms ease-in-out.
 - Plugin API in plain C (stable across compilers), one exported entry point; plugins
