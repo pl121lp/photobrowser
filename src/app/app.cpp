@@ -328,6 +328,7 @@ int App::run(const Options& options) {
     // Live content from a plugin for the photo open in whole-photo view (e.g. a video).
     std::unique_ptr<Player> player;
     std::optional<PhotoId> playerId;
+    bool autoplayPending = false;  // [view] autoplay: start once the item is fully open
 
     while (running) {
       // --- Input ---------------------------------------------------------------
@@ -449,8 +450,16 @@ int App::run(const Options& options) {
         player.reset();
         playerId = openId;
         if (openId) player = plugins.openPlayer(root / fromUtf8(session.lib.catalog.photos[*openId].relPath));
+        autoplayPending = player && config.autoplay;
       }
-      if (ui.takeActivation() && player) player->activate();
+      if (ui.takeActivation() && player) {
+        player->activate();
+        autoplayPending = false;  // the user took over
+      }
+      if (autoplayPending && ui.focusProgress() >= 1) {
+        autoplayPending = false;
+        if (!player->active()) player->activate();
+      }
       // Screensaver: live content (e.g. a video) starts by itself once its item is open.
       if (screensaver.takeArrived() && player && !player->active()) player->activate();
       // --- Draw ------------------------------------------------------------------

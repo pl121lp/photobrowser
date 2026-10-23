@@ -174,6 +174,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("fit or letterbox");
       }
+    } else if (key == "view.autoplay") {
+      if (auto b = parseBool(value)) {
+        c.autoplay = *b;
+      } else {
+        bad("on/off");
+      }
     } else if (key == "view.letterbox_bars") {
       if (value == "black" || value == "transparent") {
         c.transparentBars = value == "transparent";
@@ -355,6 +361,9 @@ std::string defaultConfigText() {
 #   photo : the start photo opened whole (arrow keys step to the next photo)
 #   full  : all photos visible, centred (start_at doesn't matter then)
 # start_focus = focus
+# on = videos (with the video plugin) start playing by themselves once opened in the
+# whole-photo view; off = click to play. The screensaver always plays them.
+# autoplay = off
 # How a photo fills its square:
 #   fit       : fill the square; the photo's edges are cropped to fit it
 #   letterbox : the whole photo, with black bars on the sides it doesn't fill

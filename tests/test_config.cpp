@@ -394,3 +394,14 @@ TEST_CASE("config: --cache-dir wins over cache_dir") {
   pb::applyOptions(c, o);
   CHECK(c.cacheDir == std::filesystem::path("/from/cli"));
 }
+
+TEST_CASE("config: autoplay") {
+  CHECK_FALSE(pb::Config{}.autoplay);
+  auto r = pb::parseConfig("[view]\nautoplay = on\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.autoplay);
+  auto bad = pb::parseConfig("[view]\nautoplay = sometimes\n");
+  CHECK_FALSE(bad.config.autoplay);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# autoplay = off\n") != std::string::npos);
+}
