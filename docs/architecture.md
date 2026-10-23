@@ -298,7 +298,9 @@ const PbPlugin* pb_plugin_entry(const PbHost* host);
     image, long edge ≥ a requested size). Called on worker threads, concurrently;
     may do I/O and decoding. The host owns all pixel memory (`PbImageOut.alloc`).
   - *Players* (optional) — live content for an item opened in whole-photo view:
-    `player_open` / `player_close`, `player_event(ACTIVATE)` for a click on the item,
+    `player_open` / `player_close`, `player_event(ACTIVATE)` for a click on the item
+    (and `PLAY_ONCE` / `PLAY_NORMAL`: while the screensaver runs, play to the end even if
+    the plugin is set to loop; plugins ignore unknown events, so new ones keep the version),
     `player_frame` returning the current RGBA frame (with a serial so unchanged frames
     aren't re-uploaded), `player_active` (the host keeps redrawing while true) and,
     since version 4, `player_progress` (position / duration in seconds; the host shows it

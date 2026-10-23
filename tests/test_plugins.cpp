@@ -199,6 +199,10 @@ TEST_CASE("plugins: load the test plugin and use its formats and players") {
   REQUIRE(progress);
   CHECK(progress->position == 2.5);
   CHECK(progress->duration == 10);
+  player->setPlayOnce(true);  // the fake reports it as position 5
+  CHECK(player->progress()->position == 5);
+  player->setPlayOnce(false);
+  CHECK(player->progress()->position == 2.5);
   auto frame = player->frame();
   REQUIRE(frame);
   CHECK(frame->w == 4);
@@ -358,5 +362,45 @@ TEST_CASE("video plugin: stills never write past the image buffer") {
   }
   if (p->destroy) p->destroy(p->self);
   pb::closeLibrary(lib);
+}
+
+// tests/data/odd200x88.mp4 is 0.5 s long.
+TEST_CASE("video plugin: [plugin.video] loop = on restarts at the end, except when told to play once") {
+  const fs::path clip = fs::path(PB_TEST_DATA_DIR) / "odd200x88.mp4";
+  auto playsThrough = [](pb::Player& player) {  // true if it ends within 2 s
+    for (int i = 0; i < 200; ++i) {
+      std::this_thread::sleep_for(10ms);
+      player.frame();  // ends are noticed when frames are taken
+      if (!player.active()) return true;
+    }
+    return false;
+  };
+  {
+    pb::PluginHost host;
+    REQUIRE_FALSE(host.load("video", {fs::path(PB_TEST_PLUGIN_DIR)}));
+    auto player = host.openPlayer(clip);
+    REQUIRE(player);
+    player->activate();
+    CHECK(playsThrough(*player));  // off by default
+  }
+  pb::PluginHost host(nullptr, {{"video", {{"loop", "on"}}}});
+  REQUIRE_FALSE(host.load("video", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  auto player = host.openPlayer(clip);
+  REQUIRE(player);
+  player->activate();
+  double last = 0;
+  bool wrapped = false;
+  for (int i = 0; i < 150 && !wrapped; ++i) {  // 1.5 s: wraps around at least once
+    std::this_thread::sleep_for(10ms);
+    player->frame();
+    CHECK(player->active());
+    if (auto p = player->progress()) {
+      wrapped = p->position < last - 0.2;
+      last = p->position;
+    }
+  }
+  CHECK(wrapped);
+  player->setPlayOnce(true);  // e.g. the screensaver waits for the end
+  CHECK(playsThrough(*player));
 }
 #endif

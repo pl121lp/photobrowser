@@ -582,6 +582,8 @@ int App::run(const Options& options) {
         if (openId) player = plugins.openPlayer(root / fromUtf8(session.lib.catalog.photos[*openId].relPath));
         autoplayPending = player && config.autoplay;
       }
+      // The screensaver moves on when the item ends, so it never loops there.
+      if (player) player->setPlayOnce(screensaver.active());
       if (ui.takeActivation() && player) {
         player->activate();
         autoplayPending = false;  // the user took over

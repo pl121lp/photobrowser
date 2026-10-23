@@ -122,6 +122,12 @@ void Player::activate() {
   if (plugin_.player_event) plugin_.player_event(player_, PB_EVENT_ACTIVATE);
 }
 
+void Player::setPlayOnce(bool once) {
+  if (once == playOnce_) return;
+  playOnce_ = once;
+  if (plugin_.player_event) plugin_.player_event(player_, once ? PB_EVENT_PLAY_ONCE : PB_EVENT_PLAY_NORMAL);
+}
+
 std::optional<LiveFrame> Player::frame() {
   PbFrame f{};
   if (!plugin_.player_frame || !plugin_.player_frame(player_, &f) || !f.rgba || !f.width || !f.height ||

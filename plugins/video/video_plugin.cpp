@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -38,6 +39,15 @@ extern "C" {
 namespace {
 
 const PbHost* g_host = nullptr;
+bool g_loop = false;  // [plugin.video] loop = on: restart at the end
+
+// A setting's on value, as the app's config reads it: on / true / yes / 1, any case.
+bool isOn(const char* value) {
+  if (!value) return false;
+  std::string v(value);
+  for (char& c : v) c = char(std::tolower(static_cast<unsigned char>(c)));
+  return v == "on" || v == "true" || v == "yes" || v == "1";
+}
 
 void logMsg(int level, const std::string& msg) {
   if (g_host && g_host->log) g_host->log(g_host->ctx, level, msg.c_str());
@@ -445,6 +455,7 @@ struct PlayState {
   std::condition_variable cv;
   std::string path;
   bool stop = false, paused = false, restart = false;
+  bool loop = false;  // [plugin.video] loop, unless the host asked to play once
   bool decodeDone = false, failed = false, ended = false;
   uint32_t w = 0, h = 0;  // upright frame size
   double start = 0, duration = 0;  // of the video stream, seconds; duration 0 = unknown
@@ -646,6 +657,7 @@ PbPlayer* playerOpen(void*, const char* path) {
   auto* p = new PbPlayer;
   p->st = std::make_shared<PlayState>();
   p->st->path = path;
+  p->st->loop = g_loop;
   return p;  // nothing is read until the first click
 }
 
@@ -659,8 +671,13 @@ void playerClose(PbPlayer* p) {
 }
 
 void playerEvent(PbPlayer* p, int event) {
-  if (event != PB_EVENT_ACTIVATE) return;
   PlayState& st = *p->st;
+  if (event == PB_EVENT_PLAY_ONCE || event == PB_EVENT_PLAY_NORMAL) {
+    std::lock_guard lock(st.m);
+    st.loop = event == PB_EVENT_PLAY_NORMAL && g_loop;
+    return;
+  }
+  if (event != PB_EVENT_ACTIVATE) return;
   if (!p->started) {
     p->started = true;
     {
@@ -710,7 +727,14 @@ int playerFrame(PbPlayer* p, PbFrame* out) {
       ++st.serial;
       popped = true;
     }
-    if (st.decodeDone && st.queue.empty()) st.ended = true;
+    if (st.decodeDone && st.queue.empty() && !st.restart) {
+      if (st.loop) {
+        st.restart = true;  // from the start again; the last frame stays until the first is due
+        popped = true;      // wakes the decode thread
+      } else {
+        st.ended = true;
+      }
+    }
     if (!st.haveShown) return 0;
     *out = PbFrame{st.w, st.h, st.w * 4, st.shown.rgba.data(), st.serial};
   }
@@ -770,6 +794,7 @@ const PbPlugin kPlugin = {
 extern "C" PB_PLUGIN_EXPORT const PbPlugin* pb_plugin_entry(const PbHost* host) {
   if (!host || host->abi_version != PB_PLUGIN_ABI_VERSION || host->struct_size < sizeof(PbHost)) return nullptr;
   g_host = host;
+  g_loop = isOn(host->setting(host->ctx, "loop"));
   av_log_set_level(AV_LOG_FATAL);
   return &kPlugin;
 }

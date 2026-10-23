@@ -98,8 +98,12 @@ typedef struct PbImageOut {
 
 typedef struct PbPlayer PbPlayer; /* opaque, owned by the plugin */
 
+/* A plugin ignores events it doesn't know, so new ones don't change the ABI version. */
 enum PbPlayerEvent {
-  PB_EVENT_ACTIVATE = 1, /* primary click on the open item (e.g. play / pause) */
+  PB_EVENT_ACTIVATE = 1,    /* primary click on the open item (e.g. play / pause) */
+  PB_EVENT_PLAY_ONCE = 2,   /* the host moves on at the end (screensaver): play to the end
+                             * and stop, even if the plugin's settings say loop */
+  PB_EVENT_PLAY_NORMAL = 3, /* back to the plugin's own settings (the default) */
 };
 
 typedef struct PbFrame {

@@ -100,7 +100,8 @@ TEST_CASE("config: focused photo zoom limit is configurable and validated") {
 TEST_CASE("config: the generated default file documents every option and parses to the defaults") {
   const std::string text = pb::defaultConfigText();
   for (auto key : {"folder", "gap", "max_photo_zoom", "enabled", "graph", "fullscreen", "mode", "color", "color2", "shader",
-                   "[map]", "width", "photo_zoom", "open", "[plugin.maptiles]"}) {
+                   "[map]", "width", "photo_zoom", "open", "[plugin.maptiles]",
+                   "[plugin.video]", "loop"}) {
     CHECK(text.find(key) != std::string::npos);
   }
   auto r = pb::parseConfig(text);

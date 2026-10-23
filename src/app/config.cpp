@@ -504,6 +504,12 @@ std::string defaultConfigText() {
 # max_zoom = 19
 # Size limit of the downloaded tile cache in MB (least recently used tiles go first).
 # disk_cache = 500
+#
+# The video plugin:
+# [plugin.video]
+# on = a video that reaches its end starts again from the beginning (not in the
+# screensaver, which moves on to the next item when a video ends).
+# loop = off
 )";
 }
 

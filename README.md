@@ -169,10 +169,18 @@ line. Design and API: [docs/architecture.md §13](docs/architecture.md#13-plugin
 | Plugin | Needs | What it does |
 |---|---|---|
 | `maptiles` | libcurl (see Dependencies) | Map tiles for the map view (`M`): OpenStreetMap by default, cached on disk. See [Map](#map). |
-| `video` | FFmpeg (see Dependencies) | `.mp4 .mov .m4v .mkv .webm .avi .3gp` join the grid as their first frame with a play badge. Open one (double-click) and click it to play with sound, click again to pause; at the end a click plays it again. HDR phone videos are tone-mapped. No seeking yet. |
+| `video` | FFmpeg (see Dependencies) | `.mp4 .mov .m4v .mkv .webm .avi .3gp` join the grid as their first frame with a play badge. Open one (double-click) and click it to play with sound, click again to pause; at the end a click plays it again (or it loops, see below). A bar at the bottom shows how far it has played. HDR phone videos are tone-mapped. No seeking yet. |
 
 ```sh
 build/linux-release/photobrowse ~/Pictures --plugin video
+```
+
+To have videos start over by themselves at the end (the screensaver still moves on
+when a video ends), add to the config file:
+
+```ini
+[plugin.video]
+loop = on   # default off
 ```
 
 Enabling or disabling a plugin that adds file types re-indexes the library once.

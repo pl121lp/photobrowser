@@ -2,7 +2,7 @@
  * whose colour is the file's first byte; a player shows a 4x2 frame while "playing".
  * Map tiles: zoom 0..5, the first pixel is (z*40, x, y); level 5 is missing, level 4
  * comes back at the wrong size; setting mode = offline makes every tile offline.
- * Progress: 2.5 of 10 s once started.
+ * Progress: 2.5 of 10 s once started (5 after PB_EVENT_PLAY_ONCE).
  * Built a second time with PB_TEST_V1_SIZE: a version-1-sized table (no tiles). */
 #include <stddef.h>
 #include <stdio.h>
@@ -16,6 +16,7 @@ static int g_offline;
 
 struct PbPlayer {
   int playing;
+  int once;
   int activations;
   uint8_t pixels[4 * 2 * 4];
 };
@@ -67,6 +68,7 @@ static PbPlayer* playerOpen(void* self, const char* path) {
 static void playerClose(PbPlayer* p) { free(p); }
 
 static void playerEvent(PbPlayer* p, int event) {
+  if (event == PB_EVENT_PLAY_ONCE || event == PB_EVENT_PLAY_NORMAL) p->once = event == PB_EVENT_PLAY_ONCE;
   if (event != PB_EVENT_ACTIVATE) return;
   p->playing = !p->playing;
   p->activations++;
@@ -89,7 +91,7 @@ static int playerActive(PbPlayer* p) { return p->playing; }
 
 static int playerProgress(PbPlayer* p, double* position, double* duration) {
   if (!p->activations) return 0;
-  *position = 2.5;
+  *position = p->once ? 5 : 2.5;
   *duration = 10;
   return 1;
 }

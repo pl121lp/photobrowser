@@ -138,7 +138,8 @@ plugin that adds file types re-indexes the library once.
 **Video plugin** (`--plugin video`, needs FFmpeg): `.mp4 .mov .m4v .mkv .webm .avi .3gp`
 files join the grid in time order, shown as their first frame with a play badge. Open
 one in the whole-photo view and click it to play with sound; click again to pause; at
-the end a click plays it again. Leaving the photo stops it. HDR phone videos are
+the end a click plays it again (or, with `[plugin.video] loop = on`, it starts over by
+itself, except in the screensaver, which moves on). Leaving the photo stops it. HDR phone videos are
 tone-mapped to look right on a normal display (like mpv / libplacebo: reference white
 sits below full white, so bright skies keep their colour). Once started, a thin bar
 with a dot at the bottom of the window (not of the video) shows how far it has played. No seeking (yet). Phone videos with a
@@ -199,6 +200,9 @@ Decided by the user:
 - Video progress: a display-only bar with a position dot, centred at the bottom of the
   window regardless of the video's size or the map panel; shown while a started video is
   open (playing, paused or ended). Seeking may be added later.
+- `[plugin.video] loop = off | on` (default off): on restarts a video at its end. The
+  screensaver ignores it (it moves on when a video ends): the host sends the player
+  `PB_EVENT_PLAY_ONCE` while the screensaver runs, `PB_EVENT_PLAY_NORMAL` otherwise.
 - Map view (`M`): OpenStreetMap raster tiles via a plugin, fly between locations;
   decisions in [map-spec.md §8](map-spec.md).
 

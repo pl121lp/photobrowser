@@ -56,10 +56,14 @@ class Player {
   std::optional<LiveFrame> frame();   // nullopt = show the still image
   bool active();                      // changing by itself: keep redrawing
   std::optional<PlaybackProgress> progress();  // nullopt = unknown (not started, or a still)
+  // True: play to the end and stop even if the plugin is set to loop (the caller moves on
+  // at the end, e.g. the screensaver). Cheap to call every frame.
+  void setPlayOnce(bool once);
 
  private:
   const PbPlugin& plugin_;
   PbPlayer* player_;
+  bool playOnce_ = false;
 };
 
 // Settings for plugins: [plugin.<name>] config sections, by plugin name, key -> value.
