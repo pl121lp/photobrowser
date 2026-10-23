@@ -192,8 +192,13 @@ TEST_CASE("plugins: load the test plugin and use its formats and players") {
   REQUIRE(player);
   CHECK_FALSE(player->frame());
   CHECK_FALSE(player->active());
+  CHECK_FALSE(player->progress());  // not started
   player->activate();
   CHECK(player->active());
+  auto progress = player->progress();
+  REQUIRE(progress);
+  CHECK(progress->position == 2.5);
+  CHECK(progress->duration == 10);
   auto frame = player->frame();
   REQUIRE(frame);
   CHECK(frame->w == 4);
@@ -248,6 +253,13 @@ TEST_CASE("plugins: a v1-sized plugin table has no tile source") {
   REQUIRE(host.plugins().size() == 1);
   CHECK(host.plugins()[0].name == "testfake_v1");
   CHECK_FALSE(host.tileSource());
+  pbtest::TempDir dir;
+  pbtest::writeFile(dir.path / "clip.fake", "A");
+  auto player = host.openPlayer(dir.path / "clip.fake");
+  REQUIRE(player);
+  player->activate();
+  CHECK(player->active());
+  CHECK_FALSE(player->progress());  // no player_progress in a v1-sized table
 }
 
 #ifdef PB_TEST_VIDEO_PLUGIN
@@ -291,6 +303,11 @@ TEST_CASE("video plugin: still, metadata and playback of a sample clip") {
   REQUIRE(later);
   CHECK(later->serial > serial);  // playing
   CHECK(player->active());
+  auto progress = player->progress();
+  REQUIRE(progress);
+  CHECK(progress->duration > 0.5);
+  CHECK(progress->position > 0.1);
+  CHECK(progress->position <= progress->duration);
   player->activate();  // pause
   CHECK_FALSE(player->active());
   const uint64_t pausedAt = player->frame()->serial;

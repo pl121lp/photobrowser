@@ -88,6 +88,17 @@ Rect buildMapStatus(std::string_view text, const FontInfo& font, double scale, c
 Rect buildAttribution(std::string_view text, const FontInfo& font, double scale, const Rect& area,
                       std::vector<OverlayQuad>& out);
 
+// Playback position of live content (e.g. a video): a thin track centred at the bottom of
+// a `viewport`-sized screen, filled up to `fraction` (clamped to 0..1). The round position
+// dot is drawn by the caller (a disc of `dotRadius` px centred on `dot`).
+struct ProgressBar {
+  Rect track;
+  Vec2d dot;
+  double dotRadius = 0;
+};
+ProgressBar buildProgressBar(double fraction, double scale, Vec2d viewport, const FontInfo& font,
+                             std::vector<OverlayQuad>& out);
+
 // A frame of `thickness` px just outside `r` (e.g. around a highlighted photo): four bars.
 void buildFrame(const Rect& r, double thickness, const float color[4], const FontInfo& font,
                 std::vector<OverlayQuad>& out);

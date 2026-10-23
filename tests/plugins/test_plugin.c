@@ -2,6 +2,7 @@
  * whose colour is the file's first byte; a player shows a 4x2 frame while "playing".
  * Map tiles: zoom 0..5, the first pixel is (z*40, x, y); level 5 is missing, level 4
  * comes back at the wrong size; setting mode = offline makes every tile offline.
+ * Progress: 2.5 of 10 s once started.
  * Built a second time with PB_TEST_V1_SIZE: a version-1-sized table (no tiles). */
 #include <stddef.h>
 #include <stdio.h>
@@ -86,6 +87,13 @@ static int playerFrame(PbPlayer* p, PbFrame* out) {
 
 static int playerActive(PbPlayer* p) { return p->playing; }
 
+static int playerProgress(PbPlayer* p, double* position, double* duration) {
+  if (!p->activations) return 0;
+  *position = 2.5;
+  *duration = 10;
+  return 1;
+}
+
 static void destroy(void* self) { (void)self; }
 
 static int tileGet(void* self, int z, int x, int y, PbImageOut* out) {
@@ -117,7 +125,7 @@ static const char* const kExtensions[] = {".fake", NULL};
 static const PbPlugin kPlugin = {
     PB_PLUGIN_ABI_VERSION, PLUGIN_SIZE, PLUGIN_NAME, "1.0", "test plugin", NULL, kExtensions,
     probe, decodeStill, playerOpen, playerClose, playerEvent, playerFrame, playerActive, destroy,
-    "test tiles", 0, 5, tileGet,
+    "test tiles", 0, 5, tileGet, playerProgress,
 };
 
 PB_PLUGIN_EXPORT const PbPlugin* pb_plugin_entry(const PbHost* host) {

@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#define PB_PLUGIN_ABI_VERSION 3u
+#define PB_PLUGIN_ABI_VERSION 4u
 #define PB_PLUGIN_ENTRY_NAME "pb_plugin_entry"
 
 #if defined(_WIN32)
@@ -160,6 +160,11 @@ typedef struct PbPlugin {
   int tile_min_zoom, tile_max_zoom; /* e.g. 0, 19 */
   /* Fills `out` with a 256x256 RGBA image and returns PB_TILE_OK, or another PbTileResult. */
   int (*tile_get)(void* self, int z, int x, int y, PbImageOut* out);
+
+  /* ---- Since version 4 ---- */
+  /* Main thread, optional. 1 and fills the playback position and total duration (seconds,
+   * 0 <= position <= duration) while the player knows them; 0 otherwise (e.g. not started). */
+  int (*player_progress)(PbPlayer* player, double* position, double* duration);
 } PbPlugin;
 
 /* The single exported symbol. Returns NULL if the plugin can't work with this host

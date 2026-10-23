@@ -300,7 +300,9 @@ const PbPlugin* pb_plugin_entry(const PbHost* host);
   - *Players* (optional) — live content for an item opened in whole-photo view:
     `player_open` / `player_close`, `player_event(ACTIVATE)` for a click on the item,
     `player_frame` returning the current RGBA frame (with a serial so unchanged frames
-    aren't re-uploaded), and `player_active` (the host keeps redrawing while true).
+    aren't re-uploaded), `player_active` (the host keeps redrawing while true) and,
+    since version 4, `player_progress` (position / duration in seconds; the host shows it
+    as a bar with a dot at the bottom of the window — display only, no seeking yet).
     Called on the main thread and must return immediately: players run their own
     threads for I/O and decoding.
   - *Map tiles* (optional, version 2) — `tile_get(z, x, y)` fills a 256×256 RGBA
@@ -308,7 +310,7 @@ const PbPlugin* pb_plugin_entry(const PbHost* host);
     `tile_attribution` and the zoom range. Called on the host's two map tile threads;
     may block on the network.
   - `destroy` — stop all plugin threads before unload.
-- Versioning: `PB_PLUGIN_ABI_VERSION` (now 3; 3 added GPS to `PbMediaInfo`) plus `struct_size` in each table; structs
+- Versioning: `PB_PLUGIN_ABI_VERSION` (now 4; 3 added GPS to `PbMediaInfo`, 4 added `player_progress`) plus `struct_size` in each table; structs
   only grow at the end. A plugin built for another version is refused with a clear
   message; a version-2 table only as long as version 1's simply has no tile source.
 

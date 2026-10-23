@@ -263,6 +263,20 @@ Rect buildAttribution(std::string_view text, const FontInfo& font, double scale,
   return textPanel(text, font, scale, {area.x1 - margin - size.x, area.y1 - margin - size.y}, pad, 0.6f, out);
 }
 
+ProgressBar buildProgressBar(double fraction, double scale, Vec2d viewport, const FontInfo& font,
+                             std::vector<OverlayQuad>& out) {
+  fraction = std::clamp(fraction, 0.0, 1.0);
+  const double w = std::min(viewport.x / 3, 480 * scale), h = 3 * scale;
+  const double x0 = (viewport.x - w) / 2, y1 = viewport.y - 2 * kMargin * scale;
+  ProgressBar bar{{x0, y1 - h, x0 + w, y1}, {x0 + fraction * w, y1 - h / 2}, 5 * scale};
+  const double b = scale;  // dark backing keeps the bar readable over bright video
+  const Rect& t = bar.track;
+  out.push_back(solid(OverlayQuad::Kind::Panel, {t.x0 - b, t.y0 - b, t.x1 + b, t.y1 + b}, font, 0, 0, 0, 0.4f));
+  out.push_back(solid(OverlayQuad::Kind::Panel, t, font, 1, 1, 1, 0.35f));
+  out.push_back(solid(OverlayQuad::Kind::Panel, {t.x0, t.y0, bar.dot.x, t.y1}, font, 1, 1, 1, 0.9f));
+  return bar;
+}
+
 void buildFrame(const Rect& r, double thickness, const float color[4], const FontInfo& font,
                 std::vector<OverlayQuad>& out) {
   const double t = thickness;

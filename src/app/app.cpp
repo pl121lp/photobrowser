@@ -794,6 +794,17 @@ int App::run(const Options& options) {
         overlay.draw(windowPx, overlayQuads);
       }
 
+      // Playback position of the open item's live content (e.g. a video): a bar with a dot,
+      // at the bottom of the window whatever the item's size or the map panel.
+      if (const auto p = player ? player->progress() : std::nullopt) {
+        overlayQuads.clear();
+        const ProgressBar bar =
+            buildProgressBar(p->position / p->duration, uiScale, windowPx, overlayFont, overlayQuads);
+        overlay.draw(windowPx, overlayQuads);
+        const MapDot dot{{float(bar.dot.x), float(bar.dot.y)}, float(bar.dotRadius), 0.0f, {1, 1, 1, 1}};
+        mapRenderer.draw(windowPx, std::span(&dot, 1));
+      }
+
       // Map notices (e.g. no internet): a few seconds near the top centre.
       if (now < noticeUntil) {
         overlayQuads.clear();

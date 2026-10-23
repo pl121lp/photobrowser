@@ -1,5 +1,6 @@
 #include "plugin/plugin_host.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -58,6 +59,7 @@ class PluginMediaHandler final : public MediaHandler {
 // sizeof(PbPlugin) in ABI version 1, before the map tile fields.
 constexpr size_t kPluginV1Size = offsetof(PbPlugin, tile_attribution);
 constexpr size_t kPluginTilesEnd = offsetof(PbPlugin, tile_get) + sizeof(PbPlugin::tile_get);
+constexpr size_t kPluginProgressEnd = offsetof(PbPlugin, player_progress) + sizeof(PbPlugin::player_progress);
 
 // The plugin's tile_get as a TileSource; results are checked before the core sees them.
 class PluginTileSource final : public TileSource {
@@ -130,6 +132,16 @@ std::optional<LiveFrame> Player::frame() {
 }
 
 bool Player::active() { return plugin_.player_active && plugin_.player_active(player_); }
+
+std::optional<PlaybackProgress> Player::progress() {
+  if (plugin_.struct_size < kPluginProgressEnd || !plugin_.player_progress) return std::nullopt;
+  double position = 0, duration = 0;
+  if (!plugin_.player_progress(player_, &position, &duration) || !std::isfinite(position) ||
+      !std::isfinite(duration) || duration <= 0) {
+    return std::nullopt;
+  }
+  return PlaybackProgress{std::clamp(position, 0.0, duration), duration};
+}
 
 PluginHost::PluginHost(AudioBackend* audio, PluginSettings settings, fs::path cacheDir)
     : audio_(audio), settings_(std::move(settings)), cacheDir_(std::move(cacheDir)), cacheDirUtf8_(toUtf8(cacheDir_)) {}

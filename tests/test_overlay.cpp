@@ -386,3 +386,34 @@ TEST_CASE("overlay: frame is four thin bars just outside the rect") {
   }
   CHECK(all == pb::Rect{98, 98, 202, 152});
 }
+
+TEST_CASE("overlay: playback progress is a thin bar centred at the bottom of the screen") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Vec2d viewport{1920, 1080};
+  const pb::ProgressBar bar = pb::buildProgressBar(0.25, 2.0, viewport, kFont, q);
+  CHECK(bar.track.center().x == doctest::Approx(960));
+  CHECK(bar.track.y1 < viewport.y);
+  CHECK(bar.track.y1 > viewport.y - 100);
+  CHECK(bar.track.height() < 10);
+  CHECK(bar.track.width() > 300);
+  CHECK(bar.track.width() < viewport.x / 2);
+  // The dot sits on the track a quarter of the way along.
+  CHECK(bar.dot.x == doctest::Approx(bar.track.x0 + 0.25 * bar.track.width()));
+  CHECK(bar.dot.y == doctest::Approx(bar.track.center().y));
+  CHECK(bar.dotRadius > bar.track.height() / 2);
+  // Backing, track and the played part, which ends at the dot.
+  REQUIRE(q.size() == 3);
+  CHECK(q[1].rect == bar.track);
+  CHECK(q[2].rect.x0 == doctest::Approx(bar.track.x0));
+  CHECK(q[2].rect.x1 == doctest::Approx(bar.dot.x));
+  CHECK(q[2].color[3] > q[1].color[3]);
+}
+
+TEST_CASE("overlay: playback progress is clamped to the track") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::ProgressBar before = pb::buildProgressBar(-1, 1.0, {800, 600}, kFont, q);
+  CHECK(before.dot.x == doctest::Approx(before.track.x0));
+  const pb::ProgressBar after = pb::buildProgressBar(3, 1.0, {800, 600}, kFont, q);
+  CHECK(after.dot.x == doctest::Approx(after.track.x1));
+  CHECK(after.track.width() < 800);
+}

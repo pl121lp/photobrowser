@@ -38,6 +38,11 @@ struct LiveFrame {
   uint64_t serial = 0;  // changes when the pixels do
 };
 
+// How far live content has played, in seconds (0 <= position <= duration, duration > 0).
+struct PlaybackProgress {
+  double position = 0, duration = 0;
+};
+
 // Live content of one item (e.g. a playing video), opened while it is shown in
 // whole-photo view. Main thread only; every call returns quickly.
 class Player {
@@ -50,6 +55,7 @@ class Player {
   void activate();                    // primary click on the item
   std::optional<LiveFrame> frame();   // nullopt = show the still image
   bool active();                      // changing by itself: keep redrawing
+  std::optional<PlaybackProgress> progress();  // nullopt = unknown (not started, or a still)
 
  private:
   const PbPlugin& plugin_;

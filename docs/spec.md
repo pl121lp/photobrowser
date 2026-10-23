@@ -140,7 +140,8 @@ files join the grid in time order, shown as their first frame with a play badge.
 one in the whole-photo view and click it to play with sound; click again to pause; at
 the end a click plays it again. Leaving the photo stops it. HDR phone videos are
 tone-mapped to look right on a normal display (like mpv / libplacebo: reference white
-sits below full white, so bright skies keep their colour). No seeking (yet). Phone videos with a
+sits below full white, so bright skies keep their colour). Once started, a thin bar
+with a dot at the bottom of the window (not of the video) shows how far it has played. No seeking (yet). Phone videos with a
 recorded location (Android and iPhone both store one) appear on the map like photos.
 
 **Map tiles plugin** (`--plugin maptiles`, needs libcurl): OpenStreetMap tiles for the
@@ -195,6 +196,9 @@ Decided by the user:
   enabled by a command-line parameter; the app must run without knowing any plugin.
 - First plugin: video. Still thumbnail in the grid; in focus, left click starts / stops
   playback; no seeking for now.
+- Video progress: a display-only bar with a position dot, centred at the bottom of the
+  window regardless of the video's size or the map panel; shown while a started video is
+  open (playing, paused or ended). Seeking may be added later.
 - Map view (`M`): OpenStreetMap raster tiles via a plugin, fly between locations;
   decisions in [map-spec.md §8](map-spec.md).
 

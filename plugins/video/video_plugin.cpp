@@ -447,6 +447,7 @@ struct PlayState {
   bool stop = false, paused = false, restart = false;
   bool decodeDone = false, failed = false, ended = false;
   uint32_t w = 0, h = 0;  // upright frame size
+  double start = 0, duration = 0;  // of the video stream, seconds; duration 0 = unknown
   std::deque<VideoFrame> queue;
   std::vector<std::vector<uint8_t>> pool;  // recycled frame buffers
   VideoFrame shown;
@@ -507,12 +508,19 @@ void playLoop(std::shared_ptr<PlayState> st) {
 
   uint32_t w, h;
   fitSize(*s, kMaxFrameEdge, w, h);
+  const double timeBase = av_q2d(s->videoStream()->time_base);
   {
     std::lock_guard lock(st->m);
     st->w = s->rotation % 180 ? h : w;
     st->h = s->rotation % 180 ? w : h;
+    const AVStream* vs = s->videoStream();
+    if (vs->start_time != AV_NOPTS_VALUE) st->start = vs->start_time * timeBase;
+    if (vs->duration > 0) {
+      st->duration = vs->duration * timeBase;
+    } else if (s->fmt->duration > 0) {
+      st->duration = double(s->fmt->duration) / AV_TIME_BASE;
+    }
   }
-  const double timeBase = av_q2d(s->videoStream()->time_base);
   ColorConverter cc(std::clamp(std::thread::hardware_concurrency() / 4, 1u, 3u));
   std::vector<float> samples;
   std::deque<PacketPtr> videoPackets;
@@ -716,6 +724,17 @@ int playerActive(PbPlayer* p) {
   return !p->st->paused && !p->st->ended && !p->st->failed;
 }
 
+int playerProgress(PbPlayer* p, double* position, double* duration) {
+  if (!p->started) return 0;
+  std::lock_guard lock(p->st->m);
+  const PlayState& st = *p->st;
+  if (st.duration <= 0) return 0;
+  const double at = st.ended ? st.duration : st.clockStarted ? st.clock() - st.start : 0;
+  *position = std::clamp(at, 0.0, st.duration);
+  *duration = st.duration;
+  return 1;
+}
+
 void destroy(void*) {
   std::unique_lock lock(g_threadsMutex);
   g_threadsDone.wait(lock, [] { return g_threads == 0; });
@@ -743,6 +762,7 @@ const PbPlugin kPlugin = {
     0,
     0,
     nullptr,
+    playerProgress,
 };
 
 }  // namespace
