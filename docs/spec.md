@@ -67,7 +67,7 @@ the primary requirement; features come second.
 | Mouse wheel | **Smooth zoom about the cursor** (point under cursor stays put), including within whole-photo view. |
 | Right-click | In whole-photo view, reset the focused photo to fit the window. |
 | Left-click on the open photo | In whole-photo view, the item's plugin action if it has one (video: play / pause; restart once ended). Otherwise nothing. |
-| Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order; ↑/↓ the closest photo one row up/down (stays put on the top/bottom row). |
+| Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order; ↑/↓ the closest photo one row up/down (stays put on the top/bottom row). With `Shift`: five photos / rows at a time, stopping at the library's edge. |
 | `+` / `-` | Zoom in/out around screen center. |
 | `Home` | Return to the start view (`[view] start_at` photo at the `start_focus` zoom; centre photo with its neighbours by default). |
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). The app starts fullscreen unless `[display] fullscreen = false` or `--windowed`. |

@@ -344,7 +344,8 @@ void Interaction::onWheel(Vec2d px, double notches) {
   logZoom_.target = std::clamp(logZoom_.target + notches * std::log(kWheelFactor), lo, hi);
 }
 
-bool Interaction::onKey(Key k, double t) {
+bool Interaction::onKey(Key k, double t, int steps) {
+  steps = std::max(1, steps);
   now_ = t;
   const Vec2d screenMid = cam_.viewport * 0.5;
   if (focusTarget_) {
@@ -352,14 +353,22 @@ bool Interaction::onKey(Key k, double t) {
       case Key::Escape: unfocus(); return true;
       case Key::Left:
       case Key::Right: {
-        const int64_t step = k == Key::Left ? -1 : 1;
+        const int64_t step = k == Key::Left ? -steps : steps;
         showFocused(uint32_t(std::clamp<int64_t>(int64_t(*focused_) + step, 0, int64_t(layout_.count()) - 1)), t);
         return true;
       }
       case Key::Up:
       case Key::Down:
-        if (auto p = closestInRow(*focused_, k == Key::Up ? -1 : 1)) showFocused(*p, t);
+      {
+        std::optional<uint32_t> to;
+        for (int i = 0; i < steps; ++i) {
+          auto next = closestInRow(to.value_or(*focused_), k == Key::Up ? -1 : 1);
+          if (!next) break;  // top or bottom row
+          to = next;
+        }
+        if (to) showFocused(*to, t);
         return true;
+      }
       case Key::ZoomOut: unfocus(); return true;
       case Key::Home:  // start view "photo": back to the start photo, still whole
         if (startZoom_ == StartZoom::Photo) showFocused(startPos(), t);
@@ -375,8 +384,15 @@ bool Interaction::onKey(Key k, double t) {
     case Key::Down: {
       const Vec2d dir = k == Key::Left ? Vec2d{-1, 0} : k == Key::Right ? Vec2d{1, 0}
                       : k == Key::Up   ? Vec2d{0, -1} : Vec2d{0, 1};
-      const Vec2d from = tween_.active ? Vec2d{tween_.x.to, tween_.y.to} : cam_.center;
-      if (auto p = nearestPosition(from + dir)) glideTo(layout_.place(*p).cell.center(), cam_.scale, t);
+      Vec2d at = tween_.active ? Vec2d{tween_.x.to, tween_.y.to} : cam_.center;
+      std::optional<uint32_t> to;
+      for (int i = 0; i < steps; ++i) {
+        auto p = nearestPosition(at + dir);
+        if (!p) break;
+        to = p;
+        at = layout_.place(*p).cell.center();
+      }
+      if (to) glideTo(layout_.place(*to).cell.center(), cam_.scale, t);
       return true;
     }
     case Key::ZoomIn: onWheel(screenMid, 1); return true;

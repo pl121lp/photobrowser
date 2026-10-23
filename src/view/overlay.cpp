@@ -171,6 +171,7 @@ std::vector<HelpEntry> helpEntries() {
       {"Arrows", "move one photo"},
       {"Left / Right", "whole-photo view: previous / next photo"},
       {"Up / Down", "whole-photo view: closest photo one row up / down"},
+      {"Shift + arrows", "move five photos (rows) at a time"},
       {"+ / -", "zoom in / out"},
       {"Home", "back to the start view"},
       {"Enter", "open the centered photo whole"},

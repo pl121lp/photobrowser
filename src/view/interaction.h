@@ -40,7 +40,9 @@ class Interaction {
   void onPointerUp(Vec2d px, double t);
   void onSecondaryClick();
   void onWheel(Vec2d px, double notches);
-  bool onKey(Key k, double t);  // false if unhandled (Escape when not focused)
+  // false if unhandled (Escape when not focused). Arrows move `steps` photos (Shift: 5),
+  // stopping at the library's edge.
+  bool onKey(Key k, double t, int steps = 1);
   // Fitted screen rect (px) for the whole photo, before focused-photo zoom/pan.
   void setFocusRect(const Rect& screen);
   Rect focusDisplayRect() const;

@@ -389,7 +389,9 @@ int App::run(const Options& options) {
               SDL_SetWindowFullscreen(window, !fs);
             } else if (auto key = mapKey(k)) {
               setScreensaver(false);
-              if (!ui.onKey(*key, t) && *key == Key::Escape) SDL_SetWindowFullscreen(window, false);
+              const bool arrow = *key == Key::Left || *key == Key::Right || *key == Key::Up || *key == Key::Down;
+              const int steps = arrow && (ev.key.mod & SDL_KMOD_SHIFT) ? 5 : 1;  // Shift: hop 5 photos
+              if (!ui.onKey(*key, t, steps) && *key == Key::Escape) SDL_SetWindowFullscreen(window, false);
             }
             break;
           }

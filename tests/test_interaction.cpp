@@ -543,3 +543,38 @@ TEST_CASE("interaction: full start view stays centred when the window grows (goi
   CHECK(f.cam.center.x == doctest::Approx(f.layout.bounds().center().x));
   CHECK(f.cam.center.y == doctest::Approx(f.layout.bounds().center().y));
 }
+
+TEST_CASE("interaction: shift+arrow hops five photos, stopping at the edges") {
+  SUBCASE("grid") {
+    Fixture f;  // 20 photos: 5 columns x 4 rows
+    f.cam.center = f.layout.place(0).cell.center();
+    f.ui.onKey(pb::Key::Right, f.t, 5);
+    f.run(1.0);
+    CHECK(f.cam.center.x == doctest::Approx(f.layout.place(4).cell.center().x));  // only 4 more columns
+    f.ui.onKey(pb::Key::Down, f.t, 5);
+    f.run(1.0);
+    CHECK(f.cam.center.y == doctest::Approx(f.layout.place(19).cell.center().y));  // bottom row
+    f.ui.onKey(pb::Key::Left, f.t, 2);
+    f.run(1.0);
+    CHECK(f.cam.center.x == doctest::Approx(f.layout.place(2).cell.center().x));
+  }
+  SUBCASE("whole-photo view") {
+    Fixture f;
+    const auto p = f.screenOf(6);
+    f.click(p);
+    f.click(p);
+    f.run(0.5);
+    REQUIRE(f.ui.focused());
+    f.ui.onKey(pb::Key::Right, f.t, 5);
+    CHECK(*f.ui.focused() == 11);
+    f.ui.onKey(pb::Key::Left, f.t, 5);
+    f.ui.onKey(pb::Key::Left, f.t, 5);
+    CHECK(*f.ui.focused() == 1);
+    f.ui.onKey(pb::Key::Left, f.t, 5);
+    CHECK(*f.ui.focused() == 0);
+    f.ui.onKey(pb::Key::Down, f.t, 5);
+    CHECK(*f.ui.focused() == 15);  // last row (row 3), same column
+    f.ui.onKey(pb::Key::Up, f.t, 2);
+    CHECK(*f.ui.focused() == 5);
+  }
+}

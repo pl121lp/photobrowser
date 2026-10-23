@@ -145,6 +145,7 @@ mistakes in the settings file are reported with the line number.
 | Right-click | reset a zoomed focused photo to fit the window |
 | Click the open photo | its plugin action, if any (video: play / pause) |
 | Arrow keys | move one photo (in whole-photo view: ←/→ previous/next, ↑/↓ closest photo one row up/down) |
+| `Shift` + arrow keys | the same, five photos (or rows) at a time; stops at the edge |
 | `+` / `-` | zoom about the center |
 | `Home` | back to the start view |
 | `F11` or `F` | toggle fullscreen |
