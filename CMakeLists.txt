@@ -171,6 +171,7 @@ if(PB_HAVE_TURBOJPEG)
   target_sources(pb_tests PRIVATE
     tests/test_imaging.cpp
     tests/test_png_handler.cpp
+    tests/test_index_perf.cpp
     tests/test_cache.cpp
     tests/test_indexer.cpp
     tests/test_library_index.cpp

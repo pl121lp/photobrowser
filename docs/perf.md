@@ -219,3 +219,30 @@ arithmetic vectorizable in 256-pixel chunks; written as one pass per pixel it wa
 across up to 3 helper threads; swscale's 7 ms is what remains. Stills (indexing) stay
 single-threaded, since several are decoded at once. Grid `--bench` is not affected
 (no video playback in it).
+
+## 2026-10-23 — PNG and HEIC indexing
+
+`quickIndex` per file (wall clock, one thread, warm file cache after an untimed pass;
+`pb_tests --test-case="perf: quickIndex*" --no-skip`, release build, 16-thread laptop CPU),
+up to 50 files per kind spread evenly through `photos/`, two runs each:
+
+| Kind | n | mean | median | max |
+|---|---|---|---|---|
+| JPEG | 50 | 1.92 ms | 2.1 ms | 3.1 ms |
+| PNG (1024x1536 / 1170x2532 screenshots, full decode + resize) | 21 | 48.6-49.5 ms | 44 ms | 106 ms |
+| HEIC (libheif default threads) | 50 | 24.6 ms | 5.8 ms | 305 ms |
+| HEIC, `heif_context_set_max_decoding_threads(ctx, 1)` | 50 | 46-49 ms | 5.5-6.3 ms | 690 ms |
+
+HEIC split: 46 of 50 sampled files have a 320x240 embedded thumbnail (about 5.8 ms, 2.8x
+JPEG median); 4 have none (e.g. `IMG_5693.HEIC`) and need a full 12 MP decode, 210-305 ms.
+Those 4 make the mean 12.8x JPEG. Limiting libheif to one decoding thread only slows the
+no-thumbnail decodes (to 360-690 ms), so it was not kept. The "<= ~3x JPEG" bar holds for
+typical HEICs, not for the mean of this sample; the cost is inherent without an ABI
+change (no cheaper preview exists in those files). PNG is a full decode by nature.
+
+Cold library (`photobrowse photos --plugin heif --rebuild-cache --bench`, 1978 items, 4K
+fullscreen, RTX 2080 Super): first full frame after 5.2 s; the bench ran during indexing
+(frame p50 16.67, p99 19.7 ms, 5 frames > 20 ms, 85 jobs pending at the end). Warm
+(`--bench` without rebuild, two runs): first frame ~105 ms, p50 16.68-16.69, p95 17.6,
+p99 18.0-19.2, max 20.8-33.0, frames > 20 ms: 2 and 2; no regression against the map
+table above (the library is larger now, 1978 vs 1115 items).

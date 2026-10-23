@@ -1,6 +1,7 @@
 # PhotoBrowse — PNG and HEIC Support Spec
 
-Status: **design** (2026-10-23). Self-contained together with `docs/spec.md`,
+Status: **implemented** (2026-10-23), plan `docs/plans/2026-10-23-png-heic.md`;
+deviations in §8. Self-contained together with `docs/spec.md`,
 `docs/architecture.md` (§13 Plugins), `docs/map-spec.md` and `CLAUDE.md`.
 
 ## 1. Intent
@@ -179,3 +180,15 @@ The README lists the new optional packages (never install them — CLAUDE.md).
 Names of new types/functions, where the built-in PNG handler is registered, whether
 the heif plugin downscales or caps libheif threads (measure), and the exact CMake
 detection of libheif per platform.
+
+## 8. Deviations made during implementation
+
+- The plugin must call `heif_init`/`heif_deinit` (libheif then loads its decoder
+  plugins, e.g. libde265); without it no HEIC decodes.
+- libheif's image handle size is already post-rotation (`irot`/`imir` applied), so the
+  plugin reports it as is and never swaps width and height.
+- Some iPhone HEICs (e.g. `IMG_5693.HEIC`) have no embedded thumbnail; `quickIndex` then
+  does a full 12 MP decode for them (~200-300 ms). In 4 of 50 sampled files; see
+  `docs/perf.md`. The mean per-file cost is dominated by these, so the "<= ~3x JPEG"
+  bar holds for HEICs with a thumbnail (median) but not for the mean of a mixed library.
+- A truncated HEIC with an intact thumbnail still indexes; only the larger levels fail.
