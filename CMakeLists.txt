@@ -157,6 +157,7 @@ if(PB_HAVE_TURBOJPEG)
   add_library(pb_app STATIC
     src/app/library_index.cpp
     src/app/streamer.cpp
+    src/app/map_tiles.cpp
   )
   target_link_libraries(pb_app PUBLIC pb_imaging)
   target_sources(pb_tests PRIVATE
@@ -165,6 +166,7 @@ if(PB_HAVE_TURBOJPEG)
     tests/test_indexer.cpp
     tests/test_library_index.cpp
     tests/test_streamer.cpp
+    tests/test_map_tiles.cpp
   )
   target_link_libraries(pb_tests PRIVATE pb_app)
 endif()
