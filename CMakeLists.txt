@@ -137,7 +137,9 @@ target_link_libraries(pb_tests PRIVATE pb_core)
 target_compile_definitions(pb_tests PRIVATE PB_TEST_PHOTOS_DIR="${CMAKE_SOURCE_DIR}/photos"
                                            PB_TEST_PLUGIN_DIR="${PB_PLUGIN_DIR}")
 pb_add_plugin(pb_test_plugin testfake tests/plugins/test_plugin.c)
-add_dependencies(pb_tests pb_test_plugin)
+pb_add_plugin(pb_test_plugin_v1 testfake_v1 tests/plugins/test_plugin.c)  # version-1-sized table
+target_compile_definitions(pb_test_plugin_v1 PRIVATE PB_TEST_V1_SIZE)
+add_dependencies(pb_tests pb_test_plugin pb_test_plugin_v1)
 add_test(NAME pb_tests COMMAND pb_tests)
 
 # --- pb_imaging: JPEG codec, resizing, thumbnail cache files, indexer ---------

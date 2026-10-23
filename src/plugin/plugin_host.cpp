@@ -1,5 +1,6 @@
 #include "plugin/plugin_host.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 
@@ -12,6 +13,16 @@ namespace pb {
 namespace fs = std::filesystem;
 
 namespace {
+
+// Allocator for PbImageOut: one image, at most 65536 px a side.
+uint8_t* allocImage(void* ctx, uint32_t w, uint32_t h) {
+  auto* im = static_cast<Image*>(ctx);
+  if (!im->rgba.empty() || w == 0 || h == 0 || w > 65536 || h > 65536) return nullptr;
+  im->w = w;
+  im->h = h;
+  im->rgba.resize(size_t(w) * h * 4);
+  return im->rgba.data();
+}
 
 // The plugin's PbMediaInfo / decode_still as a MediaHandler.
 class PluginMediaHandler final : public MediaHandler {
@@ -28,17 +39,41 @@ class PluginMediaHandler final : public MediaHandler {
   std::optional<Image> decodeStill(const fs::path& abs, uint32_t minLongEdge) const override {
     if (!p_.decode_still) return std::nullopt;
     Image img;
-    PbImageOut out{&img, [](void* ctx, uint32_t w, uint32_t h) -> uint8_t* {
-                     auto* im = static_cast<Image*>(ctx);
-                     if (!im->rgba.empty() || w == 0 || h == 0 || w > 65536 || h > 65536) return nullptr;
-                     im->w = w;
-                     im->h = h;
-                     im->rgba.resize(size_t(w) * h * 4);
-                     return im->rgba.data();
-                   }};
+    PbImageOut out{&img, allocImage};
     if (!p_.decode_still(p_.self, toUtf8(abs).c_str(), minLongEdge, &out) || img.empty()) return std::nullopt;
     return img;
   }
+
+ private:
+  const PbPlugin& p_;
+};
+
+// sizeof(PbPlugin) in ABI version 1, before the map tile fields.
+constexpr size_t kPluginV1Size = offsetof(PbPlugin, tile_attribution);
+constexpr size_t kPluginTilesEnd = offsetof(PbPlugin, tile_get) + sizeof(PbPlugin::tile_get);
+
+// The plugin's tile_get as a TileSource; results are checked before the core sees them.
+class PluginTileSource final : public TileSource {
+ public:
+  explicit PluginTileSource(const PbPlugin& p) : p_(p) {}
+
+  TileResult get(int z, int x, int y) const override {
+    TileResult r;
+    PbImageOut out{&r.image, allocImage};
+    switch (p_.tile_get(p_.self, z, x, y, &out)) {
+      case PB_TILE_OK: r.status = TileStatus::Ok; break;
+      case PB_TILE_MISSING: r.status = TileStatus::Missing; break;
+      case PB_TILE_OFFLINE: r.status = TileStatus::Offline; break;
+      case PB_TILE_REFUSED: r.status = TileStatus::Refused; break;
+      default: r.status = TileStatus::Error; break;
+    }
+    if (r.status == TileStatus::Ok && (r.image.w != 256 || r.image.h != 256)) r.status = TileStatus::Error;
+    if (r.status != TileStatus::Ok) r.image = {};
+    return r;
+  }
+  std::string attribution() const override { return p_.tile_attribution ? p_.tile_attribution : ""; }
+  int minZoom() const override { return p_.tile_min_zoom; }
+  int maxZoom() const override { return p_.tile_max_zoom; }
 
  private:
   const PbPlugin& p_;
@@ -59,8 +94,10 @@ struct PluginHost::Loaded {
   const PbPlugin* api = nullptr;
   PbHost host{};
   AudioBackend* audio = nullptr;
-  std::string name;  // for log messages
+  const PluginSettings* settings = nullptr;
+  std::string name;  // for log messages and its [plugin.<name>] settings
   std::unique_ptr<PluginMediaHandler> media;
+  std::unique_ptr<PluginTileSource> tiles;
 
   ~Loaded() {
     if (api && api->destroy) api->destroy(api->self);
@@ -87,7 +124,8 @@ std::optional<LiveFrame> Player::frame() {
 
 bool Player::active() { return plugin_.player_active && plugin_.player_active(player_); }
 
-PluginHost::PluginHost(AudioBackend* audio) : audio_(audio) {}
+PluginHost::PluginHost(AudioBackend* audio, PluginSettings settings, fs::path cacheDir)
+    : audio_(audio), settings_(std::move(settings)), cacheDir_(std::move(cacheDir)), cacheDirUtf8_(toUtf8(cacheDir_)) {}
 
 PluginHost::~PluginHost() {
   while (!loaded_.empty()) loaded_.pop_back();
@@ -119,8 +157,13 @@ std::optional<std::string> PluginHost::load(const std::string& nameOrPath, const
     if (std::error_code ec; fs::equivalent(i.path, path, ec)) return std::nullopt;  // already loaded
   }
 
+  if (!cacheDir_.empty()) {
+    std::error_code ec;
+    fs::create_directories(cacheDir_, ec);
+  }
   auto l = std::make_unique<Loaded>();
   l->audio = audio_;
+  l->settings = &settings_;
   std::string error;
   l->library = openLibrary(path, error);
   if (!l->library) return "plugin " + toUtf8(path) + ": " + error;
@@ -159,11 +202,19 @@ std::optional<std::string> PluginHost::load(const std::string& nameOrPath, const
     if (out) stream(out)->clear();
   };
   h.audio_close = [](PbAudioOut* out) { delete stream(out); };
+  h.setting = [](void* ctx, const char* key) -> const char* {
+    const auto* self = static_cast<Loaded*>(ctx);
+    const auto section = self->settings->find(self->name);
+    if (!key || section == self->settings->end()) return nullptr;
+    const auto it = section->second.find(key);
+    return it == section->second.end() ? nullptr : it->second.c_str();
+  };
+  h.cache_dir = cacheDirUtf8_.empty() ? nullptr : cacheDirUtf8_.c_str();
 
   l->api = entry(&l->host);
   if (!l->api) return "plugin " + toUtf8(path) + " declined to load (incompatible version?)";
   const PbPlugin& p = *l->api;
-  if (p.abi_version != PB_PLUGIN_ABI_VERSION || p.struct_size < sizeof(PbPlugin)) {
+  if (p.abi_version != PB_PLUGIN_ABI_VERSION || p.struct_size < kPluginV1Size) {
     const std::string msg = "plugin " + toUtf8(path) + " was built for plugin API version " +
                             std::to_string(p.abi_version) + ", this program uses " +
                             std::to_string(PB_PLUGIN_ABI_VERSION);
@@ -177,6 +228,14 @@ std::optional<std::string> PluginHost::load(const std::string& nameOrPath, const
   for (const char* const* e = p.extensions; e && *e; ++e) {
     info.extensions.emplace_back(*e);
     formats_.add(*e, l->media.get());
+  }
+  if (p.struct_size >= kPluginTilesEnd && p.tile_get) {
+    if (tiles_) {
+      l->host.log(l.get(), PB_LOG_WARNING, "another plugin already provides map tiles; ignored");
+    } else {
+      l->tiles = std::make_unique<PluginTileSource>(p);
+      tiles_ = l->tiles.get();
+    }
   }
   infos_.push_back(std::move(info));
   loaded_.push_back(std::move(l));

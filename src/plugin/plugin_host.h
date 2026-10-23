@@ -2,12 +2,14 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "library/media_format.h"
+#include "map/tile_source.h"
 
 struct PbPlugin;
 struct PbPlayer;
@@ -54,9 +56,12 @@ class Player {
   PbPlayer* player_;
 };
 
+// Settings for plugins: [plugin.<name>] config sections, by plugin name, key -> value.
+using PluginSettings = std::map<std::string, std::map<std::string, std::string>>;
+
 // Loads plugins (shared libraries, see src/plugin/photobrowse_plugin.h) and exposes
-// what they provide: media formats for the library and players for live content.
-// Must outlive everything that uses its formats() or players.
+// what they provide: media formats for the library, players for live content and map
+// tiles. Must outlive everything that uses its formats(), players or tile source.
 class PluginHost {
  public:
   struct Info {
@@ -65,7 +70,9 @@ class PluginHost {
     std::filesystem::path path;
   };
 
-  explicit PluginHost(AudioBackend* audio = nullptr);
+  // `cacheDir`: the per-user cache root offered to plugins (created on the first load).
+  explicit PluginHost(AudioBackend* audio = nullptr, PluginSettings settings = {},
+                      std::filesystem::path cacheDir = {});
   ~PluginHost();  // destroys and unloads plugins, last loaded first
   PluginHost(const PluginHost&) = delete;
   PluginHost& operator=(const PluginHost&) = delete;
@@ -78,10 +85,16 @@ class PluginHost {
   const MediaFormats& formats() const { return formats_; }
   // Player for a file, or nullptr if no loaded plugin offers live content for it.
   std::unique_ptr<Player> openPlayer(const std::filesystem::path& abs);
+  // Map tiles from the first loaded plugin that offers them, or nullptr.
+  const TileSource* tileSource() const { return tiles_; }
 
  private:
   struct Loaded;
   AudioBackend* audio_;
+  PluginSettings settings_;
+  std::filesystem::path cacheDir_;
+  std::string cacheDirUtf8_;
+  const TileSource* tiles_ = nullptr;
   std::vector<std::unique_ptr<Loaded>> loaded_;
   std::vector<Info> infos_;
   MediaFormats formats_;

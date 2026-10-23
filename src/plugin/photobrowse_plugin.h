@@ -12,6 +12,8 @@
  *   - player_* run on the main (render) thread. They must return within a fraction of
  *     a millisecond: no file I/O, no decoding, no waiting on locks held by slow work.
  *     A plugin that plays content runs its own threads.
+ *   - tile_get runs on the host's map tile threads (never the photo decoders), possibly
+ *     two at once. It may block on the network for up to its own timeout.
  *   - Host services (PbHost) may be called from any thread.
  *
  * Memory: the host allocates images (PbImageOut.alloc), so no memory crosses the
@@ -31,7 +33,7 @@
 extern "C" {
 #endif
 
-#define PB_PLUGIN_ABI_VERSION 1u
+#define PB_PLUGIN_ABI_VERSION 2u
 #define PB_PLUGIN_ENTRY_NAME "pb_plugin_entry"
 
 #if defined(_WIN32)
@@ -61,6 +63,14 @@ typedef struct PbHost {
   void (*audio_pause)(PbAudioOut* out, int paused);
   void (*audio_clear)(PbAudioOut* out); /* drop everything queued */
   void (*audio_close)(PbAudioOut* out);
+
+  /* ---- Since version 2 ---- */
+  /* Value of `key` in this plugin's config section [plugin.<name>], or NULL if unset.
+   * The string stays valid for the plugin's lifetime. Any thread. */
+  const char* (*setting)(void* ctx, const char* key);
+  /* Per-user cache root (UTF-8, exists), shared by all libraries, e.g.
+   * ~/.cache/photobrowse. A plugin keeps its files in a subfolder named after itself. */
+  const char* cache_dir;
 } PbHost;
 
 /* ---- Media: still images for the grid --------------------------------------------- */
@@ -93,6 +103,17 @@ typedef struct PbFrame {
   const uint8_t* rgba;    /* RGBA, sRGB, top row first */
   uint64_t serial;        /* changes whenever the pixels change (the host skips re-uploads) */
 } PbFrame;
+
+/* ---- Map tiles ------------------------------------------------------------------- */
+
+/* Web Mercator XYZ tiles of 256x256 px (z/x/y, y from the north). */
+enum PbTileResult {
+  PB_TILE_OK = 0,
+  PB_TILE_MISSING = 1, /* no such tile (404, out of range): the host draws the ancestor, no retry */
+  PB_TILE_OFFLINE = 2, /* network unreachable / DNS / timeout: retried later */
+  PB_TILE_REFUSED = 3, /* 403 / 429: the host backs off and says so once */
+  PB_TILE_ERROR = 4,   /* anything else: treated as missing for this session */
+};
 
 /* ---- The plugin -------------------------------------------------------------------- */
 
@@ -128,6 +149,12 @@ typedef struct PbPlugin {
 
   /* Called once before the library is unloaded; must stop all plugin threads. */
   void (*destroy)(void* self);
+
+  /* ---- Since version 2: map tiles (optional; tile_get NULL = no tile source) ---- */
+  const char* tile_attribution;     /* UTF-8, shown on the map, e.g. "© OpenStreetMap contributors" */
+  int tile_min_zoom, tile_max_zoom; /* e.g. 0, 19 */
+  /* Fills `out` with a 256x256 RGBA image and returns PB_TILE_OK, or another PbTileResult. */
+  int (*tile_get)(void* self, int z, int x, int y, PbImageOut* out);
 } PbPlugin;
 
 /* The single exported symbol. Returns NULL if the plugin can't work with this host

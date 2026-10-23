@@ -175,6 +175,53 @@ TEST_CASE("plugins: load the test plugin and use its formats and players") {
   CHECK_FALSE(player->active());
 }
 
+TEST_CASE("plugins: tile source from a plugin") {
+  pbtest::TempDir dir;
+  pb::PluginHost host(nullptr, {}, dir.path / "pbcache");
+  CHECK_FALSE(host.tileSource());
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  CHECK(fs::is_directory(dir.path / "pbcache"));
+  const pb::TileSource* src = host.tileSource();
+  REQUIRE(src);
+  CHECK(src->attribution() == "test tiles");
+  CHECK(src->minZoom() == 0);
+  CHECK(src->maxZoom() == 5);
+  const pb::TileResult r = src->get(2, 1, 3);
+  REQUIRE(r.status == pb::TileStatus::Ok);
+  REQUIRE(r.image.w == 256);
+  REQUIRE(r.image.h == 256);
+  CHECK(r.image.rgba[0] == 80);
+  CHECK(r.image.rgba[1] == 1);
+  CHECK(r.image.rgba[2] == 3);
+  CHECK(r.image.rgba[3] == 255);
+}
+
+TEST_CASE("plugins: tile source results are validated") {
+  pb::PluginHost host;
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  const pb::TileSource* src = host.tileSource();
+  REQUIRE(src);
+  CHECK(src->get(5, 0, 0).status == pb::TileStatus::Missing);
+  const pb::TileResult wrongSize = src->get(4, 0, 0);
+  CHECK(wrongSize.status == pb::TileStatus::Error);
+  CHECK(wrongSize.image.empty());
+}
+
+TEST_CASE("plugins: settings reach the plugin") {
+  pb::PluginHost host(nullptr, {{"testfake", {{"mode", "offline"}}}});
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE(host.tileSource());
+  CHECK(host.tileSource()->get(1, 0, 0).status == pb::TileStatus::Offline);
+}
+
+TEST_CASE("plugins: a v1-sized plugin table has no tile source") {
+  pb::PluginHost host;
+  REQUIRE_FALSE(host.load("testfake_v1", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE(host.plugins().size() == 1);
+  CHECK(host.plugins()[0].name == "testfake_v1");
+  CHECK_FALSE(host.tileSource());
+}
+
 #ifdef PB_TEST_VIDEO_PLUGIN
 // Uses the real video plugin on a sample clip anywhere under photos/ (if any).
 TEST_CASE("video plugin: still, metadata and playback of a sample clip") {

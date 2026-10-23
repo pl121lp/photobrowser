@@ -689,6 +689,10 @@ const PbPlugin kPlugin = {
     playerFrame,
     playerActive,
     destroy,
+    nullptr,  // no map tiles
+    0,
+    0,
+    nullptr,
 };
 
 }  // namespace
