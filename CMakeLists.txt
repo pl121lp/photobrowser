@@ -152,11 +152,14 @@ if(PB_HAVE_TURBOJPEG)
   add_library(pb_imaging STATIC
     src/imaging/jpeg.cpp
     src/imaging/resize.cpp
+    src/imaging/png.cpp
+    src/library/png_handler.cpp
     src/cache/l0_pack.cpp
     src/cache/thumb_cache.cpp
     src/library/indexer.cpp
   )
   target_link_libraries(pb_imaging PUBLIC pb_core PRIVATE pb_turbojpeg)
+  target_include_directories(pb_imaging PRIVATE "${CMAKE_SOURCE_DIR}/third_party/stb")
 
   # pb_app: library indexing and streaming (no SDL / GL; talks to a TextureSink).
   add_library(pb_app STATIC
@@ -167,6 +170,7 @@ if(PB_HAVE_TURBOJPEG)
   target_link_libraries(pb_app PUBLIC pb_imaging)
   target_sources(pb_tests PRIVATE
     tests/test_imaging.cpp
+    tests/test_png_handler.cpp
     tests/test_cache.cpp
     tests/test_indexer.cpp
     tests/test_library_index.cpp
