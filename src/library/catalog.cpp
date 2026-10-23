@@ -9,7 +9,7 @@ namespace pb {
 
 namespace {
 
-constexpr char kMagic[8] = {'P', 'B', 'C', 'A', 'T', 0, 0, 1};
+constexpr char kMagic[8] = {'P', 'B', 'C', 'A', 'T', 0, 0, 2};
 constexpr uint32_t kEndMarker = 0x21444E45;  // "END!"
 
 class Writer {
@@ -86,6 +86,7 @@ void Catalog::sortOrder() {
 bool saveCatalog(const Catalog& c, const std::filesystem::path& path) {
   Writer w;
   w.out.assign(kMagic, kMagic + sizeof kMagic);
+  w.str(c.formats);
   w.put(uint32_t(c.photos.size()));
   for (const auto& p : c.photos) {
     w.str(p.relPath);
@@ -112,6 +113,7 @@ std::optional<Catalog> loadCatalog(const std::filesystem::path& path) {
   Reader r(*data);
   if (!r.magic()) return std::nullopt;
   Catalog c;
+  c.formats = r.str();
   const uint32_t n = r.get<uint32_t>();
   if (!r.ok || n > data->size()) return std::nullopt;
   c.photos.resize(n);

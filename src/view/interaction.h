@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
 
 #include "core/geom.h"
 #include "layout/layout.h"
@@ -40,7 +41,12 @@ class Interaction {
   void closePhoto() { unfocus(); }
   bool flying() const { return tween_.active; }  // an eased camera move is running
 
+  // True once per click on the open photo in whole-photo view (e.g. play / pause).
+  bool takeActivation() { return std::exchange(activated_, false); }
+
   std::optional<uint32_t> focused() const;
+  // Like focused(), but only while opening or open, not while closing.
+  std::optional<uint32_t> opened() const { return focusTarget_ ? focused_ : std::nullopt; }
   double focusProgress() const { return focusProgress_; }  // 0 grid .. 1 whole photo
   double focusZoom() const;
   bool idle() const;
@@ -101,6 +107,7 @@ class Interaction {
   SmoothValue focusLogZoom_;
   Vec2d focusZoomPivot_;
   Vec2d focusPan_;
+  bool activated_ = false;
 
   Vec2d velocityPx_;
 };

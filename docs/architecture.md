@@ -16,6 +16,7 @@ Status: draft for approval · 2026-10-21 · Companion to [spec.md](spec.md)
 | Tests | **doctest** (vendored single header) + CTest | Zero install. |
 | Build | **CMake ≥ 3.24** + **Ninja**, `CMakePresets.json` | Portable; presets for Linux (GCC/Clang) and Windows (MSVC + **vcpkg** manifest). |
 | Future DB | **SQLite** (with FTS5) | Embedded, fast, cross-platform, single file. Not used in v1. |
+| Optional features | **Plugins**: shared libraries behind a small C ABI, loaded only with `--plugin` (§13) | Keeps the core small; heavy dependencies (FFmpeg, …) live in plugins only. |
 
 **Dependencies to install (Linux, Ubuntu 25.10):** `libsdl3-dev`, `libturbojpeg0-dev`.
 Already present: cmake, ninja, g++/clang++, pkg-config.
@@ -28,6 +29,9 @@ src/
   main.cpp                 arg parsing, constructs App
   app/        App          main loop, event dispatch, frame timing, fullscreen
   platform/   Paths        per-user cache dir (XDG_CACHE_HOME / %LOCALAPPDATA%), UTF-8 paths
+              DynLib       dlopen / LoadLibrary for plugins
+  plugin/     photobrowse_plugin.h  the plugin C ABI (the only header plugins include)
+              PluginHost   loads plugins; adapts them to MediaHandler and Player
   view/       Camera       center (double world coords) + zoom; screen<->world
               Motion       momentum (exponential friction), eased tweens, smooth zoom
               Input        drag/click/double-click detection -> Camera commands
@@ -37,6 +41,7 @@ src/
   library/    Catalog      ordered vector<PhotoRecord>; persisted to cache
               Scanner      recursive folder walk, change detection
               Exif         minimal EXIF reader
+              MediaFormats extension -> MediaHandler for non-JPEG files (from plugins)
   imaging/    JpegCodec    TurboJPEG wrapper: header read, scaled decode, encode
               Resize       box downscale, mip generation, orientation
   cache/      ThumbCache   on-disk levels: L0 pack file + per-photo L1/L2 files
@@ -48,6 +53,7 @@ src/
 shaders/      tile.vert / tile.frag (embedded into the binary at build time)
 tests/        unit tests for pure logic
 tools/        make_test_library.(sh|py) — synthetic 10k library via links
+plugins/      optional plugins, one folder each (video/: FFmpeg)
 ```
 
 Dependency direction: `app → view, layout, stream, gfx, library`; `stream → cache,
@@ -230,7 +236,8 @@ upload only pages near the view first; catalog in SQLite instead of one blob;
 layout `visible()` already O(visible); per-frame instance count at full zoom-out
 capped by drawing a pre-rendered overview mosaic texture instead of 100k instances.
 
-**Other formats.** `ImageCodec` interface with JPEG first; PNG/HEIC/RAW decoders later.
+**Other formats.** JPEG is built in. Anything else (PNG, HEIC, RAW, video) comes from a
+plugin as a `MediaHandler` (§13), so the core gains no codec dependencies.
 
 ## 11. Testing and measurement
 - Unit tests (no GPU): layout math & visibility & hit-testing, camera transforms and
@@ -248,3 +255,83 @@ capped by drawing a pre-rendered overview mosaic texture instead of 100k instanc
 - Build presets: `linux-debug`, `linux-release`, `windows-msvc-release` (vcpkg toolchain).
 - Windows is architected for and buildable, but verified on Linux only until a
   Windows machine/CI is available.
+
+## 13. Plugins
+
+**Principle.** The core stays small and fast: only SDL3, OpenGL and libjpeg-turbo.
+Any larger feature, especially one that brings a new dependency, is a **plugin**: a
+shared library that is loaded only when the user asks for it with `--plugin <name|path>`
+(repeatable). The application never links against, names, or special-cases a plugin;
+without `--plugin` no plugin code is loaded at all, and a build without a plugin's
+dependencies simply doesn't build that plugin.
+
+**Where plugins live.** Source in `plugins/<name>/`; built into `<build>/plugins/` as
+`libpb_<name>.so` (`pb_<name>.dll`, `libpb_<name>.dylib`). `--plugin video` looks in
+`plugins/` next to the executable, then next to it; anything containing a path
+separator or ending in a library extension is used as a path.
+
+**ABI: plain C** (`src/plugin/photobrowse_plugin.h`), so plugins can be built with a
+different compiler or C++ runtime (important on Windows), and the ABI stays stable while
+the core's C++ changes freely. The library exports one function:
+
+```c
+const PbPlugin* pb_plugin_entry(const PbHost* host);
+```
+
+- `PbHost` (host → plugin): logging and an **audio output** (float PCM streams, backed
+  by SDL3 in the app). Host services are callable from any thread.
+- `PbPlugin` (plugin → host): name/version, the **file extensions** it handles, and
+  function pointers in two groups:
+  - *Media* — `probe` (display size, capture time) and `decode_still` (an upright RGBA
+    image, long edge ≥ a requested size). Called on worker threads, concurrently;
+    may do I/O and decoding. The host owns all pixel memory (`PbImageOut.alloc`).
+  - *Players* (optional) — live content for an item opened in whole-photo view:
+    `player_open` / `player_close`, `player_event(ACTIVATE)` for a click on the item,
+    `player_frame` returning the current RGBA frame (with a serial so unchanged frames
+    aren't re-uploaded), and `player_active` (the host keeps redrawing while true).
+    Called on the main thread and must return immediately: players run their own
+    threads for I/O and decoding.
+  - `destroy` — stop all plugin threads before unload.
+- Versioning: `PB_PLUGIN_ABI_VERSION` plus `struct_size` in each table; structs only
+  grow at the end. A mismatching plugin is refused with a clear message.
+
+**How the core uses a plugin** (`PluginHost`, GL- and SDL-free, unit-tested with a
+fake plugin in `tests/plugins/`):
+- Its extensions join `MediaFormats`. The scanner accepts them; the indexer, the
+  lazy-level builder and full-resolution loads call the plugin's `decode_still`
+  instead of the JPEG decoder. From then on the item is an ordinary photo: same
+  pyramid, same caches, same streaming, same layout. Nothing else in the core knows.
+- The catalog stores the set of plugin extensions it was indexed with; loading a
+  different set (enabling or disabling a plugin) re-indexes the library once.
+- When an item opens in whole-photo view, the app asks the PluginHost for a `Player`.
+  A click on the open item (`Interaction::takeActivation`) goes to the player; its
+  frames are uploaded through the upload ring into one live texture that replaces the
+  still image while it has frames. Closing the item closes the player.
+
+**Rules for plugins.** Same performance rules as the core: no I/O or decoding on the
+main thread; player calls return in microseconds; never block the render thread on
+plugin locks held during slow work. A plugin owns its dependencies and documents them
+in the README. Thumbnails it produces are cached like photos, so a plugin that changes
+how it draws stills needs `--rebuild-cache`.
+
+**Video plugin** (`plugins/video`, FFmpeg: libavformat/avcodec/avutil/swscale/
+swresample). Extensions `.mp4 .mov .m4v .mkv .webm .avi .3gp`.
+- Still = first frame with a play badge, rotated per the display matrix; capture time
+  from `creation_time` (UTC), converted to this computer's local time to sort with
+  EXIF times (wrong by the zone difference for videos taken in another time zone).
+- Playback: one decode thread per playing video. It demuxes, decodes audio straight to
+  the host audio output (kept ~0.5 s ahead), and decodes video into a queue of 4 RGBA
+  frames; `player_frame` shows the newest frame whose time has come. The clock is wall
+  time from the first decoded frame, paused with the player. A click plays / pauses;
+  at the end a click restarts. No seeking yet. Nothing is read until the first click.
+- HDR (HLG / PQ, BT.2020 — e.g. Pixel phone videos) is tone-mapped to SDR with lookup
+  tables: SDR reference white (203 nits) stays white, highlights roll off above 75 % of
+  that white;
+  BT.2020 → BT.709 in linear light.
+- Cost: 1080p30 10-bit AV1 HDR ≈ 2 CPU cores (decoder threads + colour conversion),
+  only while a video plays.
+
+**Future plugin candidates.** Other image formats (HEIC/AVIF, RAW, PNG), metadata and
+search back-ends (SQLite + FTS5, keywords), face/place clustering, super-resolution
+zoom. Extending the ABI: append new optional function pointers (e.g. metadata
+callbacks, custom overlays, layouts) and bump the ABI version.

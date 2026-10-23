@@ -429,3 +429,25 @@ TEST_CASE("interaction: openPhoto and closePhoto drive the whole-photo view") {
   f.run(0.5);
   CHECK_FALSE(f.ui.focused());
 }
+
+TEST_CASE("interaction: click on the open photo activates it once; outside leaves") {
+  Fixture f;
+  const auto p = f.screenOf(6);
+  f.click(p);
+  f.click(p);
+  f.run(0.4);
+  CHECK_FALSE(f.ui.takeActivation());
+  f.ui.setFocusRect({100, 100, 900, 700});
+  f.run(0.5);  // past the double-click window
+  f.click({500, 400});
+  CHECK(f.ui.takeActivation());
+  CHECK_FALSE(f.ui.takeActivation());
+  REQUIRE(f.ui.opened());
+  CHECK(*f.ui.opened() == 6);
+  f.click({20, 20});
+  CHECK_FALSE(f.ui.takeActivation());
+  CHECK_FALSE(f.ui.opened());  // closing
+  CHECK(f.ui.focused());
+  f.run(0.4);
+  CHECK_FALSE(f.ui.focused());
+}

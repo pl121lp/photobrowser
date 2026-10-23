@@ -62,7 +62,10 @@ add_library(pb_core STATIC
   src/library/exif.cpp
   src/library/catalog.cpp
   src/library/scanner.cpp
+  src/library/media_format.cpp
   src/platform/paths.cpp
+  src/platform/dynlib.cpp
+  src/plugin/plugin_host.cpp
   src/stream/job_system.cpp
   src/stream/slot_allocator.cpp
   src/stream/residency.cpp
@@ -74,7 +77,28 @@ add_library(pb_core STATIC
 target_include_directories(pb_core PUBLIC src)
 file(GLOB PB_BACKGROUND_SHADERS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/shaders/backgrounds/*.frag")
 pb_embed_shaders(pb_core "${CMAKE_CURRENT_BINARY_DIR}/generated/core/background_shaders.h" ${PB_BACKGROUND_SHADERS})
-target_link_libraries(pb_core PUBLIC Threads::Threads)
+target_link_libraries(pb_core PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+
+# Plugins are shared libraries in <build>/plugins (next to the exe's plugins/ folder
+# when installed). They include only src/plugin/photobrowse_plugin.h and never link
+# against the application.
+set(PB_PLUGIN_DIR "${CMAKE_BINARY_DIR}/plugins")
+add_custom_target(photobrowse_plugins)  # builds every enabled plugin
+function(pb_add_plugin target name)
+  add_library(${target} MODULE ${ARGN})
+  target_include_directories(${target} PRIVATE "${CMAKE_SOURCE_DIR}/src")
+  set_target_properties(${target} PROPERTIES
+    OUTPUT_NAME "pb_${name}"
+    C_VISIBILITY_PRESET hidden
+    CXX_VISIBILITY_PRESET hidden
+    LIBRARY_OUTPUT_DIRECTORY "${PB_PLUGIN_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY "${PB_PLUGIN_DIR}")
+  if(WIN32)
+    set_target_properties(${target} PROPERTIES PREFIX "")
+  else()
+    set_target_properties(${target} PROPERTIES PREFIX "lib")
+  endif()
+endfunction()
 
 # --- Tests ------------------------------------------------------------------
 enable_testing()
@@ -96,10 +120,14 @@ add_executable(pb_tests
   tests/test_overlay.cpp
   tests/test_config.cpp
   tests/test_background.cpp
+  tests/test_plugins.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
-target_compile_definitions(pb_tests PRIVATE PB_TEST_PHOTOS_DIR="${CMAKE_SOURCE_DIR}/photos")
+target_compile_definitions(pb_tests PRIVATE PB_TEST_PHOTOS_DIR="${CMAKE_SOURCE_DIR}/photos"
+                                           PB_TEST_PLUGIN_DIR="${PB_PLUGIN_DIR}")
+pb_add_plugin(pb_test_plugin testfake tests/plugins/test_plugin.c)
+add_dependencies(pb_tests pb_test_plugin)
 add_test(NAME pb_tests COMMAND pb_tests)
 
 # --- pb_imaging: JPEG codec, resizing, thumbnail cache files, indexer ---------
@@ -149,10 +177,30 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     "${CMAKE_SOURCE_DIR}/shaders/fullscreen.vert"
   )
 
+  # Plugins: optional, each built only when its dependencies are present.
+  option(PB_BUILD_PLUGINS "Build the plugins whose dependencies are installed" ON)
+  if(PB_BUILD_PLUGINS)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+      pkg_check_modules(FFMPEG QUIET IMPORTED_TARGET libavformat libavcodec libavutil libswscale libswresample)
+    endif()
+    if(FFMPEG_FOUND)
+      pb_add_plugin(pb_video_plugin video plugins/video/video_plugin.cpp)
+      target_link_libraries(pb_video_plugin PRIVATE PkgConfig::FFMPEG Threads::Threads)
+      add_dependencies(photobrowse_plugins pb_video_plugin)
+      add_dependencies(pb_tests pb_video_plugin)
+      target_compile_definitions(pb_tests PRIVATE PB_TEST_VIDEO_PLUGIN)
+    else()
+      message(STATUS "FFmpeg development files not found: the video plugin will not be built.")
+    endif()
+  endif()
+
   add_executable(photobrowse
     src/main.cpp
     src/app/app.cpp
     src/app/gpu_textures.cpp
+    src/app/sdl_audio.cpp
   )
   target_link_libraries(photobrowse PRIVATE pb_app pb_gfx SDL3::SDL3)
+  add_dependencies(photobrowse photobrowse_plugins)
 endif()

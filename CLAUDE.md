@@ -23,6 +23,9 @@ OpenGL 4.1 photo browser showing a whole library as one zoomable grid.
   upload ring, tile renderer · `shaders/` GLSL (embedded at build time); `shaders/backgrounds/*.frag` are the
   background presets, picked up automatically by name (add one + its name in
   `src/app/background_presets.cpp`). Keep animated ones cheap: benchmark at 4K.
+- `src/plugin` the plugin C ABI (`photobrowse_plugin.h`) and `PluginHost` ·
+  `plugins/<name>/` optional plugins (shared libraries, built into `<build>/plugins/`;
+  `video` uses FFmpeg) · `tests/plugins/` fake plugin for host tests.
 - Libraries: `pb_core` (no deps) → `pb_imaging` (+turbojpeg) → `pb_app` (no SDL/GL)
   → `pb_gfx` + `photobrowse` exe (SDL3, GL).
 
@@ -37,6 +40,9 @@ build/linux-debug/pb_tests --test-case="<name>"      # single test
 - Never install system packages; tell the user what is needed (see README).
 - The photo folder is strictly read-only; all generated data goes to the cache dir.
 - No file I/O or JPEG decoding on the main/render thread.
+- Keep the core nimble: a larger feature, especially one needing a new dependency, is a
+  plugin (architecture §13), loaded only via `--plugin`. The core must never name or
+  depend on a specific plugin; extend the C ABI instead (append fields, bump the version).
 - `pb_core` (src/core, view, layout, library parsing, cache, stream) stays free of
   SDL and OpenGL so it is unit-testable; GL lives in `src/gfx`, SDL in `src/app`.
 - POSIX/Win32-specific code only in `src/platform/`.

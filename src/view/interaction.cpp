@@ -256,7 +256,11 @@ void Interaction::onPointerUp(Vec2d px, double t) {
 
 void Interaction::handleClick(Vec2d px, double t) {
   if (focusTarget_) {
-    if (!focusDisplayRect().contains(px)) unfocus();
+    if (focusDisplayRect().contains(px)) {
+      activated_ = true;
+    } else {
+      unfocus();
+    }
     return;
   }
   const auto hit = layout_.hit(cam_.screenToWorld(px));

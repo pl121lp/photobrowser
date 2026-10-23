@@ -30,9 +30,36 @@ void makeSmallLevels(const Image& upright, Image& l0, Image& l1) {
   l0 = fitToLongEdge(l1, kSlotSize[0]);
 }
 
+// Upright image with long edge >= minLongEdge (or natural size): JPEG via a scaled
+// decode, other formats via their handler.
+std::optional<Image> decodeUpright(const fs::path& abs, const PhotoRecord& rec, uint32_t minLongEdge,
+                                   const MediaHandler* handler) {
+  if (handler) return handler->decodeStill(abs, minLongEdge);
+  auto bytes = readWholeFile(abs);
+  if (!bytes) return std::nullopt;
+  auto img = decodeJpeg(*bytes, minLongEdge);
+  if (!img) return std::nullopt;
+  return applyOrientation(*img, rec.orientation);
+}
+
+void quickIndexWithHandler(const fs::path& abs, const MediaHandler& handler, QuickResult& q) {
+  PhotoRecord& rec = q.rec;
+  const auto info = handler.probe(abs);
+  std::optional<Image> still;
+  if (info) still = handler.decodeStill(abs, kSlotSize[1]);
+  if (!still || still->empty()) {
+    rec.flags |= kBroken;
+    return;
+  }
+  if (info->takenAt) rec.takenAt = info->takenAt;
+  rec.width = info->width ? info->width : still->w;
+  rec.height = info->height ? info->height : still->h;
+  makeSmallLevels(*still, q.l0, q.l1);
+}
+
 }  // namespace
 
-QuickResult quickIndex(const fs::path& root, const ScanEntry& e) {
+QuickResult quickIndex(const fs::path& root, const ScanEntry& e, const MediaFormats& formats) {
   QuickResult q;
   PhotoRecord& rec = q.rec;
   const fs::path abs = root / fromUtf8(e.relPath);
@@ -41,6 +68,10 @@ QuickResult quickIndex(const fs::path& root, const ScanEntry& e) {
   rec.mtime = e.mtime;
   rec.takenAt = e.mtime;
   rec.key = cacheKey(toUtf8(abs), e.size, e.mtime);
+  if (const MediaHandler* handler = formats.find(e.relPath)) {
+    quickIndexWithHandler(abs, *handler, q);
+    return q;
+  }
 
   auto head = readFileRange(abs, 0, kHeadBytes);
   if (!head) {
@@ -85,7 +116,15 @@ QuickResult quickIndex(const fs::path& root, const ScanEntry& e) {
   return q;
 }
 
-bool decodeL0L1FromOriginal(const fs::path& abs, PhotoRecord& rec, Image& l0, Image& l1) {
+bool decodeL0L1FromOriginal(const fs::path& abs, PhotoRecord& rec, Image& l0, Image& l1,
+                            const MediaHandler* handler) {
+  if (handler) {
+    auto img = handler->decodeStill(abs, kSlotSize[1]);
+    if (!img || img->empty()) return false;
+    makeSmallLevels(*img, l0, l1);
+    rec.flags &= uint8_t(~kNeedsDecodeL1);
+    return true;
+  }
   auto bytes = readWholeFile(abs);
   if (!bytes) return false;
   auto img = decodeJpeg(*bytes, kSlotSize[1]);
@@ -98,24 +137,22 @@ bool decodeL0L1FromOriginal(const fs::path& abs, PhotoRecord& rec, Image& l0, Im
   return true;
 }
 
-std::array<Image, kLevelCount> buildLazyLevels(const fs::path& abs, const PhotoRecord& rec, int highestLevel) {
+std::array<Image, kLevelCount> buildLazyLevels(const fs::path& abs, const PhotoRecord& rec, int highestLevel,
+                                               const MediaHandler* handler) {
   std::array<Image, kLevelCount> out;
   highestLevel = std::clamp(highestLevel, 2, kLevelCount - 1);
-  auto bytes = readWholeFile(abs);
-  if (!bytes) return out;
-  auto img = decodeJpeg(*bytes, kSlotSize[highestLevel]);
-  if (!img) return out;
-  out[highestLevel] = fitToLongEdge(applyOrientation(*img, rec.orientation), kSlotSize[highestLevel]);
+  auto img = decodeUpright(abs, rec, kSlotSize[highestLevel], handler);
+  if (!img || img->empty()) return out;
+  out[highestLevel] = fitToLongEdge(*img, kSlotSize[highestLevel]);
   for (int l = highestLevel - 1; l >= 2; --l) out[l] = fitToLongEdge(out[l + 1], kSlotSize[l]);
   return out;
 }
 
-std::optional<Image> decodeFull(const fs::path& abs, const PhotoRecord& rec, uint32_t minLongEdge) {
-  auto bytes = readWholeFile(abs);
-  if (!bytes) return std::nullopt;
-  auto img = decodeJpeg(*bytes, minLongEdge);
-  if (!img) return std::nullopt;
-  return applyOrientation(*img, rec.orientation);
+std::optional<Image> decodeFull(const fs::path& abs, const PhotoRecord& rec, uint32_t minLongEdge,
+                                const MediaHandler* handler) {
+  auto img = decodeUpright(abs, rec, minLongEdge, handler);
+  if (!img || img->empty()) return std::nullopt;
+  return img;
 }
 
 }  // namespace pb

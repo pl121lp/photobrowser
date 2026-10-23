@@ -35,6 +35,7 @@ uint64_t cacheKey(std::string_view absPathUtf8, uint64_t size, int64_t mtime);
 struct Catalog {
   std::vector<PhotoRecord> photos;  // index == PhotoId
   std::vector<PhotoId> order;       // layout order: (takenAt, relPath), broken excluded
+  std::string formats;              // MediaFormats::signature() it was indexed with
   void sortOrder();
 };
 

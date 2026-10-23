@@ -14,9 +14,12 @@ Design documents: [docs/spec.md](docs/spec.md), [docs/architecture.md](docs/arch
 | Toolchain | `cmake` ≥ 3.24, `ninja-build`, `g++` ≥ 13 or `clang++` ≥ 17 | Visual Studio 2022 (C++ workload), CMake, Ninja |
 | SDL3 | `sudo apt install libsdl3-dev` | via vcpkg (`vcpkg.json`) |
 | libjpeg-turbo | `sudo apt install libturbojpeg0-dev` | via vcpkg (`vcpkg.json`) |
+| FFmpeg (optional, video plugin) | `sudo apt install libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev` | vcpkg `ffmpeg` (with `avformat`, `avcodec`, `swscale`, `swresample`) |
 
 Everything else (doctest, Khronos GL headers) is vendored in `third_party/`.
-Without SDL3/libjpeg-turbo the core library and its tests still build.
+Without SDL3/libjpeg-turbo the core library and its tests still build. Plugins build
+only when their dependencies are found (`-DPB_BUILD_PLUGINS=OFF` skips them all); the
+program itself never needs them.
 
 ## Build
 
@@ -48,6 +51,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | `--windowed` | start in a window instead of fullscreen (overrides `[display] fullscreen`) |
 | `--stats` | start with the F3 stats display on |
 | `--bench` | fullscreen scripted pan/zoom tour; prints frame-time percentiles and exits |
+| `--plugin <name\|path>` | load a plugin, e.g. `--plugin video` (repeatable; see [Plugins](#plugins)) |
 | `--snapshot <file.jpg>` | save the settled start view (or the end of `--bench`) and exit |
 
 The first run on a folder indexes it (progress in the window title): dates and the
@@ -122,6 +126,7 @@ mistakes in the settings file are reported with the line number.
 | Double-click / `Enter` / scroll in past max zoom | whole-photo view (uncropped) |
 | Mouse wheel | zoom about the cursor; in whole-photo view, zoom the focused photo up to `max_photo_zoom` |
 | Right-click | reset a zoomed focused photo to fit the window |
+| Click the open photo | its plugin action, if any (video: play / pause) |
 | Arrow keys | move one photo (in whole-photo view: ←/→ previous/next, ↑/↓ closest photo one row up/down) |
 | `+` / `-` | zoom about the center |
 | `Home` | back to the start view |
@@ -133,6 +138,24 @@ mistakes in the settings file are reported with the line number.
 | `F5` | screensaver: tours random photos, flying between them (any click, scroll or key stops it) |
 | `F6` | next background: solid, each built-in preset, your shader file, then solid again |
 | `Q` | quit |
+
+## Plugins
+
+The core stays small; optional features with their own dependencies are plugins
+(shared libraries in `build/<preset>/plugins/`), loaded only when named on the command
+line. Design and API: [docs/architecture.md §13](docs/architecture.md#13-plugins).
+
+| Plugin | Needs | What it does |
+|---|---|---|
+| `video` | FFmpeg (see Dependencies) | `.mp4 .mov .m4v .mkv .webm .avi .3gp` join the grid as their first frame with a play badge. Open one (double-click) and click it to play with sound, click again to pause; at the end a click plays it again. HDR phone videos are tone-mapped. No seeking yet. |
+
+```sh
+build/linux-release/photobrowse ~/Pictures --plugin video
+```
+
+Enabling or disabling a plugin that adds file types re-indexes the library once.
+Video dates come from the file's UTC creation time shown in this computer's time zone,
+so clips filmed in another time zone sort a few hours off from the photos around them.
 
 ## Performance testing
 

@@ -27,7 +27,7 @@ the primary requirement; features come second.
 
 **Non-goals (for now)**
 - Editing, rating, tagging, deleting, moving, or otherwise changing photos.
-- Video, RAW, HEIC, PNG (JPEG only in v1; the decoder is behind an interface).
+- RAW, HEIC, PNG in the core (JPEG only; other formats come from plugins).
 - Network/cloud libraries, multi-user, sharing.
 
 **Anti-goals** (would count as failure even if "working")
@@ -37,6 +37,8 @@ the primary requirement; features come second.
 - The UI waiting on disk: no interaction may block on I/O or decoding.
 - A slow startup with a warm cache (re-opening a 10k library must be near-instant).
 - Modifying anything in the user's photo folder (it is strictly read-only).
+- A heavy core: larger features with their own dependencies are **plugins**, loaded
+  only when asked for (§3.7); the app runs fully without any of them.
 
 ## 3. The experience
 
@@ -64,6 +66,7 @@ the primary requirement; features come second.
 | Double-click on a photo | Open it in the **whole-photo view** (§3.3). |
 | Mouse wheel | **Smooth zoom about the cursor** (point under cursor stays put), including within whole-photo view. |
 | Right-click | In whole-photo view, reset the focused photo to fit the window. |
+| Left-click on the open photo | In whole-photo view, the item's plugin action if it has one (video: play / pause; restart once ended). Otherwise nothing. |
 | Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order; ↑/↓ the closest photo one row up/down (stays put on the top/bottom row). |
 | `+` / `-` | Zoom in/out around screen center. |
 | `Home` | Return to the start view (center photo). |
@@ -122,7 +125,19 @@ way to see one photo whole:
 
 ### 3.6 Running it
 `photobrowse [photo-folder]` — defaults to `./photos`.
-Options: `--cache-dir <dir>`, `--rebuild-cache`, `--layout square-crop`.
+Options: `--cache-dir <dir>`, `--rebuild-cache`, `--layout square-crop`,
+`--plugin <name|path>` (repeatable).
+
+### 3.7 Plugins
+Optional features ship as plugins (shared libraries) and are enabled per run with
+`--plugin <name>`; see architecture §13 for the API. Enabling or disabling a plugin
+that adds file types re-indexes the library once.
+
+**Video plugin** (`--plugin video`, needs FFmpeg): `.mp4 .mov .m4v .mkv .webm .avi .3gp`
+files join the grid in time order, shown as their first frame with a play badge. Open
+one in the whole-photo view and click it to play with sound; click again to pause; at
+the end a click plays it again. Leaving the photo stops it. HDR phone videos are
+tone-mapped to look right on a normal display. No seeking (yet).
 
 ## 4. Performance targets (v1)
 Reference machine (the dev laptop, worst case): **3840×2160 @ 60 Hz on the integrated
@@ -167,6 +182,10 @@ Decided by the user:
 - Whole-photo view in v1.
 - Library: ~10k on internal SSD now; 50k–100k later (optimize later). First-run indexing
   time of a minute or two is fine.
+- Nimble core: larger features with extra dependencies are dynamically loaded plugins,
+  enabled by a command-line parameter; the app must run without knowing any plugin.
+- First plugin: video. Still thumbnail in the grid; in focus, left click starts / stops
+  playback; no seeking for now.
 
 Calls made by Claude (open to change):
 - Key bindings; double-click / zoom-past-max / `Enter` open whole-photo view.
@@ -177,5 +196,13 @@ Calls made by Claude (open to change):
 - Date fallback = file mtime; tie-break = file name; folder scan is recursive.
 - JPEG only in v1.
 - Cross-fade duration ~150 ms; click-to-center ~400 ms ease-in-out.
+- Plugin API in plain C (stable across compilers), one exported entry point; plugins
+  provide media (probe + still image) and optional players; host offers log + audio.
+- Plugins are named on the command line only (`--plugin video`, repeatable), not in
+  config.ini; looked up in `plugins/` next to the executable.
+- "In focus" for video = opened in the whole-photo view; the video plays in place of
+  the still, with sound; a click at the end restarts it.
+- Video capture time = container `creation_time` converted to the computer's local
+  time zone (EXIF times are local wall-clock).
 - Screensaver: `F5`, off by default (`[screensaver] enabled`), hold time measured from
   when the photo is fully open; user input stops it rather than fighting it.

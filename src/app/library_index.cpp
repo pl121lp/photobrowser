@@ -20,18 +20,21 @@ bool save(const fs::path& libDir, const LibraryState& st) {
 }
 }  // namespace
 
-std::optional<LibraryState> loadWarm(const fs::path& libDir) {
+std::optional<LibraryState> loadWarm(const fs::path& libDir, const MediaFormats& formats) {
   auto catalog = loadCatalog(libDir / "catalog.bin");
-  if (!catalog) return std::nullopt;
+  if (!catalog || catalog->formats != formats.signature()) return std::nullopt;
   auto l0 = readL0Pack(libDir / "l0.pack");
   if (!l0) return std::nullopt;
   return LibraryState{std::move(*catalog), std::move(*l0)};
 }
 
-std::pair<PhotoRecord, Image> indexOne(const fs::path& root, const ScanEntry& e, const ThumbCache& thumbs) {
-  QuickResult q = quickIndex(root, e);
+std::pair<PhotoRecord, Image> indexOne(const fs::path& root, const ScanEntry& e, const ThumbCache& thumbs,
+                                       const MediaFormats& formats) {
+  QuickResult q = quickIndex(root, e, formats);
   if (q.rec.flags & kNeedsDecodeL1) {
-    if (!decodeL0L1FromOriginal(root / fromUtf8(e.relPath), q.rec, q.l0, q.l1)) q.rec.flags |= kBroken;
+    if (!decodeL0L1FromOriginal(root / fromUtf8(e.relPath), q.rec, q.l0, q.l1, formats.find(e.relPath))) {
+      q.rec.flags |= kBroken;
+    }
   }
   if (!(q.rec.flags & kBroken) && !q.l1.empty()) {
     thumbs.write(1, q.rec.key, q.l1);
@@ -43,8 +46,9 @@ std::pair<PhotoRecord, Image> indexOne(const fs::path& root, const ScanEntry& e,
   return {std::move(q.rec), std::move(q.l0)};
 }
 
-Indexer::Indexer(fs::path root, fs::path libDir, JobSystem& jobs, const ThumbCache& thumbs)
-    : root_(std::move(root)), libDir_(std::move(libDir)), jobs_(jobs), thumbs_(thumbs) {}
+Indexer::Indexer(fs::path root, fs::path libDir, JobSystem& jobs, const ThumbCache& thumbs,
+                 const MediaFormats& formats)
+    : root_(std::move(root)), libDir_(std::move(libDir)), jobs_(jobs), thumbs_(thumbs), formats_(formats) {}
 
 Indexer::~Indexer() {
   cancelled_ = true;
@@ -58,7 +62,7 @@ void Indexer::start() {
       --outstanding_;
       return;
     }
-    auto scan = scanFolder(root_);
+    auto scan = scanFolder(root_, formats_);
     total_ = uint32_t(scan.size());
     scanned_ = true;
     if (scan.empty()) {
@@ -77,7 +81,7 @@ void Indexer::start() {
           --outstanding_;
           return;
         }
-        auto r = indexOne(root_, e, thumbs_);
+        auto r = indexOne(root_, e, thumbs_, formats_);
         bool last;
         {
           std::lock_guard lock(m_);
@@ -99,6 +103,7 @@ void Indexer::finish() {
     state_.catalog.photos.push_back(std::move(rec));
   }
   results_.clear();
+  state_.catalog.formats = formats_.signature();
   state_.catalog.sortOrder();
   fs::create_directories(libDir_);
   save(libDir_, state_);
@@ -111,10 +116,10 @@ LibraryState Indexer::take() {
 }
 
 bool refreshLibrary(const fs::path& root, const fs::path& libDir, const LibraryState& current,
-                    const ThumbCache& thumbs, const std::atomic<bool>* stop) {
+                    const ThumbCache& thumbs, const std::atomic<bool>* stop, const MediaFormats& formats) {
   auto stopped = [&] { return stop && stop->load(); };
   if (stopped()) return false;
-  const auto scan = scanFolder(root);
+  const auto scan = scanFolder(root, formats);
   const ScanDiff diff = diffCatalog(current.catalog, scan);
   if (diff.empty()) return false;
 
@@ -124,6 +129,7 @@ bool refreshLibrary(const fs::path& root, const fs::path& libDir, const LibraryS
   for (const auto& [key, img] : current.l0) l0ByKey.emplace(key, &img);
 
   LibraryState next;
+  next.catalog.formats = current.catalog.formats;
   for (PhotoId id = 0; id < current.catalog.photos.size(); ++id) {
     if (drop.contains(id)) continue;
     const auto& rec = current.catalog.photos[id];
@@ -139,7 +145,7 @@ bool refreshLibrary(const fs::path& root, const fs::path& libDir, const LibraryS
   }
   for (const auto& e : toIndex) {
     if (stopped()) return false;
-    auto [rec, l0] = indexOne(root, e, thumbs);
+    auto [rec, l0] = indexOne(root, e, thumbs, formats);
     if (!l0.empty()) next.l0.emplace_back(rec.key, std::move(l0));
     next.catalog.photos.push_back(std::move(rec));
   }

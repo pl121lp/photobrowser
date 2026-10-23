@@ -31,6 +31,10 @@ class GpuTextures final : public TextureSink {
   void uploadFullRows(int index, int mip, uint32_t y0, uint32_t rows, const Image& m) override;
 
   GLuint texture(const TexRef& r) const;
+  // Live content (a plugin player's current frame): one texture, refilled when
+  // `serial` changes. Returns the texture and the frame's UV rect within it.
+  std::pair<GLuint, UvRect> liveFrame(uint32_t w, uint32_t h, uint32_t stride, const uint8_t* rgba, uint64_t serial);
+  void releaseLive();  // frees the live texture
   void endFrame() { ring_.endFrame(); }  // submit this frame's uploads
   double takeUploadMs() { return std::exchange(uploadMs_, 0.0); }  // time spent in GL uploads
 
@@ -48,6 +52,9 @@ class GpuTextures final : public TextureSink {
   size_t pagesCreated_ = 0;
   std::array<FullTexture, Streamer::kFullSlots> full_{};
   GLuint placeholder_ = 0;
+  GLuint live_ = 0;
+  uint32_t liveW_ = 0, liveH_ = 0;
+  uint64_t liveSerial_ = 0;
   double uploadMs_ = 0;
   Vec2d fullCapacity_{1920, 1080};
 };

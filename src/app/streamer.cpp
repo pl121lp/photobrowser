@@ -26,10 +26,11 @@ size_t mipBytes(const std::vector<Image>& mips) {
 }  // namespace
 
 Streamer::Streamer(const Catalog& catalog, std::filesystem::path photoRoot, const ThumbCache& thumbs,
-                   JobSystem& jobs, TextureSink& sink, size_t vramBudgetBytes)
+                   JobSystem& jobs, TextureSink& sink, size_t vramBudgetBytes, const MediaFormats& formats)
     : catalog_(catalog),
       root_(std::move(photoRoot)),
       thumbs_(thumbs),
+      formats_(formats),
       jobs_(jobs),
       sink_(sink),
       residency_(uint32_t(catalog.photos.size()), vramBudgetBytes),
@@ -75,7 +76,8 @@ TexRef Streamer::refFor(PhotoId id, int level) {
 
 void Streamer::submit(const Residency::Request& r) {
   const PhotoRecord rec = catalog_.photos[r.id];
-  jobs_.submit(r.priority, [results = results_, guard = guard_, rec, req = r, root = root_, &thumbs = thumbs_] {
+  jobs_.submit(r.priority, [results = results_, guard = guard_, rec, req = r, root = root_, &thumbs = thumbs_,
+                            handler = formats_.find(rec.relPath)] {
     ++guard->running;
     struct Done {
       JobGuard& g;
@@ -89,12 +91,12 @@ void Streamer::submit(const Residency::Request& r) {
       if (req.level == 1) {
         PhotoRecord copy = rec;
         Image l0, l1;
-        if (decodeL0L1FromOriginal(abs, copy, l0, l1)) {
+        if (decodeL0L1FromOriginal(abs, copy, l0, l1, handler)) {
           thumbs.write(1, rec.key, l1);
           img = std::move(l1);
         }
       } else {
-        auto levels = buildLazyLevels(abs, rec, req.level);
+        auto levels = buildLazyLevels(abs, rec, req.level, handler);
         for (int l = 2; l <= req.level; ++l) {
           if (!levels[size_t(l)].empty()) thumbs.write(l, rec.key, levels[size_t(l)]);
         }
@@ -152,14 +154,14 @@ std::optional<TexRef> Streamer::fullFor(PhotoId id, double now, uint32_t longEdg
   f.cancel = std::make_shared<CancelToken>();
   const PhotoRecord rec = catalog_.photos[id];
   jobs_.submit(kFullPriority, [results = results_, guard = guard_, rec, id, longEdge, cancel = f.cancel,
-                               root = root_] {
+                               root = root_, handler = formats_.find(rec.relPath)] {
     ++guard->running;
     struct Done {
       JobGuard& g;
       ~Done() { --g.running; }
     } done{*guard};
     if (!guard->alive || cancel->cancelled) return;
-    auto img = decodeFull(root / fromUtf8(rec.relPath), rec, longEdge);
+    auto img = decodeFull(root / fromUtf8(rec.relPath), rec, longEdge, handler);
     std::vector<Image> mips;
     if (img && !cancel->cancelled) mips = buildMips(fitToLongEdge(*img, longEdge));
     results->push({id, kFullLevel, std::move(mips)});

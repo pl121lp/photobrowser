@@ -22,6 +22,39 @@ GpuTextures::~GpuTextures() {
     if (f.tex) gl::DeleteTextures(1, &f.tex);
   }
   gl::DeleteTextures(1, &placeholder_);
+  releaseLive();
+}
+
+std::pair<GLuint, UvRect> GpuTextures::liveFrame(uint32_t w, uint32_t h, uint32_t stride, const uint8_t* rgba,
+                                                 uint64_t serial) {
+  const bool resized = !live_ || w != liveW_ || h != liveH_;
+  if (resized) {
+    releaseLive();
+    gl::GenTextures(1, &live_);
+    gl::BindTexture(GL_TEXTURE_2D, live_);
+    gl::TexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, GLsizei(w), GLsizei(h), 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    liveW_ = w;
+    liveH_ = h;
+  }
+  if (resized || serial != liveSerial_) {
+    // Through the upload ring: copied now, transferred asynchronously at endFrame().
+    const auto t0 = std::chrono::steady_clock::now();
+    ring_.upload(live_, 0, 0, 0, w, h, stride / 4, rgba);
+    uploadMs_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    liveSerial_ = serial;
+  }
+  return {live_, UvRect{0, 0, 1, 1}};
+}
+
+void GpuTextures::releaseLive() {
+  if (live_) gl::DeleteTextures(1, &live_);
+  live_ = 0;
+  liveW_ = liveH_ = 0;
 }
 
 bool GpuTextures::prewarm(size_t pages, Vec2d viewport) {

@@ -11,6 +11,7 @@
 #include "app/config.h"
 #include "app/gpu_textures.h"
 #include "app/library_index.h"
+#include "app/sdl_audio.h"
 #include "app/streamer.h"
 #include "core/frame_history.h"
 #include "core/frame_stats.h"
@@ -22,6 +23,7 @@
 #include "layout/content.h"
 #include "layout/layout.h"
 #include "platform/paths.h"
+#include "plugin/plugin_host.h"
 #include "view/camera.h"
 #include "view/bench_script.h"
 #include "view/interaction.h"
@@ -132,6 +134,31 @@ int App::run(const Options& options) {
     std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
     return 1;
   }
+
+  // Plugins (--plugin): looked up in plugins/ next to the executable, then beside it.
+  // Declared before everything that uses their formats or players.
+  SdlAudio audio;
+  auto pluginHost = std::make_unique<PluginHost>(&audio);
+  PluginHost& plugins = *pluginHost;
+  if (!options.plugins.empty()) {
+    std::vector<fs::path> pluginDirs;
+    if (const char* base = SDL_GetBasePath()) pluginDirs = {fromUtf8(base) / "plugins", fromUtf8(base)};
+    for (const auto& name : options.plugins) {
+      if (auto err = plugins.load(name, pluginDirs)) {
+        std::fprintf(stderr, "photobrowse: %s\n", err->c_str());
+        SDL_Quit();
+        return 2;
+      }
+    }
+    for (const auto& p : plugins.plugins()) {
+      std::string exts;
+      for (const auto& e : p.extensions) exts += " " + e;
+      std::printf("plugin: %s %s (%s)%s%s\n", p.name.c_str(), p.version.c_str(), toUtf8(p.path).c_str(),
+                  exts.empty() ? "" : " files:", exts.c_str());
+    }
+    audio.init();
+  }
+  const MediaFormats& formats = plugins.formats();
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
@@ -250,7 +277,7 @@ int App::run(const Options& options) {
       const size_t budget = kVramBudget - std::min(kVramBudget / 2, l0Pages * kPageBytes + fullReserve);
       prewarmPages = l0Pages + budget / kPageBytes;
       session.streamer =
-          std::make_unique<Streamer>(session.lib.catalog, root, thumbs, *jobs, textures, budget);
+          std::make_unique<Streamer>(session.lib.catalog, root, thumbs, *jobs, textures, budget, formats);
       session.streamer->setL0(session.lib.l0);
       session.streamer->setUploadTimeBudget(3.0);
       const std::string title = session.lib.catalog.order.empty()
@@ -259,17 +286,17 @@ int App::run(const Options& options) {
       SDL_SetWindowTitle(window, title.c_str());
     };
 
-    if (auto warm = loadWarm(libDir)) {
+    if (auto warm = loadWarm(libDir, formats)) {
       startSession(std::move(*warm));
       // Pick up folder changes for the next launch; trim the disk cache.
       auto snapshot = std::make_shared<LibraryState>(session.lib);
-      jobs->submit(kBackgroundPriority, [root, libDir, snapshot, stop = stopBackground, &thumbs] {
-        refreshLibrary(root, libDir, *snapshot, thumbs, stop.get());
+      jobs->submit(kBackgroundPriority, [root, libDir, snapshot, stop = stopBackground, &thumbs, &formats] {
+        refreshLibrary(root, libDir, *snapshot, thumbs, stop.get(), formats);
         if (!*stop) thumbs.sweep(kDiskCacheCap);
       });
     } else {
       indexJobs = std::make_unique<JobSystem>(defaultWorkerCount());
-      indexer = std::make_unique<Indexer>(root, libDir, *indexJobs, thumbs);
+      indexer = std::make_unique<Indexer>(root, libDir, *indexJobs, thumbs, formats);
       indexer->start();
     }
 
@@ -285,12 +312,15 @@ int App::run(const Options& options) {
     if (options.bench) background.enableTiming();
     std::optional<BenchScript> bench;
     uint64_t lastSwap = 0, benchStart = 0;
+    // Live content from a plugin for the photo open in whole-photo view (e.g. a video).
+    std::unique_ptr<Player> player;
+    std::optional<PhotoId> playerId;
 
     while (running) {
       // --- Input ---------------------------------------------------------------
       // With stats shown, keep rendering at the display rate so the numbers mean something.
       const bool wait = ui.idle() && !animating && !prewarming && !indexer && !options.snapshot && !options.bench &&
-                        !showStats && !background.animated() &&
+                        !showStats && !background.animated() && !(player && player->active()) &&
                         (!session.streamer || session.streamer->stats().pendingRequests == 0);
       SDL_Event ev;
       bool have = wait ? SDL_WaitEventTimeout(&ev, 100) : SDL_PollEvent(&ev);
@@ -394,6 +424,18 @@ int App::run(const Options& options) {
       ui.update(seconds(now), dt);
       screensaver.update(ui, layout->count(), seconds(now));  // after: reacts to a move ending this frame
 
+      // A player exists while its photo is opening or open; a click on it goes to the player.
+      std::optional<PhotoId> openId;
+      if (const auto o = ui.opened(); o && session.streamer && *o < session.lib.catalog.order.size()) {
+        openId = session.lib.catalog.order[*o];
+      }
+      if (openId != playerId) {
+        if (player) textures.releaseLive();
+        player.reset();
+        playerId = openId;
+        if (openId) player = plugins.openPlayer(root / fromUtf8(session.lib.catalog.photos[*openId].relPath));
+      }
+      if (ui.takeActivation() && player) player->activate();
       // --- Draw ------------------------------------------------------------------
       const uint64_t tPre = SDL_GetTicksNS();
       const float clear[3] = {background.clearColor()[0], background.clearColor()[1], background.clearColor()[2]};
@@ -405,6 +447,10 @@ int App::run(const Options& options) {
       animating = false;
       if (session.streamer) {
         session.streamer->frame(seconds(now), camera, *layout, ui.focused(), config.maxPhotoZoom, draws);
+        std::optional<std::pair<GLuint, UvRect>> live;
+        if (player) {
+          if (auto f = player->frame()) live = textures.liveFrame(f->w, f->h, f->stride, f->rgba, f->serial);
+        }
         textures.endFrame();
         tStream = SDL_GetTicksNS();
         keyed.clear();
@@ -429,6 +475,13 @@ int App::run(const Options& options) {
             setRect(ti.rect, ui.focusDisplayRect());
             setUv(ti.uv, compose(d.cur.uv, m.uv));
             setUv(ti.uvPrev, compose(d.prev.uv, m.uv));
+            if (live && playerId == d.id) {  // the player's frame replaces the still
+              setUv(ti.uv, compose(live->second, m.uv));
+              setUv(ti.uvPrev, compose(live->second, m.uv));
+              ti.fade = 1;
+              focusedTile.emplace(uint64_t(live->first) << 32 | live->first, ti);
+              continue;
+            }
             focusedTile.emplace(key, ti);
             continue;
           }
@@ -552,11 +605,13 @@ int App::run(const Options& options) {
     }
 
     *stopBackground = true;
+    player.reset();
     session.streamer.reset();
     indexer.reset();
     indexJobs.reset();
     jobs.reset();
   }
+  pluginHost.reset();  // stops plugin threads while SDL (audio) is still up
   SDL_GL_DestroyContext(context);
   SDL_DestroyWindow(window);
   SDL_Quit();

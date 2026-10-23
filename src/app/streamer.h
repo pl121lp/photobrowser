@@ -11,6 +11,7 @@
 #include "cache/thumb_cache.h"
 #include "layout/layout.h"
 #include "library/catalog.h"
+#include "library/media_format.h"
 #include "stream/job_system.h"
 #include "stream/residency.h"
 #include "view/camera.h"
@@ -66,7 +67,7 @@ class Streamer {
   static constexpr int kFullSlots = 3;
 
   Streamer(const Catalog& catalog, std::filesystem::path photoRoot, const ThumbCache& thumbs, JobSystem& jobs,
-           TextureSink& sink, size_t vramBudgetBytes);
+           TextureSink& sink, size_t vramBudgetBytes, const MediaFormats& formats = MediaFormats::none());
   ~Streamer();
 
   void setL0(const L0Entries& entries);  // uploads the always-resident 32 px level
@@ -118,6 +119,7 @@ class Streamer {
   const Catalog& catalog_;
   std::filesystem::path root_;
   const ThumbCache& thumbs_;
+  const MediaFormats& formats_;
   JobSystem& jobs_;
   TextureSink& sink_;
   Residency residency_;

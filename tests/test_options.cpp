@@ -76,3 +76,11 @@ TEST_CASE("options: config file and no default folder") {
   CHECK(*o.configFile == "/tmp/x.ini");
   CHECK_FALSE(o.photoDir);  // the folder comes from the config unless given
 }
+
+TEST_CASE("options: plugins") {
+  auto r = parse({"--plugin", "video", "--plugin", "/x/libpb_other.so"});
+  REQUIRE(std::holds_alternative<pb::Options>(r));
+  CHECK(std::get<pb::Options>(r).plugins == std::vector<std::string>{"video", "/x/libpb_other.so"});
+  CHECK(std::holds_alternative<std::string>(parse({"--plugin"})));
+  CHECK(std::get<pb::Options>(parse({})).plugins.empty());
+}

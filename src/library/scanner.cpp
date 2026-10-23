@@ -1,7 +1,6 @@
 #include "library/scanner.h"
 
 #include <algorithm>
-#include <cctype>
 #include <unordered_map>
 
 #include "platform/paths.h"
@@ -10,22 +9,14 @@ namespace pb {
 
 namespace fs = std::filesystem;
 
-namespace {
-bool isJpegExt(const fs::path& p) {
-  std::string e = toUtf8(p.extension());
-  std::transform(e.begin(), e.end(), e.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-  return e == ".jpg" || e == ".jpeg";
-}
-}  // namespace
-
-std::vector<ScanEntry> scanFolder(const fs::path& root) {
+std::vector<ScanEntry> scanFolder(const fs::path& root, const MediaFormats& formats) {
   std::vector<ScanEntry> out;
   std::error_code ec;
   fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
   for (; !ec && it != end; it.increment(ec)) {
     const auto& entry = *it;
     std::error_code e2;
-    if (!entry.is_regular_file(e2) || !isJpegExt(entry.path())) continue;
+    if (!entry.is_regular_file(e2) || !formats.accepts(toUtf8(entry.path().filename()))) continue;
     const auto size = entry.file_size(e2);
     if (e2) continue;
     const auto mt = entry.last_write_time(e2);

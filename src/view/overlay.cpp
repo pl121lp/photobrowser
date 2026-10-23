@@ -182,6 +182,7 @@ std::vector<HelpEntry> helpEntries() {
       {"Double-click", "open a photo whole"},
       {"Wheel", "zoom about the cursor (also inside a whole photo)"},
       {"Right-click", "reset a zoomed photo to fit"},
+      {"Click open photo", "plugin action, e.g. play / pause a video"},
   };
 }
 
