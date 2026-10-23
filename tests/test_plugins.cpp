@@ -176,10 +176,10 @@ TEST_CASE("plugins: load the test plugin and use its formats and players") {
 }
 
 #ifdef PB_TEST_VIDEO_PLUGIN
-// Uses the real video plugin on the sample clips in photos/ (if any).
+// Uses the real video plugin on a sample clip anywhere under photos/ (if any).
 TEST_CASE("video plugin: still, metadata and playback of a sample clip") {
   fs::path clip;
-  for (const auto& e : fs::directory_iterator(PB_TEST_PHOTOS_DIR)) {
+  for (const auto& e : fs::recursive_directory_iterator(PB_TEST_PHOTOS_DIR)) {
     if (pb::lowerExtension(e.path().filename().string()) == ".mp4") clip = e.path();
   }
   if (clip.empty()) return;

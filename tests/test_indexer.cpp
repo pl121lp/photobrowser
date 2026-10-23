@@ -9,8 +9,9 @@
 #include "test_util.h"
 
 namespace {
+// Scan entry for fixture photo `name`, relative to pbtest::photoDir(name).
 pb::ScanEntry entry(const std::string& name) {
-  auto all = pb::scanFolder(PB_TEST_PHOTOS_DIR);
+  auto all = pb::scanFolder(pbtest::photoDir(name), pb::MediaFormats::none(), false);
   auto it = std::find_if(all.begin(), all.end(), [&](const pb::ScanEntry& e) { return e.relPath == name; });
   REQUIRE(it != all.end());
   return *it;
@@ -18,7 +19,8 @@ pb::ScanEntry entry(const std::string& name) {
 }  // namespace
 
 TEST_CASE("indexer: pixel photo quick pass uses preview") {
-  auto q = pb::quickIndex(PB_TEST_PHOTOS_DIR, entry("PXL_20260321_003010085.jpg"));
+  const std::string name = "PXL_20260321_003010085.jpg";
+  auto q = pb::quickIndex(pbtest::photoDir(name), entry(name));
   CHECK(q.rec.relPath == "PXL_20260321_003010085.jpg");
   CHECK(q.rec.takenAt == *pb::parseExifDateTime("2026:03:20 20:30:10"));
   CHECK(q.rec.width == 3072);
@@ -33,11 +35,12 @@ TEST_CASE("indexer: pixel photo quick pass uses preview") {
 
 TEST_CASE("indexer: file without preview falls back") {
   const auto e = entry("PXL_20260321_012354015~2.jpg");
-  auto q = pb::quickIndex(PB_TEST_PHOTOS_DIR, e);
+  const auto dir = pbtest::photoDir(e.relPath);
+  auto q = pb::quickIndex(dir, e);
   CHECK((q.rec.flags & pb::kNeedsDecodeL1) != 0);
   CHECK(q.l1.empty());
   pb::Image l0, l1;
-  REQUIRE(pb::decodeL0L1FromOriginal(std::filesystem::path(PB_TEST_PHOTOS_DIR) / e.relPath, q.rec, l0, l1));
+  REQUIRE(pb::decodeL0L1FromOriginal(dir / e.relPath, q.rec, l0, l1));
   CHECK(std::max(l1.w, l1.h) == 128);
   CHECK(std::max(l0.w, l0.h) == 32);
   CHECK((q.rec.flags & pb::kNeedsDecodeL1) == 0);
@@ -67,8 +70,9 @@ TEST_CASE("indexer: truncated jpeg does not crash") {
 
 TEST_CASE("indexer: lazy levels cascade") {
   const auto e = entry("PXL_20260321_010024264.jpg");  // landscape 3648x2736
-  auto q = pb::quickIndex(PB_TEST_PHOTOS_DIR, e);
-  auto lv = pb::buildLazyLevels(std::filesystem::path(PB_TEST_PHOTOS_DIR) / e.relPath, q.rec, 4);
+  const auto dir = pbtest::photoDir(e.relPath);
+  auto q = pb::quickIndex(dir, e);
+  auto lv = pb::buildLazyLevels(dir / e.relPath, q.rec, 4);
   CHECK(lv[4].w == 1024);
   CHECK(lv[4].h == 768);
   CHECK(lv[3].w == 512);
@@ -79,8 +83,9 @@ TEST_CASE("indexer: lazy levels cascade") {
 
 TEST_CASE("indexer: full decode at screen size") {
   const auto e = entry("PXL_20260321_003010085.jpg");
-  auto q = pb::quickIndex(PB_TEST_PHOTOS_DIR, e);
-  auto f = pb::decodeFull(std::filesystem::path(PB_TEST_PHOTOS_DIR) / e.relPath, q.rec, 2000);
+  const auto dir = pbtest::photoDir(e.relPath);
+  auto q = pb::quickIndex(dir, e);
+  auto f = pb::decodeFull(dir / e.relPath, q.rec, 2000);
   REQUIRE(f);
   CHECK(f->h == 2040);  // 1/2 scale
 }

@@ -1,13 +1,36 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
+#include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace pbtest {
 
-inline std::string photo(const std::string& name) { return std::string(PB_TEST_PHOTOS_DIR) + "/" + name; }
+// A fixture photo by file name, found anywhere under photos/ (which may be organised in
+// subfolders). Throws if it is missing, so the test fails instead of reading nothing.
+inline std::string photo(const std::string& name) {
+  static const std::map<std::string, std::string> byName = [] {
+    std::map<std::string, std::string> m;
+    std::error_code ec;
+    for (auto it = std::filesystem::recursive_directory_iterator(PB_TEST_PHOTOS_DIR, ec);
+         !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+      if (it->is_regular_file()) m.emplace(it->path().filename().string(), it->path().string());
+    }
+    return m;
+  }();
+  const auto it = byName.find(name);
+  if (it == byName.end()) throw std::runtime_error("test photo not found under " PB_TEST_PHOTOS_DIR ": " + name);
+  return it->second;
+}
+
+// The folder holding fixture photo `name`.
+inline std::filesystem::path photoDir(const std::string& name) {
+  return std::filesystem::path(photo(name)).parent_path();
+}
 
 inline std::vector<uint8_t> readFile(const std::string& path, size_t maxBytes = SIZE_MAX) {
   std::ifstream f(path, std::ios::binary);
