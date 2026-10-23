@@ -115,6 +115,10 @@ double MapCamera::widthAt(double z) const { return viewport.x / (kTilePx * std::
 void MapCamera::flyTo(Vec2d worldCenter, double newZoom, double t) {
   stopMotion();
   newZoom = std::clamp(newZoom, minZoom, maxZoom);
+  if (viewport.x < 1) {  // nothing to see (e.g. a minimised window): no path to fly
+    jumpTo(worldCenter, newZoom);
+    return;
+  }
   Vec2d target = worldCenter;
   target.x -= std::floor(target.x);
   if (target.x - center.x > 0.5) target.x -= 1;  // the short way around the world
@@ -135,6 +139,7 @@ std::optional<MapCamera::View> MapCamera::fitView(std::span<const Vec2d> points,
     box = {std::min(box.x0, p.x), std::min(box.y0, p.y), std::max(box.x1, p.x), std::max(box.y1, p.y)};
   }
   if (box.width() < 1e-12 && box.height() < 1e-12) return View{box.center(), singleZoom};
+  if (viewport.x < 1 || viewport.y < 1) return View{box.center(), minZoom};
   const double fill = 1 - 2 * padding;
   double scale = 1e300;  // world px per world unit that fits the box
   if (box.width() > 0) scale = std::min(scale, viewport.x * fill / box.width());
@@ -154,7 +159,7 @@ void MapCamera::update(double t, double dt) {
     } else {
       double w = 0;
       flight_->path.at(flight_->path.length() * easeInOutCubic(u), center, w);
-      zoom = std::log2(viewport.x / (kTilePx * uiScale * w));
+      if (viewport.x >= 1 && w > 0) zoom = std::log2(viewport.x / (kTilePx * uiScale * w));
     }
     normalize();
     return;

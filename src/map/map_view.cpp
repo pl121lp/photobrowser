@@ -165,7 +165,9 @@ void MapView::update(double t, double dt, Vec2d window, double uiScale, const Su
     pulseStart_ = t;
   }
 
-  if (open_ && probing_ && probeOffline_ > 0 && tilesPending == 0) {
+  // No internet: offline results and nothing good, once everything asked has failed or
+  // after two failures (a dead network can take seconds per tile to time out).
+  if (open_ && probing_ && probeOffline_ > 0 && (tilesPending == 0 || probeOffline_ >= 2)) {
     probing_ = false;
     notices_.push_back(MapNotice::NoInternet);
     setOpen(false, t);

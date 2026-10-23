@@ -1,9 +1,11 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "core/geom.h"
@@ -34,6 +36,9 @@ struct TileRequest {
 class TileSet {
  public:
   static constexpr double kFadeS = 0.15, kOfflineRetryS = 5, kRefusedRetryS = 60;
+  // Tiles neither loaded nor requested are forgotten after this many frames unused, so
+  // long sessions (e.g. flying between photos for hours) stay cheap.
+  static constexpr uint64_t kForgetFrames = 120;
 
   TileSet(int minZ, int maxZ);
 
@@ -48,6 +53,7 @@ class TileSet {
   size_t pending() const { return pending_; }  // requested, not yet loaded or failed
   bool fading(double now) const { return now < fadeUntil_; }
   Vec2d slotOrigin(SlotRef s) const { return slots_.origin(s); }
+  size_t entryCount() const { return entries_.size(); }  // tiles tracked (bounded)
 
  private:
   enum class State : uint8_t { None, Requested, Resident, Failed, Retry };
@@ -62,6 +68,8 @@ class TileSet {
 
   Entry& entry(TileKey k);
   void want(TileKey k, int64_t priority, double now, std::vector<TileRequest>& out);
+  void unrequest(Entry& e);  // Requested -> another state: bookkeeping
+  void forgetUnused();
   // Nearest resident strict ancestor of k and the part of it that k covers.
   const Entry* ancestor(TileKey k, UvRect& sub);
   UvRect slotUv(SlotRef s) const { return slots_.uv(s, 256, 256); }
@@ -69,6 +77,8 @@ class TileSet {
   int minZ_, maxZ_;
   SlotAllocator slots_{256};
   std::unordered_map<uint64_t, Entry> entries_;
+  std::unordered_set<uint64_t> requested_;          // keys in state Requested
+  std::array<std::optional<uint64_t>, 256> slotKey_;  // resident tile per slot
   uint64_t frame_ = 0;
   size_t pending_ = 0;
   double fadeUntil_ = 0;

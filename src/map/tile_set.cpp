@@ -32,8 +32,24 @@ void TileSet::want(TileKey k, int64_t priority, double now, std::vector<TileRequ
   if (e.state != State::None) return;
   e.state = State::Requested;
   e.cancel = std::make_shared<CancelToken>();
+  requested_.insert(k.packed());
   ++pending_;
   out.push_back({k, priority, e.cancel});
+}
+
+void TileSet::unrequest(Entry& e) {
+  if (e.state != State::Requested) return;
+  requested_.erase(e.key.packed());
+  e.cancel.reset();
+  --pending_;
+}
+
+void TileSet::forgetUnused() {
+  for (auto it = entries_.begin(); it != entries_.end();) {
+    const Entry& e = it->second;
+    const bool keep = e.state == State::Resident || e.state == State::Requested || e.lastUsed + kForgetFrames > frame_;
+    it = keep ? std::next(it) : entries_.erase(it);
+  }
 }
 
 const TileSet::Entry* TileSet::ancestor(TileKey k, UvRect& sub) {
@@ -94,14 +110,19 @@ void TileSet::frame(const MapCamera& cam, double now, std::vector<MapTileDraw>& 
   }
 
   // Cancel what is no longer wanted.
-  for (auto& [key, e] : entries_) {
-    if (e.state == State::Requested && e.lastUsed != frame_) {
-      e.cancel->cancelled = true;
-      e.cancel.reset();
-      e.state = State::None;
-      --pending_;
+  for (auto it = requested_.begin(); it != requested_.end();) {
+    Entry& e = entries_.at(*it);
+    if (e.lastUsed == frame_) {
+      ++it;
+      continue;
     }
+    e.cancel->cancelled = true;
+    e.cancel.reset();
+    e.state = State::None;
+    --pending_;
+    it = requested_.erase(it);
   }
+  if (frame_ % 64 == 0) forgetUnused();
   std::stable_sort(requests.begin() + long(firstRequest), requests.end(),
                    [](const TileRequest& a, const TileRequest& b) { return a.priority < b.priority; });
 }
@@ -109,14 +130,15 @@ void TileSet::frame(const MapCamera& cam, double now, std::vector<MapTileDraw>& 
 std::optional<SlotRef> TileSet::loaded(TileKey k, double now) {
   Entry& e = entry(k);
   if (e.state == State::Resident) return std::nullopt;
-  if (e.state == State::Requested) --pending_;
-  e.cancel.reset();
+  unrequest(e);
   std::optional<SlotRef> slot = slots_.allocate();
   if (!slot) {
     // Evict the least recently used tile not drawn this frame (deeper levels first on ties).
     Entry* victim = nullptr;
-    for (auto& [key, other] : entries_) {
-      if (other.state != State::Resident || other.lastUsed == frame_) continue;
+    for (const auto& key : slotKey_) {
+      if (!key) continue;
+      Entry& other = entries_.at(*key);
+      if (other.lastUsed == frame_) continue;
       if (!victim || other.lastUsed < victim->lastUsed ||
           (other.lastUsed == victim->lastUsed && other.key.z > victim->key.z)) {
         victim = &other;
@@ -132,6 +154,7 @@ std::optional<SlotRef> TileSet::loaded(TileKey k, double now) {
   }
   e.state = State::Resident;
   e.slot = *slot;
+  slotKey_[slot->slot] = k.packed();
   e.loadedAt = now;
   e.lastUsed = frame_;
   return slot;
@@ -140,8 +163,7 @@ std::optional<SlotRef> TileSet::loaded(TileKey k, double now) {
 void TileSet::failed(TileKey k, TileStatus s, double now) {
   Entry& e = entry(k);
   if (e.state == State::Resident) return;
-  if (e.state == State::Requested) --pending_;
-  e.cancel.reset();
+  unrequest(e);
   switch (s) {
     case TileStatus::Offline:
       e.state = State::Retry;
@@ -156,12 +178,13 @@ void TileSet::failed(TileKey k, TileStatus s, double now) {
 }
 
 void TileSet::cancelAll() {
-  for (auto& [key, e] : entries_) {
-    if (e.state != State::Requested) continue;
+  for (const uint64_t key : requested_) {
+    Entry& e = entries_.at(key);
     e.cancel->cancelled = true;
     e.cancel.reset();
     e.state = State::None;
   }
+  requested_.clear();
   pending_ = 0;
 }
 

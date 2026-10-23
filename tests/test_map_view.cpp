@@ -343,3 +343,16 @@ TEST_CASE("map view: non-finite photo positions are ignored") {
   CHECK(std::isfinite(f.map.camera().center.x));
   CHECK(std::isfinite(f.map.camera().zoom));
 }
+
+TEST_CASE("map view: two offline results with nothing good close the map without waiting for the rest") {
+  Fixture f;
+  f.map.toggle(f.t, &f.source);
+  f.pending = 20;  // a dead network that times out: the rest would take long
+  f.run(0.1);
+  const std::vector<pb::TileStatus> offline = {pb::TileStatus::Offline, pb::TileStatus::Offline};
+  f.map.tileResults(offline);
+  f.pending = 18;
+  f.step();
+  CHECK_FALSE(f.map.isOpen());
+  CHECK(f.map.takeNotice() == pb::MapNotice::NoInternet);
+}

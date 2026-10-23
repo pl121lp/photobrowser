@@ -823,6 +823,9 @@ int App::run(const Options& options) {
     }
 
     *stopBackground = true;
+    // Map tile fetches can take a few seconds to give up on a dead network: the
+    // window goes away first so quitting never looks frozen.
+    SDL_HideWindow(window);
     mapTiles.reset();
     player.reset();
     session.streamer.reset();

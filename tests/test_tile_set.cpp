@@ -199,3 +199,22 @@ TEST_CASE("tile set: tiles across the antimeridian use wrapped keys") {
   f.frame(cam, 1);
   CHECK(std::any_of(f.draws.begin(), f.draws.end(), [](const auto& d) { return d.screen.x1 <= 400 + 1e-6; }));
 }
+
+TEST_CASE("tile set: entries stay bounded over a long pan") {
+  Fixture f;
+  size_t seen = 0;
+  double now = 0;
+  for (int i = 0; i < 3000; ++i) {
+    // A slow pan right across the world at zoom 12: new tiles all the time.
+    const auto cam = camera({std::fmod(0.0005 * i, 1.0), 0.4}, 12);
+    f.frame(cam, now);
+    seen += f.requests.size();
+    for (size_t k = 0; k < f.requests.size(); ++k) {
+      if (k % 2) f.set.failed(f.requests[k].key, pb::TileStatus::Missing, now);
+      else f.set.loaded(f.requests[k].key, now);
+    }
+    now += 1.0 / 60;
+  }
+  CHECK(seen > 15000);
+  CHECK(f.set.entryCount() < 3000);  // only tiles used recently (and the resident ones)
+}

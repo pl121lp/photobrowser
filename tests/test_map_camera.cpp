@@ -246,3 +246,19 @@ TEST_CASE("map camera: fitView contains every point with padding and respects ma
   const std::vector<pb::Vec2d> world = {pb::toWorld(60, -170), pb::toWorld(-40, 170)};
   CHECK(pb::MapCamera::fitView(world, vp, 1, 0.1, 16, 15, 2)->zoom == 2);
 }
+
+TEST_CASE("map camera: a zero-width viewport never produces NaN or an endless flight") {
+  Fixture f;
+  f.cam.jumpTo(pb::toWorld(59.9, 10.7), 10);
+  f.cam.viewport = {0, 600};
+  f.cam.flyTo(pb::toWorld(41.9, 12.5), 15, f.t);
+  f.run(4);
+  CHECK_FALSE(f.cam.flying());
+  CHECK(std::isfinite(f.cam.center.x));
+  CHECK(std::isfinite(f.cam.center.y));
+  CHECK(std::isfinite(f.cam.zoom));
+  const std::vector<pb::Vec2d> pts = {{0.4, 0.4}, {0.5, 0.5}};
+  auto v = pb::MapCamera::fitView(pts, {0, 0}, 1, 0.1, 16, 15, 2);
+  REQUIRE(v);
+  CHECK(std::isfinite(v->zoom));
+}
