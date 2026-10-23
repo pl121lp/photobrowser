@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "layout/content.h"
 #include "layout/square_grid.h"
 #include "view/camera.h"
 #include "view/interaction.h"
@@ -598,4 +599,27 @@ TEST_CASE("interaction: photo effect applies only in whole-photo view and resets
   f.run(0.5);
   f.ui.onKey(pb::Key::Enter, f.t);  // the next photo opens without an effect
   CHECK(f.ui.photoEffect() == 0);
+}
+
+TEST_CASE("interaction: narrowing viewport keeps the centre photo centred and the open photo fitted") {
+  Fixture f;
+  const uint32_t centre = f.layout.centerPosition();
+  for (int i = 0; i <= 20; ++i) {
+    f.ui.setViewport({1000 - 20.0 * i, 800});
+    f.run(1.0 / 120);
+    CHECK(f.screenOf(centre).x == doctest::Approx(f.cam.viewport.x / 2).epsilon(0.0005));
+  }
+  f.ui.onKey(pb::Key::Enter, f.t);
+  f.run(0.5);
+  for (int i = 0; i <= 20; ++i) {
+    const pb::Vec2d vp{600 + 20.0 * i, 800};
+    f.ui.setViewport(vp);
+    f.ui.setFocusRect(pb::fitRect({0, 0, vp.x, vp.y}, 1.5));
+    f.run(1.0 / 120);
+    const pb::Rect r = f.ui.focusDisplayRect();
+    CHECK(r.x0 >= -1e-9);
+    CHECK(r.x1 <= vp.x + 1e-9);
+    CHECK(r.y0 >= -1e-9);
+    CHECK(r.y1 <= vp.y + 1e-9);
+  }
 }
