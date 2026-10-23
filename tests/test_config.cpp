@@ -99,7 +99,8 @@ TEST_CASE("config: focused photo zoom limit is configurable and validated") {
 
 TEST_CASE("config: the generated default file documents every option and parses to the defaults") {
   const std::string text = pb::defaultConfigText();
-  for (auto key : {"folder", "gap", "max_photo_zoom", "enabled", "graph", "fullscreen", "mode", "color", "color2", "shader"}) {
+  for (auto key : {"folder", "gap", "max_photo_zoom", "enabled", "graph", "fullscreen", "mode", "color", "color2", "shader",
+                   "[map]", "width", "photo_zoom", "open", "[plugin.maptiles]"}) {
     CHECK(text.find(key) != std::string::npos);
   }
   auto r = pb::parseConfig(text);
@@ -404,4 +405,34 @@ TEST_CASE("config: autoplay") {
   CHECK_FALSE(bad.config.autoplay);
   CHECK(hasWarning(bad, "line 2"));
   CHECK(pb::defaultConfigText().find("# autoplay = off\n") != std::string::npos);
+}
+
+TEST_CASE("config: map settings") {
+  pb::Config d;
+  CHECK(d.mapWidth == 0.4);
+  CHECK(d.mapPhotoZoom == 15);
+  CHECK_FALSE(d.mapOpen);
+  auto r = pb::parseConfig("[map]\nwidth = 0.5\nphoto_zoom = 12\nopen = on\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.mapWidth == 0.5);
+  CHECK(r.config.mapPhotoZoom == 12);
+  CHECK(r.config.mapOpen);
+  auto bad = pb::parseConfig("[map]\nwidth = 0.9\nphoto_zoom = 25\nopen = maybe\n");
+  CHECK(bad.config.mapWidth == 0.8);
+  CHECK(bad.config.mapPhotoZoom == 19);
+  CHECK_FALSE(bad.config.mapOpen);
+  CHECK(hasWarning(bad, "map.width"));
+  CHECK(hasWarning(bad, "map.photo_zoom"));
+  CHECK(hasWarning(bad, "maybe"));
+  CHECK(pb::parseConfig("[map]\nwidth = 0.1\n").config.mapWidth == 0.2);
+}
+
+TEST_CASE("config: plugin sections keep raw values without warnings") {
+  auto r = pb::parseConfig(
+      "[plugin.maptiles]\nurl = https://x/{z}/{x}/{y}.png\nMax_Zoom = 18  # comment\n[plugin.video]\nfoo = Bar\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.pluginSettings["maptiles"]["url"] == "https://x/{z}/{x}/{y}.png");
+  CHECK(r.config.pluginSettings["maptiles"]["max_zoom"] == "18");
+  CHECK(r.config.pluginSettings["video"]["foo"] == "Bar");
+  CHECK(pb::Config{}.pluginSettings.empty());
 }

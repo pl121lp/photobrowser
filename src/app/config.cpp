@@ -312,6 +312,28 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("on/off");
       }
+    } else if (key == "map.width") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 0.2 || *d > 0.8) warn(key + " must be between 0.2 and 0.8; clamped");
+        c.mapWidth = std::clamp(*d, 0.2, 0.8);
+      } else {
+        bad("a number");
+      }
+    } else if (key == "map.photo_zoom") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 2 || *d > 19) warn(key + " must be between 2 and 19; clamped");
+        c.mapPhotoZoom = std::clamp(*d, 2.0, 19.0);
+      } else {
+        bad("a number");
+      }
+    } else if (key == "map.open") {
+      if (auto b = parseBool(value)) {
+        c.mapOpen = *b;
+      } else {
+        bad("on/off");
+      }
+    } else if (section.starts_with("plugin.") && section.size() > 7) {
+      c.pluginSettings[section.substr(7)][key.substr(section.size() + 1)] = std::string(value);
     } else if (section.starts_with("background.") && (key.ends_with(".color") || key.ends_with(".color2"))) {
       const std::string preset = section.substr(11);
       if (!isPresetName(preset)) continue;  // warned at the section header
@@ -424,6 +446,16 @@ std::string defaultConfigText() {
 # on = hide the other photos while one is shown (just the photo on the background).
 # photo_only = off
 
+[map]
+# The map (M) shows where photos were taken. It needs a map tile plugin: start with
+# --plugin maptiles (see the README).
+# Fraction of the window the map panel takes (0.2 to 0.8).
+# width = 0.4
+# Map zoom when showing a single photo's location (2 to 19; 15 = streets).
+# photo_zoom = 15
+# on = show the map at startup.
+# open = off
+
 [background]
 # The starting background; F6 steps through solid, every preset and your shader file.
 # mode = solid     : just color
@@ -460,6 +492,18 @@ std::string defaultConfigText() {
 # [background.aurora]
 # color = #3fd6a0
 # color2 = #0b1020
+
+# Plugins (--plugin <name>) read their settings from a section named after them,
+# [plugin.<name>]. For example the map tile plugin:
+# [plugin.maptiles]
+# Tile URL; {z} {x} {y} are replaced, {key} by api_key. OpenStreetMap is the default;
+# for heavy use pick a provider with its own key (OSM's servers are run by volunteers).
+# url = https://tile.openstreetmap.org/{z}/{x}/{y}.png
+# api_key =
+# attribution = © OpenStreetMap contributors
+# max_zoom = 19
+# Size limit of the downloaded tile cache in MB (least recently used tiles go first).
+# disk_cache = 500
 )";
 }
 

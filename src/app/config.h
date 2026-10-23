@@ -79,6 +79,13 @@ struct Config {
   double screensaverHold = 30;   // seconds on each photo (1..3600)
   double screensaverSlowZoom = 1;  // zoom reached by the end of each hold (1 = off, max 2)
   bool screensaverPhotoOnly = false;  // hide the other photos while one is shown
+
+  // [map]
+  double mapWidth = 0.4;     // fraction of the window the map panel takes (0.2..0.8)
+  double mapPhotoZoom = 15;  // map zoom for a single photo's location (2..19)
+  bool mapOpen = false;      // show the map at startup
+  // [plugin.<name>] sections: key -> raw value, handed to that plugin.
+  std::map<std::string, std::map<std::string, std::string>> pluginSettings;
   friend bool operator==(const Config&, const Config&) = default;
 };
 
