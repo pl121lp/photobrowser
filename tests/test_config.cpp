@@ -285,3 +285,23 @@ TEST_CASE("config: fit or letterbox") {
   CHECK(hasWarning(bad, "line 2"));
   CHECK(pb::defaultConfigText().find("# fit = fit\n") != std::string::npos);
 }
+
+TEST_CASE("config: sort order and start position") {
+  CHECK_FALSE(pb::Config{}.newestFirst);
+  CHECK(pb::Config{}.startAt == pb::StartAt::Center);
+  auto r = pb::parseConfig("[library]\nsort = newest_first\n[view]\nstart_at = random\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.newestFirst);
+  CHECK(r.config.startAt == pb::StartAt::Random);
+  CHECK(pb::parseConfig("[view]\nstart_at = oldest\n").config.startAt == pb::StartAt::Oldest);
+  CHECK(pb::parseConfig("[view]\nstart_at = newest\n").config.startAt == pb::StartAt::Newest);
+  CHECK_FALSE(pb::parseConfig("[library]\nsort = oldest_first\n").config.newestFirst);
+  auto bad = pb::parseConfig("[library]\nsort = by_name\n[view]\nstart_at = middle\n");
+  CHECK_FALSE(bad.config.newestFirst);
+  CHECK(bad.config.startAt == pb::StartAt::Center);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(hasWarning(bad, "line 4"));
+  const std::string text = pb::defaultConfigText();
+  CHECK(text.find("# sort = oldest_first\n") != std::string::npos);
+  CHECK(text.find("# start_at = center\n") != std::string::npos);
+}

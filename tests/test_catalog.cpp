@@ -149,3 +149,12 @@ TEST_CASE("paths: concurrent atomic writes to one file never mix contents") {
   for (auto& th : threads) th.join();
   CHECK(bad == 0);
 }
+
+TEST_CASE("catalog: newest first is the exact reverse") {
+  pb::Catalog c;
+  c.photos = {rec("b.jpg", 100), rec("a.jpg", 100), rec("c.jpg", 50), rec("x.jpg", 10, pb::kBroken)};
+  c.sortOrder(true);
+  CHECK(c.order == std::vector<pb::PhotoId>{0, 1, 2});
+  c.sortOrder(false);
+  CHECK(c.order == std::vector<pb::PhotoId>{2, 1, 0});
+}

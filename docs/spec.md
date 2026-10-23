@@ -69,7 +69,7 @@ the primary requirement; features come second.
 | Left-click on the open photo | In whole-photo view, the item's plugin action if it has one (video: play / pause; restart once ended). Otherwise nothing. |
 | Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order; ↑/↓ the closest photo one row up/down (stays put on the top/bottom row). |
 | `+` / `-` | Zoom in/out around screen center. |
-| `Home` | Return to the start view (center photo). |
+| `Home` | Return to the start view (the `[view] start_at` photo; centre by default). |
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). The app starts fullscreen unless `[display] fullscreen = false` or `--windowed`. |
 | `Esc` | Close the help; otherwise leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
 | `Q` / window close | Quit. |
@@ -206,6 +206,11 @@ Calls made by Claude (open to change):
   time zone (EXIF times are local wall-clock).
 - Screensaver: `F5`, off by default (`[screensaver] enabled`), hold time measured from
   when the photo is fully open; user input stops it rather than fighting it.
+- `[library] sort = oldest_first | newest_first` (default oldest first): the layout
+  order only; the cached catalog stays oldest first, so switching needs no re-index.
+- `[view] start_at = center | oldest | newest | random` (default center): the photo
+  the start view centres on, at the usual start zoom; `Home` returns to the same photo
+  (random picks once per launch).
 - `[view] fit = fit | letterbox` (default fit = today's square fill with a centre crop):
   letterbox shows each photo whole inside its square with black bars; opening a photo
   then grows from the letterboxed photo. Done in the tile shader (image-area mask), so

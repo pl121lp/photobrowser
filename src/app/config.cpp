@@ -139,6 +139,21 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "library.sort") {
+      if (value == "oldest_first" || value == "newest_first") {
+        c.newestFirst = value == "newest_first";
+      } else {
+        bad("oldest_first or newest_first");
+      }
+    } else if (key == "view.start_at") {
+      static const std::map<std::string, StartAt, std::less<>> kStart = {
+          {"center", StartAt::Center}, {"oldest", StartAt::Oldest}, {"newest", StartAt::Newest},
+          {"random", StartAt::Random}};
+      if (auto it = kStart.find(value); it != kStart.end()) {
+        c.startAt = it->second;
+      } else {
+        bad("center, oldest, newest or random");
+      }
     } else if (key == "view.fit") {
       if (value == "fit" || value == "letterbox") {
         c.letterbox = value == "letterbox";
@@ -268,10 +283,20 @@ std::string defaultConfigText() {
 [library]
 # Folder with your photos (searched including subfolders). ~ means your home folder.
 # folder = photos
+# Order of the photos (by date taken), row by row from the top left.
+#   oldest_first : oldest photo first
+#   newest_first : newest photo first
+# sort = oldest_first
 
 [view]
 # Space around each photo, as a fraction of a photo's size (0 to 0.2). 0 = no gaps.
 # gap = 0.03
+# Which photo the view starts on (Home goes back to it):
+#   center : the photo in the middle of the library
+#   oldest : the oldest photo
+#   newest : the newest photo
+#   random : a different random photo each time the program starts
+# start_at = center
 # How a photo fills its square:
 #   fit       : fill the square; the photo's edges are cropped to fit it
 #   letterbox : the whole photo, with black bars on the sides it doesn't fill

@@ -70,7 +70,7 @@ uint64_t cacheKey(std::string_view absPathUtf8, uint64_t size, int64_t mtime) {
   return fnv1a(&mtime, sizeof mtime, h);
 }
 
-void Catalog::sortOrder() {
+void Catalog::sortOrder(bool newestFirst) {
   order.clear();
   for (PhotoId i = 0; i < photos.size(); ++i) {
     if (!(photos[i].flags & kBroken)) order.push_back(i);
@@ -81,6 +81,7 @@ void Catalog::sortOrder() {
     if (pa.takenAt != pb.takenAt) return pa.takenAt < pb.takenAt;
     return pa.relPath < pb.relPath;
   });
+  if (newestFirst) std::reverse(order.begin(), order.end());
 }
 
 bool saveCatalog(const Catalog& c, const std::filesystem::path& path) {

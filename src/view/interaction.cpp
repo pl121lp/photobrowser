@@ -57,11 +57,26 @@ void Interaction::setViewport(Vec2d px) {
 
 void Interaction::layoutChanged() { computeLimits(); }
 
+uint32_t startPosition(StartAt at, uint32_t count, uint32_t centerPos, bool newestFirst, uint32_t randomValue) {
+  if (count == 0) return 0;
+  switch (at) {
+    case StartAt::Oldest: return newestFirst ? count - 1 : 0;
+    case StartAt::Newest: return newestFirst ? 0 : count - 1;
+    case StartAt::Random: return randomValue % count;
+    case StartAt::Center: break;
+  }
+  return centerPos;
+}
+
+Vec2d Interaction::startCenter() const {
+  if (layout_.count() == 0) return layout_.bounds().center();
+  const uint32_t pos = start_ && *start_ < layout_.count() ? *start_ : layout_.centerPosition();
+  return layout_.place(pos).cell.center();
+}
+
 void Interaction::resetView() {
   stopMotion();
-  const Vec2d c = layout_.count() > 0 ? layout_.place(layout_.centerPosition()).cell.center()
-                                      : layout_.bounds().center();
-  cam_.center = c;
+  cam_.center = startCenter();
   cam_.scale = startScale();
   logZoom_.current = logZoom_.target = std::log(cam_.scale);
 }
@@ -349,12 +364,7 @@ bool Interaction::onKey(Key k, double t) {
     }
     case Key::ZoomIn: onWheel(screenMid, 1); return true;
     case Key::ZoomOut: onWheel(screenMid, -1); return true;
-    case Key::Home: {
-      const Vec2d c = layout_.count() > 0 ? layout_.place(layout_.centerPosition()).cell.center()
-                                          : layout_.bounds().center();
-      glideTo(c, startScale(), t);
-      return true;
-    }
+    case Key::Home: glideTo(startCenter(), startScale(), t); return true;
     case Key::Enter:
       if (auto p = nearestPosition(cam_.center)) focus(*p, t);
       return true;

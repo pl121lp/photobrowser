@@ -13,6 +13,12 @@ namespace pb {
 
 enum class Key { Left, Right, Up, Down, ZoomIn, ZoomOut, Home, Enter, Escape };
 
+// Which photo the start view (and Home) centres on.
+enum class StartAt { Center, Oldest, Newest, Random };
+// Layout position for `at` among `count` photos. `newestFirst`: the layout runs newest
+// to oldest. `randomValue`: any random number (used by Random).
+uint32_t startPosition(StartAt at, uint32_t count, uint32_t centerPos, bool newestFirst, uint32_t randomValue);
+
 // Turns pointer/wheel/key input into camera motion and whole-photo focus.
 // Pure logic: times are seconds from any monotonic clock, positions are drawable px.
 class Interaction {
@@ -21,7 +27,9 @@ class Interaction {
 
   void setViewport(Vec2d px);
   void layoutChanged();  // call after Layout::build(); recomputes zoom limits
-  void resetView();      // jump to the start view (center photo)
+  void resetView();      // jump to the start view (the start position, default the centre photo)
+  // Photo the start view and Home centre on; nullopt or out of range = centre photo.
+  void setStartPosition(std::optional<uint32_t> pos) { start_ = pos; }
 
   void onPointerDown(Vec2d px, double t);
   void onPointerMove(Vec2d px, double t);
@@ -65,6 +73,7 @@ class Interaction {
   };
 
   double startScale() const;
+  Vec2d startCenter() const;
   void computeLimits();
   void glideTo(Vec2d center, double scale, double t);
   void stopMotion();
@@ -83,6 +92,7 @@ class Interaction {
   Camera& cam_;
   const Layout& layout_;
   double minScale_ = 1, maxScale_ = 1;
+  std::optional<uint32_t> start_;
   double now_ = 0;
 
   // Pointer

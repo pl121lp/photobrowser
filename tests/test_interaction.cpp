@@ -451,3 +451,32 @@ TEST_CASE("interaction: click on the open photo activates it once; outside leave
   f.run(0.4);
   CHECK_FALSE(f.ui.focused());
 }
+
+TEST_CASE("interaction: start position per start_at mode") {
+  // 20 photos, centre position 10 (as the grid reports it).
+  using pb::StartAt;
+  CHECK(pb::startPosition(StartAt::Center, 20, 10, false, 0) == 10);
+  CHECK(pb::startPosition(StartAt::Oldest, 20, 10, false, 0) == 0);
+  CHECK(pb::startPosition(StartAt::Newest, 20, 10, false, 0) == 19);
+  CHECK(pb::startPosition(StartAt::Oldest, 20, 10, true, 0) == 19);  // newest first: oldest is last
+  CHECK(pb::startPosition(StartAt::Newest, 20, 10, true, 0) == 0);
+  CHECK(pb::startPosition(StartAt::Random, 20, 10, false, 47) == 47 % 20);
+  CHECK(pb::startPosition(StartAt::Random, 0, 0, false, 47) == 0);
+  CHECK(pb::startPosition(StartAt::Newest, 0, 0, false, 0) == 0);
+}
+
+TEST_CASE("interaction: start view and Home go to the start position") {
+  Fixture f;
+  f.ui.setStartPosition(17);
+  f.ui.resetView();
+  CHECK(f.cam.center == f.layout.place(17).cell.center());
+  f.click(f.screenOf(6));
+  f.run(0.6);
+  CHECK(f.ui.onKey(pb::Key::Home, f.t));
+  f.run(1.0);
+  CHECK(f.cam.center.x == doctest::Approx(f.layout.place(17).cell.center().x));
+  CHECK(f.cam.center.y == doctest::Approx(f.layout.place(17).cell.center().y));
+  f.ui.setStartPosition(99);  // beyond the library: falls back to the centre photo
+  f.ui.resetView();
+  CHECK(f.cam.center == f.layout.place(f.layout.centerPosition()).cell.center());
+}

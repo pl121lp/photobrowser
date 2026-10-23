@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <memory>
+#include <random>
 #include <vector>
 
 #include "app/background_presets.h"
@@ -271,8 +272,11 @@ int App::run(const Options& options) {
     size_t prewarmPages = 0;
     auto startSession = [&](LibraryState lib) {
       session.lib = std::move(lib);
+      session.lib.catalog.sortOrder(config.newestFirst);  // saved oldest first; cheap to redo
       layout->build(uint32_t(session.lib.catalog.order.size()));
       ui.layoutChanged();
+      ui.setStartPosition(startPosition(config.startAt, layout->count(), layout->centerPosition(),
+                                        config.newestFirst, std::random_device{}()));
       ui.resetView();
       const size_t l0Pages = (session.lib.catalog.photos.size() + 16383) / 16384;
       const size_t fullReserve = size_t(Streamer::kFullSlots) * 3840 * 2880 * 4 * 4 / 3;
