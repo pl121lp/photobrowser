@@ -44,6 +44,56 @@ std::vector<uint8_t> syntheticBigEndianJpeg() {
   return j;
 }
 
+void putRational(std::vector<uint8_t>& v, uint32_t num, uint32_t den) {
+  put32be(v, num);
+  put32be(v, den);
+}
+
+void putEntry(std::vector<uint8_t>& v, uint16_t tag, uint16_t type, uint32_t count, uint32_t value) {
+  put16be(v, tag);
+  put16be(v, type);
+  put32be(v, count);
+  put32be(v, value);
+}
+
+// Big-endian JPEG whose IFD0 points to a GPS IFD. `coords`: with latitude/longitude
+// (33 deg 52' 30" S, 151 deg 12' 36" W, 122.5 m below sea level); else only the version tag.
+std::vector<uint8_t> syntheticGpsJpeg(bool coords) {
+  std::vector<uint8_t> tiff = {'M', 'M', 0, 42};
+  put32be(tiff, 8);  // IFD0 at 8
+  put16be(tiff, 1);
+  putEntry(tiff, 0x8825, 4, 1, 26);  // GPS IFD at 26
+  put32be(tiff, 0);
+  if (coords) {
+    const uint32_t data = 26 + 2 + 6 * 12 + 4;  // after the GPS IFD
+    put16be(tiff, 6);
+    putEntry(tiff, 1, 2, 2, uint32_t('S') << 24);  // LatitudeRef, inline ASCII
+    putEntry(tiff, 2, 5, 3, data);                 // Latitude
+    putEntry(tiff, 3, 2, 2, uint32_t('W') << 24);  // LongitudeRef
+    putEntry(tiff, 4, 5, 3, data + 24);            // Longitude
+    putEntry(tiff, 5, 1, 1, 1u << 24);             // AltitudeRef: below sea level
+    putEntry(tiff, 6, 5, 1, data + 48);            // Altitude
+    put32be(tiff, 0);
+    putRational(tiff, 33, 1);
+    putRational(tiff, 52, 1);
+    putRational(tiff, 3000, 100);
+    putRational(tiff, 151, 1);
+    putRational(tiff, 12, 1);
+    putRational(tiff, 36, 1);
+    putRational(tiff, 1225, 10);
+  } else {
+    put16be(tiff, 1);
+    putEntry(tiff, 0, 1, 4, 0x02020000);  // GPSVersionID only
+    put32be(tiff, 0);
+  }
+  std::vector<uint8_t> j = {0xFF, 0xD8, 0xFF, 0xE1};
+  put16be(j, uint16_t(2 + 6 + tiff.size()));
+  for (char c : std::string("Exif\0\0", 6)) j.push_back(uint8_t(c));
+  j.insert(j.end(), tiff.begin(), tiff.end());
+  j.insert(j.end(), {0xFF, 0xDA, 0x00, 0x02});
+  return j;
+}
+
 }  // namespace
 
 TEST_CASE("exif: pixel photo") {
@@ -57,6 +107,11 @@ TEST_CASE("exif: pixel photo") {
   CHECK(i->height == 4080);
   CHECK(i->thumbOffset == 1310);
   CHECK(i->thumbLength == 23268);
+  REQUIRE(i->gps);
+  CHECK(i->gps->lat == doctest::Approx(40.752153).epsilon(1e-6));
+  CHECK(i->gps->lon == doctest::Approx(-73.98535).epsilon(1e-6));
+  REQUIRE(i->gps->altitude);
+  CHECK(*i->gps->altitude == doctest::Approx(64.0));
 }
 
 TEST_CASE("exif: SOF can lie beyond the first 64 KB") {
@@ -112,4 +167,23 @@ TEST_CASE("exif: big-endian and orientation 6") {
   CHECK(i->width == 640);
   CHECK(i->height == 480);
   CHECK_FALSE(i->dateTimeOriginal);
+}
+
+TEST_CASE("exif: GPS position, hemispheres and altitude below sea level") {
+  auto j = syntheticGpsJpeg(true);
+  auto i = pb::parseJpegHeader(j);
+  REQUIRE(i);
+  REQUIRE(i->gps);
+  CHECK(i->gps->lat == doctest::Approx(-33.875));
+  CHECK(i->gps->lon == doctest::Approx(-151.21));
+  REQUIRE(i->gps->altitude);
+  CHECK(*i->gps->altitude == doctest::Approx(-122.5));
+}
+
+TEST_CASE("exif: GPS block without coordinates is no position") {
+  auto j = syntheticGpsJpeg(false);
+  auto i = pb::parseJpegHeader(j);
+  REQUIRE(i);
+  CHECK_FALSE(i->gps);
+  CHECK_FALSE(pb::parseJpegHeader(syntheticBigEndianJpeg())->gps);
 }

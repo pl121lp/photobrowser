@@ -123,15 +123,21 @@ std::string formatDateTime(int64_t seconds) {
   return t;
 }
 
+namespace {
+// At most 48 characters, the middle replaced by "..." when longer.
+std::string shortened(std::string s) {
+  constexpr size_t kMax = 48;
+  if (s.size() <= kMax) return s;
+  const size_t tail = (kMax - 3) / 2;
+  return s.substr(0, kMax - 3 - tail) + "..." + s.substr(s.size() - tail);
+}
+}  // namespace
+
 std::vector<std::string> photoInfoLines(const PhotoInfo& p) {
-  constexpr size_t kMaxName = 48;
   std::vector<std::string> lines;
-  std::string name = p.name.substr(p.name.find_last_of('/') + 1);
-  if (name.size() > kMaxName) {
-    const size_t tail = (kMaxName - 3) / 2;
-    name = name.substr(0, kMaxName - 3 - tail) + "..." + name.substr(name.size() - tail);
-  }
-  lines.push_back(name);
+  const size_t slash = p.name.find_last_of('/');
+  lines.push_back(shortened(p.name.substr(slash + 1)));
+  if (slash != std::string::npos) lines.push_back(shortened(p.name.substr(0, slash + 1)));
   char t[96];
   if (p.width && p.height) {
     std::snprintf(t, sizeof t, "%u x %u  %.1f MP", p.width, p.height, double(p.width) * p.height / 1e6);
@@ -140,6 +146,13 @@ std::vector<std::string> photoInfoLines(const PhotoInfo& p) {
   lines.push_back((p.dateFromFile ? "Modified " : "Taken ") + formatDateTime(p.takenAt));
   std::snprintf(t, sizeof t, "%.1f MB", double(p.fileSize) / (1 << 20));
   lines.push_back(t);
+  if (p.gps) {
+    // Five decimals is about a metre; the font has no degree sign.
+    int n = std::snprintf(t, sizeof t, "GPS %.5f %c, %.5f %c", std::abs(p.gps->lat), p.gps->lat < 0 ? 'S' : 'N',
+                          std::abs(p.gps->lon), p.gps->lon < 0 ? 'W' : 'E');
+    if (p.gps->altitude) std::snprintf(t + n, sizeof t - size_t(n), "  %.0f m", *p.gps->altitude);
+    lines.push_back(t);
+  }
   return lines;
 }
 

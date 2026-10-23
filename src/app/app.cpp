@@ -581,7 +581,8 @@ int App::run(const Options& options) {
       if (const auto f = ui.focused(); showInfo && f && ui.focusProgress() >= 1 && session.streamer &&
                                        *f < session.lib.catalog.order.size()) {
         const PhotoRecord& rec = session.lib.catalog.photos[session.lib.catalog.order[*f]];
-        const PhotoInfo info{rec.relPath, rec.width, rec.height, rec.takenAt, rec.takenAt == rec.mtime, rec.fileSize};
+        const PhotoInfo info{rec.relPath, rec.width, rec.height, rec.takenAt, rec.takenAt == rec.mtime,
+                             rec.fileSize, rec.gps};
         overlayQuads.clear();
         buildPhotoInfo(info, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,
                        overlayQuads);

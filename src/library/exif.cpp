@@ -32,6 +32,8 @@ class TiffReader {
 
 constexpr uint16_t kTagOrientation = 0x0112;
 constexpr uint16_t kTagExifIfd = 0x8769;
+constexpr uint16_t kTagGpsIfd = 0x8825;
+constexpr uint16_t kGpsLatRef = 1, kGpsLat = 2, kGpsLonRef = 3, kGpsLon = 4, kGpsAltRef = 5, kGpsAlt = 6;
 constexpr uint16_t kTagDateTimeOriginal = 0x9003;
 constexpr uint16_t kTagThumbOffset = 0x0201;
 constexpr uint16_t kTagThumbLength = 0x0202;
@@ -61,6 +63,48 @@ std::optional<uint32_t> scalar(const TiffReader& r, uint16_t type, size_t valueO
   return std::nullopt;
 }
 
+// `count` unsigned RATIONALs (type 5) at the offset stored in the value field.
+bool rationals(const TiffReader& r, uint16_t type, uint32_t count, size_t valueOff, double (&out)[3]) {
+  if (type != 5 || count < 1 || count > 3) return false;
+  auto off = r.u32(valueOff);
+  if (!off) return false;
+  for (uint32_t i = 0; i < count; ++i) {
+    auto num = r.u32(size_t(*off) + 8 * i), den = r.u32(size_t(*off) + 8 * i + 4);
+    if (!num || !den) return false;
+    out[i] = *den ? double(*num) / *den : 0;
+  }
+  return true;
+}
+
+// Degrees from a degrees/minutes/seconds triple.
+std::optional<double> dms(const TiffReader& r, uint16_t type, uint32_t count, size_t valueOff) {
+  double v[3] = {};
+  if (count != 3 || !rationals(r, type, count, valueOff, v)) return std::nullopt;
+  return v[0] + v[1] / 60 + v[2] / 3600;
+}
+
+void parseGps(const TiffReader& r, uint32_t ifd, JpegHeaderInfo& info) {
+  std::optional<double> lat, lon, alt;
+  char latRef = 'N', lonRef = 'E';
+  bool belowSea = false;
+  walkIfd(r, ifd, [&](uint16_t tag, uint16_t type, uint32_t count, size_t v) {
+    // Refs are 2-byte ASCII and AltitudeRef one BYTE, so they sit in the value field.
+    auto first = r.bytes(v, 1);
+    if (tag == kGpsLatRef && type == 2 && !first.empty()) latRef = char(first[0]);
+    if (tag == kGpsLonRef && type == 2 && !first.empty()) lonRef = char(first[0]);
+    if (tag == kGpsAltRef && type == 1 && !first.empty()) belowSea = first[0] == 1;
+    if (tag == kGpsLat) lat = dms(r, type, count, v);
+    if (tag == kGpsLon) lon = dms(r, type, count, v);
+    if (tag == kGpsAlt) {
+      if (double a[3] = {}; count == 1 && rationals(r, type, count, v, a)) alt = a[0];
+    }
+  });
+  if (!lat || !lon || *lat > 90 || *lon > 180) return;
+  GeoPos g{latRef == 'S' ? -*lat : *lat, lonRef == 'W' ? -*lon : *lon, std::nullopt};
+  if (alt) g.altitude = belowSea ? -*alt : *alt;
+  info.gps = g;
+}
+
 void parseExif(std::span<const uint8_t> tiff, uint64_t tiffFileOffset, JpegHeaderInfo& info) {
   if (tiff.size() < 8) return;
   bool be;
@@ -76,14 +120,17 @@ void parseExif(std::span<const uint8_t> tiff, uint64_t tiffFileOffset, JpegHeade
   auto ifd0 = r.u32(4);
   if (!ifd0) return;
 
-  std::optional<uint32_t> exifIfd;
+  std::optional<uint32_t> exifIfd, gpsIfd;
   auto ifd1 = walkIfd(r, *ifd0, [&](uint16_t tag, uint16_t type, uint32_t, size_t v) {
     if (tag == kTagOrientation) {
       if (auto o = scalar(r, type, v); o && *o >= 1 && *o <= 8) info.orientation = int(*o);
     } else if (tag == kTagExifIfd) {
       exifIfd = scalar(r, type, v);
+    } else if (tag == kTagGpsIfd) {
+      gpsIfd = scalar(r, type, v);
     }
   });
+  if (gpsIfd && *gpsIfd != *ifd0) parseGps(r, *gpsIfd, info);
 
   if (exifIfd && *exifIfd != *ifd0) {
     walkIfd(r, *exifIfd, [&](uint16_t tag, uint16_t type, uint32_t count, size_t v) {

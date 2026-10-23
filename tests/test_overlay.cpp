@@ -268,3 +268,26 @@ TEST_CASE("photo effect: label panel sits in the top-right corner and holds its 
     CHECK(quad.rect.y1 <= panel.y1 + 1e-9);
   }
 }
+
+TEST_CASE("photo info: folder line under the name, root photos have none") {
+  auto p = info();
+  p.name = "2024/holiday/IMG_1234.jpg";
+  auto lines = pb::photoInfoLines(p);
+  REQUIRE(lines.size() == 5);
+  CHECK(lines[0] == "IMG_1234.jpg");
+  CHECK(lines[1] == "2024/holiday/");
+  p.name = std::string(80, 'f') + "/x.jpg";
+  CHECK(pb::photoInfoLines(p)[1].size() == 48);
+  CHECK(pb::photoInfoLines(p)[1].find("...") != std::string::npos);
+  CHECK(pb::photoInfoLines(info()).size() == 4);
+}
+
+TEST_CASE("photo info: GPS line with hemispheres and altitude") {
+  auto p = info();
+  p.gps = pb::GeoPos{40.752153, -73.98535, 64.4};
+  auto lines = pb::photoInfoLines(p);
+  REQUIRE(lines.size() == 5);
+  CHECK(lines[4] == "GPS 40.75215 N, 73.98535 W  64 m");
+  p.gps = pb::GeoPos{-33.875, 151.21, std::nullopt};
+  CHECK(pb::photoInfoLines(p)[4] == "GPS 33.87500 S, 151.21000 E");
+}

@@ -7,6 +7,7 @@
 
 #include "core/frame_history.h"
 #include "core/geom.h"
+#include "library/exif.h"
 
 namespace pb {
 
@@ -50,11 +51,12 @@ Rect buildOverlay(const OverlayStats& s, const FrameHistory& history, const Font
 
 // Basic metadata of the photo in whole-photo view (F2), all from the catalog.
 struct PhotoInfo {
-  std::string name;  // relative path; only the file name is shown
+  std::string name;  // relative path: the file name, then its folder on a line of its own
   uint32_t width = 0, height = 0;  // after EXIF orientation; 0 if unknown
   int64_t takenAt = 0;             // naive local time stored as seconds since 1970
   bool dateFromFile = false;       // no EXIF date: takenAt is the file's modification time
   uint64_t fileSize = 0;
+  std::optional<GeoPos> gps;
 };
 
 // "YYYY-MM-DD HH:MM:SS" for a naive time stored as seconds since 1970.

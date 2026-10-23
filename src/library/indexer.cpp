@@ -98,6 +98,7 @@ QuickResult quickIndex(const fs::path& root, const ScanEntry& e, const MediaForm
   if (info->sawSof) setDims(rec, info->width, info->height);
   rec.thumbOffset = info->thumbOffset;
   rec.thumbLength = info->thumbLength;
+  rec.gps = info->gps;
 
   std::optional<Image> preview;
   if (info->thumbLength > 0 && info->thumbOffset + info->thumbLength <= head->size()) {

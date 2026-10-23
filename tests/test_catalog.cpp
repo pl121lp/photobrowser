@@ -46,12 +46,15 @@ TEST_CASE("catalog: save/load round trip") {
   r.key = 0xDEADBEEFCAFEF00DULL;
   r.thumbOffset = 1310;
   r.thumbLength = 23268;
-  c.photos = {r, rec("b.jpg", 1)};
+  r.gps = pb::GeoPos{40.75215, -73.98535, 64.0};
+  pb::PhotoRecord b = rec("b.jpg", 1);
+  b.gps = pb::GeoPos{-33.875, 151.21, std::nullopt};
+  c.photos = {r, b, rec("c.jpg", 2)};
   c.sortOrder();
   REQUIRE(pb::saveCatalog(c, dir.path / "catalog.bin"));
   auto l = pb::loadCatalog(dir.path / "catalog.bin");
   REQUIRE(l);
-  REQUIRE(l->photos.size() == 2);
+  REQUIRE(l->photos.size() == 3);
   const auto& a = l->photos[0];
   CHECK(a.relPath == r.relPath);
   CHECK(a.fileSize == r.fileSize);
@@ -64,6 +67,14 @@ TEST_CASE("catalog: save/load round trip") {
   CHECK(a.key == r.key);
   CHECK(a.thumbOffset == r.thumbOffset);
   CHECK(a.thumbLength == r.thumbLength);
+  REQUIRE(a.gps);
+  CHECK(a.gps->lat == r.gps->lat);
+  CHECK(a.gps->lon == r.gps->lon);
+  CHECK(a.gps->altitude == r.gps->altitude);
+  REQUIRE(l->photos[1].gps);
+  CHECK(l->photos[1].gps->lat == b.gps->lat);
+  CHECK_FALSE(l->photos[1].gps->altitude);
+  CHECK_FALSE(l->photos[2].gps);
   CHECK(l->order == c.order);
 }
 

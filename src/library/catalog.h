@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include "library/exif.h"
+
 namespace pb {
 
 using PhotoId = uint32_t;  // index into Catalog::photos (stable within a session)
@@ -26,6 +28,7 @@ struct PhotoRecord {
   uint8_t flags = 0;
   uint64_t key = 0;  // cacheKey(): names this photo's files in the thumbnail cache
   uint64_t thumbOffset = 0, thumbLength = 0;  // embedded preview JPEG in the file
+  std::optional<GeoPos> gps;                  // EXIF GPS position, if any
 
   double aspect() const { return width && height ? double(width) / height : 1.0; }
 };

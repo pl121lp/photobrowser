@@ -1,6 +1,7 @@
 #include "library/catalog.h"
 
 #include <algorithm>
+#include <bit>
 #include <cstring>
 
 #include "platform/paths.h"
@@ -9,7 +10,7 @@ namespace pb {
 
 namespace {
 
-constexpr char kMagic[8] = {'P', 'B', 'C', 'A', 'T', 0, 0, 3};
+constexpr char kMagic[8] = {'P', 'B', 'C', 'A', 'T', 0, 0, 4};
 constexpr uint32_t kEndMarker = 0x21444E45;  // "END!"
 
 class Writer {
@@ -20,6 +21,7 @@ class Writer {
     static_assert(std::is_integral_v<T>);
     for (size_t i = 0; i < sizeof(T); ++i) out.push_back(uint8_t(uint64_t(v) >> (8 * i)));
   }
+  void real(double v) { put(std::bit_cast<uint64_t>(v)); }
   void str(const std::string& s) {
     put(uint32_t(s.size()));
     out.insert(out.end(), s.begin(), s.end());
@@ -41,6 +43,7 @@ class Reader {
     pos_ += sizeof(T);
     return T(v);
   }
+  double real() { return std::bit_cast<double>(get<uint64_t>()); }
   std::string str() {
     const uint32_t n = get<uint32_t>();
     if (!ok || pos_ + n > d_.size()) {
@@ -102,6 +105,12 @@ bool saveCatalog(const Catalog& c, const std::filesystem::path& path) {
     w.put(p.key);
     w.put(p.thumbOffset);
     w.put(p.thumbLength);
+    w.put(uint8_t((p.gps ? 1 : 0) | (p.gps && p.gps->altitude ? 2 : 0)));
+    if (p.gps) {
+      w.real(p.gps->lat);
+      w.real(p.gps->lon);
+      if (p.gps->altitude) w.real(*p.gps->altitude);
+    }
   }
   w.put(uint32_t(c.order.size()));
   for (PhotoId id : c.order) w.put(id);
@@ -132,6 +141,10 @@ std::optional<Catalog> loadCatalog(const std::filesystem::path& path) {
     p.key = r.get<uint64_t>();
     p.thumbOffset = r.get<uint64_t>();
     p.thumbLength = r.get<uint64_t>();
+    if (const uint8_t gps = r.get<uint8_t>(); gps & 1) {
+      p.gps = GeoPos{r.real(), r.real(), std::nullopt};  // braced init: evaluated in order
+      if (gps & 2) p.gps->altitude = r.real();
+    }
     if (!r.ok) return std::nullopt;
   }
   const uint32_t m = r.get<uint32_t>();
