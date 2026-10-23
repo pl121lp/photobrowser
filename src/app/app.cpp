@@ -668,6 +668,8 @@ int App::run(const Options& options) {
           setUv(ti.uvPrev, d.uvPrev);
           ti.fade = d.fade;
           ti.dim = map.dimmed() ? 0.6f : 0.0f;
+          // Image area past the tile's edges: no letterbox darkening of the edge pixels (seams).
+          setUv(ti.content, UvRect{-0.01f, -0.01f, 1.01f, 1.01f});
           mapInstances.push_back(ti);
         }
         renderer.setCornerRadius(0);
