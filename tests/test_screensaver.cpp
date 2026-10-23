@@ -148,3 +148,37 @@ TEST_CASE("screensaver: without slow zoom the photo stays fitted and frames aren
   CHECK(f.ui.focusZoom() == doctest::Approx(1));
   CHECK_FALSE(f.saver.animating());
 }
+
+TEST_CASE("screensaver: reports each arrival once (to start live content such as a video)") {
+  Fixture f(100, 2);
+  f.saver.start();
+  CHECK_FALSE(f.saver.takeArrived());
+  f.untilOpen();
+  f.run(1.0 / 60);  // the step after the photo is fully open
+  CHECK(f.saver.takeArrived());
+  CHECK_FALSE(f.saver.takeArrived());
+  f.run(2.1);       // hold over: flies on
+  CHECK_FALSE(f.saver.takeArrived());
+  f.untilOpen();
+  f.run(1.0 / 60);
+  CHECK(f.saver.takeArrived());
+}
+
+TEST_CASE("screensaver: stays while the item is still playing, then moves on") {
+  Fixture f(100, 2);
+  f.saver.start();
+  const uint32_t p = f.untilOpen();
+  auto runBusy = [&](double seconds, bool busy) {
+    for (double e = 0; e < seconds; e += 1.0 / 60) {
+      f.t += 1.0 / 60;
+      f.ui.update(f.t, 1.0 / 60);
+      f.saver.update(f.ui, f.layout.count(), f.t, busy);
+    }
+  };
+  runBusy(5, true);  // well past the 2 s hold
+  REQUIRE(f.ui.focused());
+  CHECK(*f.ui.focused() == p);
+  CHECK_FALSE(f.ui.flying());
+  runBusy(0.1, false);  // finished playing
+  CHECK(f.ui.flying());
+}

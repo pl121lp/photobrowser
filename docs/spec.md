@@ -76,7 +76,7 @@ the primary requirement; features come second.
 | `F1` | Toggle **help**: a centered panel listing every key and mouse binding (shrinks to fit small windows). `Esc` also closes it. Off by default. |
 | `F2` | Toggle photo info: while a photo is fully open in whole-photo view, a bottom-left panel shows its file name, width × height (megapixels), date taken (EXIF; file modification date if none) and file size. Off by default. |
 | `F3` | Toggle performance stats: on-screen overlay in fullscreen (fps, frame time, p99, loads, GPU memory, frame-time graph); window title otherwise. |
-| `F5` | Toggle **screensaver mode**: fly to a random photo and open it in the whole-photo view, hold it for `[screensaver] hold` seconds (30 by default), then travel to another random photo. Each journey is eased and pulls back (zooms out) mid-way, then zooms in on arrival; longer distances take longer (2–6 s). Repeats until turned off; any click, scroll or key (other than F2/F3/F5/F11/F) also stops it. The cursor is hidden while it runs. Off by default; `[screensaver] enabled = on` starts the app in it. Options: `slow_zoom` (e.g. 1.15) slowly zooms into each photo during the hold, at a steady rate, reaching that zoom at the end and easing back to fit as it leaves; `photo_only = on` fades the other photos out while a photo is shown, leaving just the photo on the background (they return for the journey). |
+| `F5` | Toggle **screensaver mode**: fly to a random photo and open it in the whole-photo view, hold it for `[screensaver] hold` seconds (30 by default), then travel to another random photo. Each journey is eased and pulls back (zooms out) mid-way, then zooms in on arrival; longer distances take longer (2–6 s). Repeats until turned off; any click, scroll or key (other than F2/F3/F5/F11/F) also stops it. The cursor is hidden while it runs. Off by default; `[screensaver] enabled = on` starts the app in it. Options: `slow_zoom` (e.g. 1.15) slowly zooms into each photo during the hold, at a steady rate, reaching that zoom at the end and easing back to fit as it leaves; `photo_only = on` fades the other photos out while a photo is shown, leaving just the photo on the background (they return for the journey). Items with live content (videos, via a plugin) start playing by themselves once open, and the tour stays until they finish (or `hold`, if longer). |
 | `F6` | Cycle the **background**: solid → each built-in preset (gradient, vignette, grain, …, warp) → the `[background] shader` file if one is set and readable → solid. Starts from the configured background; not saved. The configured background, solid and the shader file use `color`/`color2`; every other preset uses its own built-in colours, overridable per preset with `[background.<preset>] color` / `color2`. |
 
 - A click is a press+release with < ~4 px of movement; anything more is a drag.
@@ -224,6 +224,10 @@ Calls made by Claude (open to change):
   letterbox shows each photo whole inside its square with black bars; opening a photo
   then grows from the letterboxed photo. Done in the tile shader (image-area mask), so
   it composes with rounded corners and plugin content.
+- `[view] letterbox_bars = black | transparent` (default black): with transparent the
+  bars are see-through, so letterboxed photos float on the background. Same mask in
+  the tile shader, applied to alpha; tile draws blend (no measurable cost, as for
+  rounded corners).
 - `[view] corner_radius` (default 0 = square): a fraction of each photo's shorter side,
   so corners look the same at every zoom; applies to every tile (photos, video stills
   and playing video, whole-photo view). With `fit = letterbox` the photo itself is

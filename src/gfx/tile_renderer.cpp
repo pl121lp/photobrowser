@@ -19,6 +19,7 @@ bool TileRenderer::init() {
   if (!program_) return false;
   uViewport_ = gl::GetUniformLocation(program_, "uViewport");
   uCornerRadius_ = gl::GetUniformLocation(program_, "uCornerRadius");
+  uTransparentBars_ = gl::GetUniformLocation(program_, "uTransparentBars");
   gl::UseProgram(program_);
   gl::Uniform1i(gl::GetUniformLocation(program_, "uTex"), 0);
   gl::Uniform1i(gl::GetUniformLocation(program_, "uTexPrev"), 1);
@@ -54,6 +55,7 @@ void TileRenderer::draw(GLuint tex, GLuint texPrev, std::span<const TileInstance
   gl::UseProgram(program_);
   gl::Uniform2f(uViewport_, float(viewport_.x), float(viewport_.y));
   gl::Uniform1f(uCornerRadius_, cornerRadius_);
+  gl::Uniform1f(uTransparentBars_, transparentBars_ ? 1.0f : 0.0f);
   gl::BindVertexArray(vao_);
   gl::ActiveTexture(GL_TEXTURE0);
   gl::BindTexture(GL_TEXTURE_2D, tex);
@@ -65,9 +67,9 @@ void TileRenderer::draw(GLuint tex, GLuint texPrev, std::span<const TileInstance
   // Orphan the buffer so the driver never waits on the previous draw's data.
   gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(capacity_), nullptr, GL_STREAM_DRAW);
   gl::BufferSubData(GL_ARRAY_BUFFER, 0, GLsizeiptr(bytes), tiles.data());
-  // Blending only when needed (rounded corners or fading tiles); otherwise opaque tiles
+  // Blending only when needed (rounded corners, transparent bars, fading tiles); otherwise opaque tiles
   // skip the framebuffer read.
-  const bool blend = cornerRadius_ > 0 ||
+  const bool blend = cornerRadius_ > 0 || transparentBars_ ||
                      std::any_of(tiles.begin(), tiles.end(), [](const TileInstance& t) { return t.alpha < 1; });
   if (blend) {
     gl::Enable(GL_BLEND);

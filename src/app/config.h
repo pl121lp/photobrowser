@@ -52,7 +52,8 @@ struct Config {
   bool newestFirst = false;  // [library] sort: oldest_first (default) | newest_first
   StartAt startAt = StartAt::Center;
   StartZoom startZoom = StartZoom::Focus;  // [view] start_focus: focus | photo | full  // [view] start_at: photo the start view centres on
-  bool letterbox = false;   // [view] fit: false = fill the square (crop), true = whole photo with bars
+  bool letterbox = false;
+  bool transparentBars = false;  // [view] letterbox_bars: black (default) | transparent   // [view] fit: false = fill the square (crop), true = whole photo with bars
   double cornerRadius = 0;  // rounded corners, fraction of a photo's shorter side (0..0.5)
   double maxPhotoZoom = 4.0;  // maximum enlargement in whole-photo view (1..16)
   bool stats = false;

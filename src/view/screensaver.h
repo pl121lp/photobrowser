@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <random>
+#include <utility>
 
 #include "view/interaction.h"
 
@@ -24,7 +25,10 @@ class Screensaver {
   bool animating() const { return phase_ == Phase::Holding && slowZoom_ > 1; }
   // Call every frame after Interaction::update(), so each step starts in the frame
   // the previous one ends (no idle frame between). `count`: photos in the layout.
-  void update(Interaction& ui, uint32_t count, double t);
+  // `busy`: the open item is still playing (e.g. a video); it stays until done.
+  void update(Interaction& ui, uint32_t count, double t, bool busy = false);
+  // True once each time a photo has fully opened (to start its live content).
+  bool takeArrived() { return std::exchange(arrived_, false); }
 
  private:
   enum class Phase { Off, Starting, Flying, Opening, Holding };
@@ -36,6 +40,7 @@ class Screensaver {
   Phase phase_ = Phase::Off;
   std::optional<uint32_t> target_;
   double since_ = 0;
+  bool arrived_ = false;
 };
 
 }  // namespace pb

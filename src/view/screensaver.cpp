@@ -9,6 +9,7 @@ Screensaver::Screensaver(double holdSeconds, uint32_t seed) : hold_(holdSeconds)
 
 void Screensaver::start() {
   phase_ = Phase::Starting;
+  arrived_ = false;
   target_.reset();
 }
 
@@ -18,12 +19,12 @@ uint32_t Screensaver::pick(uint32_t count) {
   return r >= *target_ ? r + 1 : r;  // never the photo we are leaving
 }
 
-void Screensaver::update(Interaction& ui, uint32_t count, double t) {
+void Screensaver::update(Interaction& ui, uint32_t count, double t, bool busy) {
   switch (phase_) {
     case Phase::Off: return;
     case Phase::Holding:
       if (slowZoom_ > 1) ui.setFocusZoom(std::pow(slowZoom_, std::min(1.0, (t - since_) / hold_)));
-      if (t - since_ < hold_ || count < 2) return;
+      if (t - since_ < hold_ || busy || count < 2) return;
       [[fallthrough]];
     case Phase::Starting:
       if (count == 0) return;
@@ -41,6 +42,7 @@ void Screensaver::update(Interaction& ui, uint32_t count, double t) {
       if (ui.focusProgress() < 1) return;
       since_ = t;
       phase_ = Phase::Holding;
+      arrived_ = true;
       return;
   }
 }

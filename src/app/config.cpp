@@ -174,6 +174,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("fit or letterbox");
       }
+    } else if (key == "view.letterbox_bars") {
+      if (value == "black" || value == "transparent") {
+        c.transparentBars = value == "transparent";
+      } else {
+        bad("black or transparent");
+      }
     } else if (key == "view.corner_radius") {
       if (auto d = parseNumber(value)) {
         if (*d < 0 || *d > 0.5) warn(key + " must be between 0 and 0.5; clamped");
@@ -322,6 +328,8 @@ std::string defaultConfigText() {
 #   fit       : fill the square; the photo's edges are cropped to fit it
 #   letterbox : the whole photo, with black bars on the sides it doesn't fill
 # fit = fit
+# Letterbox bars: black, or transparent (the background shows around each photo).
+# letterbox_bars = black
 # Rounded photo (and video) corners: radius as a fraction of a photo's shorter side.
 # 0 = square corners, 0.05 = subtle, 0.5 = fully round ends.
 # corner_radius = 0

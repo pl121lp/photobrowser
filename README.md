@@ -77,6 +77,7 @@ gap = 0.03                 # space around photos, 0 = none, max 0.2
 start_at = center          # center | oldest | newest | random (Home returns there)
 start_focus = focus        # focus (photo + neighbours) | photo (opened whole; arrows step on) | full (all photos)
 fit = fit                  # fit = fill each square (edges cropped) | letterbox = whole photo, black bars
+letterbox_bars = black     # letterbox bars: black | transparent (background shows through)
 corner_radius = 0          # rounded corners: fraction of the shorter side, 0.05 = subtle, max 0.5
 max_photo_zoom = 4         # focused-photo zoom limit, relative to fit (1 to 16)
 
@@ -143,7 +144,7 @@ mistakes in the settings file are reported with the line number.
 | `F1` | help: show / hide a list of all keys and mouse actions |
 | `F2` | photo info (name, size, date taken, file size) while a photo is open in whole-photo view |
 | `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
-| `F5` | screensaver: tours random photos, flying between them (any click, scroll or key stops it) |
+| `F5` | screensaver: tours random photos, flying between them; videos (with the plugin) play by themselves and the tour waits for them to end (any click, scroll or key stops it) |
 | `F6` | next background: solid, each built-in preset, your shader file, then solid again |
 | `Q` | quit |
 

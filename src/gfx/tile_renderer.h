@@ -25,12 +25,15 @@ class TileRenderer {
   void beginFrame(Vec2d viewportPx, const float clearRgb[3]);
   // Rounded corners: radius as a fraction of each tile's shorter side (0 = square).
   void setCornerRadius(float fraction) { cornerRadius_ = fraction; }
+  // Letterbox bars (outside a tile's image area) transparent instead of black.
+  void setTransparentBars(bool on) { transparentBars_ = on; }
   void draw(GLuint tex, GLuint texPrev, std::span<const TileInstance> tiles);
 
  private:
   GLuint program_ = 0, vao_ = 0, vbo_ = 0;
-  GLint uViewport_ = -1, uCornerRadius_ = -1;
+  GLint uViewport_ = -1, uCornerRadius_ = -1, uTransparentBars_ = -1;
   float cornerRadius_ = 0;
+  bool transparentBars_ = false;
   size_t capacity_ = 0;
   Vec2d viewport_;
 };

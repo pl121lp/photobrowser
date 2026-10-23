@@ -329,3 +329,15 @@ TEST_CASE("config: recursive library scan") {
   CHECK(hasWarning(bad, "line 2"));
   CHECK(pb::defaultConfigText().find("# recursive = off\n") != std::string::npos);
 }
+
+TEST_CASE("config: letterbox bars black or transparent") {
+  CHECK_FALSE(pb::Config{}.transparentBars);
+  auto r = pb::parseConfig("[view]\nletterbox_bars = transparent\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.transparentBars);
+  CHECK_FALSE(pb::parseConfig("[view]\nletterbox_bars = black\n").config.transparentBars);
+  auto bad = pb::parseConfig("[view]\nletterbox_bars = pink\n");
+  CHECK_FALSE(bad.config.transparentBars);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# letterbox_bars = black\n") != std::string::npos);
+}

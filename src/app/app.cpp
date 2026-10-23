@@ -203,6 +203,7 @@ int App::run(const Options& options) {
     OverlayRenderer overlay;
     if (!renderer.init() || !overlay.init()) exitCode = 1;
     renderer.setCornerRadius(float(config.cornerRadius));
+    renderer.setTransparentBars(config.letterbox && config.transparentBars);
     BackgroundRenderer background;
     // The user's shader file is read once here; F6 switches without file I/O.
     const std::string userShader = toUtf8(config.backgroundShader);
@@ -431,7 +432,8 @@ int App::run(const Options& options) {
       }
       if (bench) bench->drive(ui, camera.viewport, seconds(now));
       ui.update(seconds(now), dt);
-      screensaver.update(ui, layout->count(), seconds(now));  // after: reacts to a move ending this frame
+      // After ui.update: reacts to a move ending this frame. Stays while the open item plays.
+      screensaver.update(ui, layout->count(), seconds(now), player && player->active());
 
       // A player exists while its photo is opening or open; a click on it goes to the player.
       std::optional<PhotoId> openId;
@@ -445,6 +447,8 @@ int App::run(const Options& options) {
         if (openId) player = plugins.openPlayer(root / fromUtf8(session.lib.catalog.photos[*openId].relPath));
       }
       if (ui.takeActivation() && player) player->activate();
+      // Screensaver: live content (e.g. a video) starts by itself once its item is open.
+      if (screensaver.takeArrived() && player && !player->active()) player->activate();
       // --- Draw ------------------------------------------------------------------
       const uint64_t tPre = SDL_GetTicksNS();
       const float clear[3] = {background.clearColor()[0], background.clearColor()[1], background.clearColor()[2]};

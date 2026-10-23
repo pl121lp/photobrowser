@@ -7,6 +7,7 @@ flat in vec2 vHalf;
 flat in vec4 vContent;
 
 uniform float uCornerRadius;  // fraction of the tile's shorter side; 0 = square
+uniform float uTransparentBars;  // 1 = letterbox bars transparent, 0 = black
 
 uniform sampler2D uTex;
 uniform sampler2D uTexPrev;
@@ -24,11 +25,13 @@ void main() {
   float rc = uCornerRadius * 2.0 * min(ch.x, ch.y);
   vec2 qc = abs(vLocal - (vContent.xy + vContent.zw) * 0.5) - (ch - rc);
   float dc = length(max(qc, 0.0)) + min(max(qc.x, qc.y), 0.0) - rc;
-  c *= clamp(0.5 - dc, 0.0, 1.0);
+  float inImage = clamp(0.5 - dc, 0.0, 1.0);
+  c *= mix(inImage, 1.0, uTransparentBars);  // black bars ...
+  float barAlpha = mix(1.0, inImage, uTransparentBars);  // ... or see-through ones
   // Rounded rectangle: signed distance in px, one pixel of anti-aliasing at the edge.
   float r = uCornerRadius * 2.0 * min(vHalf.x, vHalf.y);
   vec2 q = abs(vLocal) - (vHalf - r);
   float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
   float coverage = clamp(0.5 - d, 0.0, 1.0);
-  fragColor = vec4(c, vParams.z * coverage);
+  fragColor = vec4(c, vParams.z * coverage * barAlpha);
 }
