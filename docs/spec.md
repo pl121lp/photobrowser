@@ -206,9 +206,14 @@ Calls made by Claude (open to change):
   time zone (EXIF times are local wall-clock).
 - Screensaver: `F5`, off by default (`[screensaver] enabled`), hold time measured from
   when the photo is fully open; user input stops it rather than fighting it.
+- `[view] fit = fit | letterbox` (default fit = today's square fill with a centre crop):
+  letterbox shows each photo whole inside its square with black bars; opening a photo
+  then grows from the letterboxed photo. Done in the tile shader (image-area mask), so
+  it composes with rounded corners and plugin content.
 - `[view] corner_radius` (default 0 = square): a fraction of each photo's shorter side,
   so corners look the same at every zoom; applies to every tile (photos, video stills
-  and playing video, whole-photo view). Computed in the tile shader; no extra passes.
+  and playing video, whole-photo view). With `fit = letterbox` the photo itself is
+  rounded (radius from its own shorter side), as well as its black frame. Computed in the tile shader; no extra passes.
 - Screensaver `slow_zoom` and `photo_only` are off by default; the zoom is steady in
   log scale over the whole hold, about the photo's centre; "hidden" photos fade to the
   background (not to black), only while a photo is open.

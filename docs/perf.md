@@ -138,3 +138,24 @@ one pixel of anti-aliasing); with a radius > 0 tile draws blend. Release builds,
 | Intel UHD (CML GT2) | after, radius 0.08 | 16.69 | 17.57–17.59 | 17.93–18.05 | 1, 0 |
 
 No measurable cost, including on the integrated reference GPU with blending on.
+
+## 2026-10-22 — Letterbox mode (`[view] fit = letterbox`)
+
+Each tile gained an image-area rect (one more vec4 attribute); the fragment shader
+blacks out the bars with a box distance (one pixel of anti-aliasing). Release builds,
+3840×2160 fullscreen, 288-photo warm library, two runs each; frame interval in ms.
+
+| GPU | Build / setting | p50 | p95 | p99 | frames > 20 ms |
+|---|---|---|---|---|---|
+| RTX 2080 Super Max-Q | before | 16.66–16.67 | 17.62–17.68 | 18.17–18.28 | 0, 1 |
+| RTX 2080 Super Max-Q | after, fit | 16.66–16.68 | 17.59–17.72 | 18.11–18.22 | 3, 1 |
+| RTX 2080 Super Max-Q | after, letterbox | 16.65–16.66 | 17.62–17.65 | 18.21–18.33 | 1, 1 |
+| Intel UHD (CML GT2) | before | 16.69 | 17.62–17.63 | 17.88–18.28 | 2, 1 |
+| Intel UHD (CML GT2) | after, fit | 16.67–16.70 | 17.65–17.71 | 18.19–18.32 | 2, 1 |
+| Intel UHD (CML GT2) | after, letterbox | 16.67–16.69 | 17.47–17.64 | 17.97–18.15 | 2, 2 |
+
+No measurable difference; the ~33 ms maxima on the integrated GPU occur before and
+after alike (start of the run).
+Follow-up: rounding the letterboxed photo itself (two more ALU ops per pixel).
+Intel UHD, letterbox + corner_radius 0.06 + warp background, two runs: p50
+16.67–16.69, p95 17.52–17.63, p99 18.13–18.20 ms, 0 and 2 frames > 20 ms — unchanged.

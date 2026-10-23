@@ -91,7 +91,11 @@ class Layout {
 - The **content UV rect** (crop vs. fit) is computed per visible tile on the CPU from
   the photo's aspect ratio, the cell rect, and the mode, and passed per instance. Thumbnails are stored with their
   *full aspect ratio*, so changing layout mode never touches the cache.
-- Letterbox frames (future) = draw cell background black, image fitted inside.
+- Letterbox (`[view] fit = letterbox`): the tile keeps the square cell; its UVs are
+  extended beyond the image (`letterbox()` in `layout/content`) and a per-instance
+  image-area rect lets the tile shader paint the bars black — one quad per photo,
+  no extra draws. Level selection still assumes the fill crop (slightly sharper than
+  needed for letterboxed photos).
 
 ## 5. Image pyramid and caching
 

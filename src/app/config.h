@@ -46,6 +46,7 @@ struct PresetColors {
 struct Config {
   std::filesystem::path photoFolder = "photos";
   double gap = 0.03;  // per side, as a fraction of a photo; 0 = photos touch
+  bool letterbox = false;   // [view] fit: false = fill the square (crop), true = whole photo with bars
   double cornerRadius = 0;  // rounded corners, fraction of a photo's shorter side (0..0.5)
   double maxPhotoZoom = 4.0;  // maximum enlargement in whole-photo view (1..16)
   bool stats = false;

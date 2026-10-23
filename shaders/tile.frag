@@ -4,6 +4,7 @@ in vec2 vUvPrev;
 flat in vec3 vParams;
 in vec2 vLocal;
 flat in vec2 vHalf;
+flat in vec4 vContent;
 
 uniform float uCornerRadius;  // fraction of the tile's shorter side; 0 = square
 
@@ -17,6 +18,13 @@ void main() {
   vec4 cur = texture(uTex, vUv);
   vec4 prev = texture(uTexPrev, vUvPrev);
   vec3 c = mix(prev.rgb, cur.rgb, vParams.x) * (1.0 - vParams.y);
+  // Letterbox: black outside the image area (a full-tile area costs nothing visible).
+  // The photo itself gets the rounded corners too, sized from its own shorter side.
+  vec2 ch = abs(vContent.zw - vContent.xy) * 0.5;
+  float rc = uCornerRadius * 2.0 * min(ch.x, ch.y);
+  vec2 qc = abs(vLocal - (vContent.xy + vContent.zw) * 0.5) - (ch - rc);
+  float dc = length(max(qc, 0.0)) + min(max(qc.x, qc.y), 0.0) - rc;
+  c *= clamp(0.5 - dc, 0.0, 1.0);
   // Rounded rectangle: signed distance in px, one pixel of anti-aliasing at the edge.
   float r = uCornerRadius * 2.0 * min(vHalf.x, vHalf.y);
   vec2 q = abs(vLocal) - (vHalf - r);

@@ -273,3 +273,15 @@ TEST_CASE("config: corner radius") {
   CHECK(hasWarning(bad, "line 2"));
   CHECK(pb::defaultConfigText().find("# corner_radius = 0\n") != std::string::npos);
 }
+
+TEST_CASE("config: fit or letterbox") {
+  CHECK_FALSE(pb::Config{}.letterbox);
+  CHECK(pb::parseConfig("[view]\nfit = letterbox\n").config.letterbox);
+  auto r = pb::parseConfig("[view]\nfit = fit\n");
+  CHECK(r.warnings.empty());
+  CHECK_FALSE(r.config.letterbox);
+  auto bad = pb::parseConfig("[view]\nfit = stretch\n");
+  CHECK_FALSE(bad.config.letterbox);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# fit = fit\n") != std::string::npos);
+}

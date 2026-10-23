@@ -460,12 +460,16 @@ int App::run(const Options& options) {
         std::optional<std::pair<uint64_t, TileInstance>> focusedTile;
         for (const TileDraw& d : draws) {
           const PhotoRecord& rec = session.lib.catalog.photos[d.id];
-          const UvRect crop = cropUv(rec.aspect(), 1.0);
           const Rect r = layout->place(d.pos).photo;
+          // Fit fills the square with a centre crop; letterbox shows the whole photo
+          // inside it, the image coordinates extended over the bars.
+          const Letterbox lb = letterbox(rec.aspect(), r.width() / r.height());
+          const UvRect crop = config.letterbox ? lb.uv : cropUv(rec.aspect(), r.width() / r.height());
           const Vec2d a = camera.worldToScreen({r.x0, r.y0});
           const Vec2d b = camera.worldToScreen({r.x1, r.y1});
           TileInstance ti{};
           setRect(ti.rect, {a.x, a.y, b.x, b.y});
+          if (config.letterbox) setUv(ti.content, lb.content);
           setUv(ti.uv, compose(d.cur.uv, crop));
           setUv(ti.uvPrev, compose(d.prev.uv, crop));
           ti.fade = d.fade;
@@ -473,7 +477,10 @@ int App::run(const Options& options) {
           const uint64_t key = uint64_t(textures.texture(d.cur)) << 32 | textures.texture(d.prev);
           if (auto f = ui.focused(); f && *f == d.pos) {
             // Whole-photo view: morph from the square crop to the full photo, drawn on top.
-            const FocusMorph m = focusMorph({a.x, a.y, b.x, b.y}, rec.aspect(), camera.viewport, ui.focusProgress());
+            // Morphs from the square crop, or in letterbox mode from the letterboxed photo.
+            const Rect start = config.letterbox ? fitRect({a.x, a.y, b.x, b.y}, rec.aspect()) : Rect{a.x, a.y, b.x, b.y};
+            const FocusMorph m = focusMorph(start, rec.aspect(), camera.viewport, ui.focusProgress());
+            setUv(ti.content, UvRect{0, 0, 1, 1});
             ui.setFocusRect(m.rect);
             setRect(ti.rect, ui.focusDisplayRect());
             setUv(ti.uv, compose(d.cur.uv, m.uv));

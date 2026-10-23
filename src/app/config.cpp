@@ -139,6 +139,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "view.fit") {
+      if (value == "fit" || value == "letterbox") {
+        c.letterbox = value == "letterbox";
+      } else {
+        bad("fit or letterbox");
+      }
     } else if (key == "view.corner_radius") {
       if (auto d = parseNumber(value)) {
         if (*d < 0 || *d > 0.5) warn(key + " must be between 0 and 0.5; clamped");
@@ -266,6 +272,10 @@ std::string defaultConfigText() {
 [view]
 # Space around each photo, as a fraction of a photo's size (0 to 0.2). 0 = no gaps.
 # gap = 0.03
+# How a photo fills its square:
+#   fit       : fill the square; the photo's edges are cropped to fit it
+#   letterbox : the whole photo, with black bars on the sides it doesn't fill
+# fit = fit
 # Rounded photo (and video) corners: radius as a fraction of a photo's shorter side.
 # 0 = square corners, 0.05 = subtle, 0.5 = fully round ends.
 # corner_radius = 0

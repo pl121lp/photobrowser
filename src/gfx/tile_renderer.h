@@ -14,6 +14,7 @@ struct TileInstance {
   float fade;       // weight of the current texture, 0..1
   float dim;        // 0 = normal, 1 = black
   float alpha = 1;  // opacity; below 1 blends over the background
+  float content[4] = {0, 0, 1, 1};  // image area in tile coordinates; black bars outside
 };
 
 // Draws textured screen-space quads with one instanced draw per texture pair.

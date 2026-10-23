@@ -37,6 +37,7 @@ bool TileRenderer::init() {
   attr(1, 4, offsetof(TileInstance, uv));
   attr(2, 4, offsetof(TileInstance, uvPrev));
   attr(3, 3, offsetof(TileInstance, fade));
+  attr(4, 4, offsetof(TileInstance, content));
   return true;
 }
 

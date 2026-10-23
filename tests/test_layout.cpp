@@ -121,3 +121,41 @@ TEST_CASE("grid: zero gap means photos touch") {
   CHECK(g.hit({1.0001, 1.5}).value() == 3);
   CHECK(pb::makeLayout("square-crop", 0.1) != nullptr);
 }
+
+TEST_CASE("content: letterbox a landscape photo in a square tile") {
+  const auto lb = pb::letterbox(2.0, 1.0);  // 2:1 photo, square tile
+  CHECK(lb.content.u0 == 0);
+  CHECK(lb.content.u1 == 1);
+  CHECK(lb.content.v0 == doctest::Approx(0.25));
+  CHECK(lb.content.v1 == doctest::Approx(0.75));
+  // Image coordinates across the whole tile: the photo maps exactly onto `content`.
+  CHECK(lb.uv.u0 == doctest::Approx(0));
+  CHECK(lb.uv.u1 == doctest::Approx(1));
+  CHECK(lb.uv.v0 == doctest::Approx(-0.5));
+  CHECK(lb.uv.v1 == doctest::Approx(1.5));
+}
+
+TEST_CASE("content: letterbox a portrait photo, and a photo that already fits") {
+  const auto lb = pb::letterbox(0.75, 1.0);
+  CHECK(lb.content.u0 == doctest::Approx(0.125));
+  CHECK(lb.content.u1 == doctest::Approx(0.875));
+  CHECK(lb.content.v0 == 0);
+  CHECK(lb.uv.u0 == doctest::Approx(-0.125 / 0.75));
+  CHECK(lb.uv.u1 == doctest::Approx(1 + 0.125 / 0.75));
+  const auto same = pb::letterbox(1.0, 1.0);
+  CHECK(same.content.u0 == 0);
+  CHECK(same.content.v1 == 1);
+  CHECK(same.uv.u0 == doctest::Approx(0));
+  CHECK(same.uv.v1 == doctest::Approx(1));
+}
+
+TEST_CASE("content: letterboxed whole-photo morph starts at the letterboxed photo") {
+  const pb::Rect cell{100, 100, 300, 300};
+  const double a = 2.0;
+  const pb::Rect start = pb::fitRect(cell, a);
+  auto g0 = pb::focusMorph(start, a, {1000, 800}, 0);
+  CHECK(g0.rect == start);
+  CHECK(g0.uv.u0 == doctest::Approx(0));
+  CHECK(g0.uv.v0 == doctest::Approx(0));
+  CHECK(g0.uv.v1 == doctest::Approx(1));
+}

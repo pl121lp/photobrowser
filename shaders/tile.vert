@@ -4,6 +4,7 @@ layout(location = 0) in vec4 aRect;    // screen px: x0, y0, x1, y1
 layout(location = 1) in vec4 aUv;      // u0, v0, u1, v1 in uTex
 layout(location = 2) in vec4 aUvPrev;  // same in uTexPrev
 layout(location = 3) in vec3 aParams;  // fade (weight of uTex), dim, alpha
+layout(location = 4) in vec4 aContent; // image area in tile coordinates (letterbox)
 
 uniform vec2 uViewport;
 
@@ -12,6 +13,7 @@ out vec2 vUvPrev;
 flat out vec3 vParams;
 out vec2 vLocal;       // px from the tile centre
 flat out vec2 vHalf;   // tile half size, px
+flat out vec4 vContent;  // image area, px from the tile centre: x0, y0, x1, y1
 
 void main() {
   vec2 corner = vec2(gl_VertexID & 1, gl_VertexID >> 1);
@@ -23,4 +25,5 @@ void main() {
   vParams = aParams;
   vHalf = abs(aRect.zw - aRect.xy) * 0.5;
   vLocal = (corner - 0.5) * (aRect.zw - aRect.xy);
+  vContent = (aContent - 0.5) * (aRect.zw - aRect.xy).xyxy;
 }

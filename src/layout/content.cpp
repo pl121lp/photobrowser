@@ -24,6 +24,20 @@ UvRect cropUv(double imageAspect, double targetAspect) {
   return {0, (1 - keep) / 2, 1, (1 + keep) / 2};
 }
 
+Letterbox letterbox(double imageAspect, double tileAspect) {
+  Letterbox lb;
+  if (imageAspect > tileAspect) {
+    const float h = float(tileAspect / imageAspect);
+    lb.content = {0, (1 - h) / 2, 1, (1 + h) / 2};
+  } else {
+    const float w = float(imageAspect / tileAspect);
+    lb.content = {(1 - w) / 2, 0, (1 + w) / 2, 1};
+  }
+  const float cw = lb.content.u1 - lb.content.u0, ch = lb.content.v1 - lb.content.v0;
+  lb.uv = {-lb.content.u0 / cw, -lb.content.v0 / ch, (1 - lb.content.u0) / cw, (1 - lb.content.v0) / ch};
+  return lb;
+}
+
 FocusMorph focusMorph(const Rect& cell, double imageAspect, Vec2d viewport, double progress) {
   const double margin = 0.02 * std::min(viewport.x, viewport.y);
   const Rect target = fitRect(Rect{0, 0, viewport.x, viewport.y}.inset(margin), imageAspect);

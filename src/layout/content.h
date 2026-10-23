@@ -11,6 +11,13 @@ Rect fitRect(const Rect& box, double aspect);
 // image has aspect `imageAspect` (i.e. the visible part of a center crop).
 UvRect cropUv(double imageAspect, double targetAspect);
 
+// A photo shown whole inside a tile of another aspect, with bars on two sides.
+struct Letterbox {
+  UvRect content;  // where the photo sits in the tile (tile coordinates, 0..1)
+  UvRect uv;       // image coordinates at the tile's edges (beyond 0..1 on the bar sides)
+};
+Letterbox letterbox(double imageAspect, double tileAspect);
+
 struct FocusMorph {
   Rect rect;  // screen px
   UvRect uv;  // part of the image to show
