@@ -60,6 +60,7 @@ add_library(pb_core STATIC
   src/view/screensaver.cpp
   src/view/overlay.cpp
   src/library/exif.cpp
+  src/library/png_header.cpp
   src/library/catalog.cpp
   src/library/scanner.cpp
   src/library/media_format.cpp
@@ -116,6 +117,7 @@ add_executable(pb_tests
   tests/test_interaction.cpp
   tests/test_screensaver.cpp
   tests/test_exif.cpp
+  tests/test_png.cpp
   tests/test_catalog.cpp
   tests/test_scanner.cpp
   tests/test_jobs.cpp
