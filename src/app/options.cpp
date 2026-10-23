@@ -9,7 +9,7 @@ namespace pb {
 std::string usage() {
   return "Usage: photobrowse [photo-folder] [options]\n"
          "\n"
-         "  photo-folder          folder with JPEG photos (subfolders too with\n"
+         "  photo-folder          folder with JPEG and PNG photos (subfolders too with\n"
          "                        [library] recursive = on)\n"
          "                        (default: [library] folder in the config file, else ./photos)\n"
          "  --config <file>       settings file (default: ~/.config/photobrowse/config.ini,\n"
@@ -26,10 +26,12 @@ std::string usage() {
          "  --help                show this help\n"
          "\n"
          "Plugins (built when their libraries are installed; see README):\n"
+         "  heif                  HEIC/HEIF photos (e.g. from iPhones) in the grid, with date\n"
+         "                        and GPS for the map (libheif + libde265)\n"
          "  video                 video files in the grid; click an open one to play (FFmpeg)\n"
          "  maptiles              map tiles for the map view (M): OpenStreetMap, cached on\n"
          "                        disk; settings in [plugin.maptiles] (libcurl)\n"
-         "  Several at once:      --plugin video --plugin maptiles\n";
+         "  Several at once:      --plugin heif --plugin video --plugin maptiles\n";
 }
 
 std::variant<Options, std::string> parseOptions(int argc, char** argv) {
