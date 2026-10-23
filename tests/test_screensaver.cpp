@@ -117,3 +117,34 @@ TEST_CASE("screensaver: empty and single-photo libraries") {
   REQUIRE(one.ui.focused());
   CHECK(*one.ui.focused() == 0);
 }
+
+TEST_CASE("screensaver: slow zoom grows steadily over the hold, then eases back on leaving") {
+  Fixture f(100, 4);
+  f.saver.setSlowZoom(1.2);
+  f.saver.start();
+  f.untilOpen();
+  CHECK(f.ui.focusZoom() == doctest::Approx(1).epsilon(0.01));
+  CHECK(f.saver.animating());
+  f.ui.setFocusRect({200, 100, 800, 700});  // the app reports the fitted rect each frame
+  f.run(2);
+  CHECK(f.ui.focusZoom() == doctest::Approx(std::sqrt(1.2)).epsilon(0.01));  // half way, in log scale
+  const pb::Rect r = f.ui.focusDisplayRect();
+  CHECK(r.center().x == doctest::Approx(500));  // zooms about the photo's centre
+  CHECK(r.center().y == doctest::Approx(400));
+  f.run(1.9);
+  CHECK(f.ui.focusZoom() == doctest::Approx(1.2).epsilon(0.01));
+  f.run(0.15);  // hold over: flies on
+  REQUIRE(f.ui.flying());
+  CHECK(f.ui.focusZoom() > 1.01);  // no jump back to fit
+  f.run(0.5);
+  CHECK(f.ui.focusZoom() == doctest::Approx(1));
+}
+
+TEST_CASE("screensaver: without slow zoom the photo stays fitted and frames aren't needed") {
+  Fixture f(100, 2);
+  f.saver.start();
+  f.untilOpen();
+  f.run(1.5);
+  CHECK(f.ui.focusZoom() == doctest::Approx(1));
+  CHECK_FALSE(f.saver.animating());
+}

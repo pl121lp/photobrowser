@@ -237,3 +237,24 @@ TEST_CASE("config: screensaver") {
   CHECK(text.find("[screensaver]") != std::string::npos);
   CHECK(text.find("hold = 30") != std::string::npos);
 }
+
+TEST_CASE("config: screensaver slow zoom and photo only") {
+  CHECK(pb::Config{}.screensaverSlowZoom == doctest::Approx(1));
+  CHECK_FALSE(pb::Config{}.screensaverPhotoOnly);
+  auto r = pb::parseConfig("[screensaver]\nslow_zoom = 1.25\nphoto_only = on\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.screensaverSlowZoom == doctest::Approx(1.25));
+  CHECK(r.config.screensaverPhotoOnly);
+  auto clamped = pb::parseConfig("[screensaver]\nslow_zoom = 5\n");
+  CHECK(clamped.config.screensaverSlowZoom == doctest::Approx(2));
+  CHECK(hasWarning(clamped, "line 2"));
+  auto bad = pb::parseConfig("[screensaver]\nslow_zoom = lots\nphoto_only = maybe\n");
+  CHECK(bad.config.screensaverSlowZoom == doctest::Approx(1));
+  CHECK_FALSE(bad.config.screensaverPhotoOnly);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(hasWarning(bad, "line 3"));
+  const std::string text = pb::defaultConfigText();
+  CHECK(text.find("# slow_zoom = 1") != std::string::npos);
+  CHECK(text.find("# photo_only = off") != std::string::npos);
+  CHECK(pb::parseConfig(text).warnings.empty());
+}

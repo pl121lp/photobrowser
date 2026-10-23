@@ -108,3 +108,17 @@ already allocated full-texture capacity. Frame pacing stayed at the 60 Hz limit;
 one after-run had two marginal 20–21 ms intervals, with CPU work peaking at only
 4.31 ms (consistent with the existing PRIME/display-copy variance rather than a
 decode or upload stall). Warm-run reported residency was 341 MB before and after.
+
+## 2026-10-22 — Tile alpha (screensaver photo_only)
+
+The tile shader gained a per-instance alpha (vec3 params instead of vec2); blending
+is enabled only for a draw whose tiles include alpha < 1. Paired release benchmarks,
+RTX 2080 Super Max-Q, 3840×2160 fullscreen, 288-photo warm library, two runs each.
+
+| Build | p50 | p95 | p99 | max | frames > 20 ms | CPU work p99 |
+|---|---|---|---|---|---|---|
+| Before | 16.67 | 17.65 | 18.03–18.08 | 19.65–23.26 | 0–3 of ~630 | 2.15–2.22 |
+| After | 16.66–16.68 | 17.57–17.62 | 18.17–18.18 | 20.41–20.78 | 1–2 of ~630 | 1.80–2.14 |
+
+No measurable difference; the few > 20 ms intervals appear in both builds (the known
+PRIME/display-copy variance; CPU work stayed under 4 ms after).

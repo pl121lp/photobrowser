@@ -85,6 +85,8 @@ gpu = auto                 # auto | integrated | discrete (laptops with two GPUs
 [screensaver]
 enabled = off              # on = start in screensaver mode (F5 toggles)
 hold = 30                  # seconds on each photo
+slow_zoom = 1              # slow zoom into each photo while shown: 1 = off, 1.15 = gentle, max 2
+photo_only = off           # on = hide the other photos while one is shown
 
 [background]
 mode = shader              # solid | gradient | vignette | shader

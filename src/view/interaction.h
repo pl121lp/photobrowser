@@ -38,7 +38,10 @@ class Interaction {
   // the way and zooms in to the max grid zoom on arrival; longer distances take longer.
   void flyTo(uint32_t pos, double t);
   void openPhoto(uint32_t pos, double t) { focus(pos, t); }  // whole-photo view
-  void closePhoto() { unfocus(); }
+  // Leaves whole-photo view; a zoomed photo eases back to fit instead of jumping.
+  void closePhoto() { unfocus(true); }
+  // Sets the open photo's zoom (1 = fit) at once, about the photo's centre.
+  void setFocusZoom(double zoom);
   bool flying() const { return tween_.active; }  // an eased camera move is running
 
   // True once per click on the open photo in whole-photo view (e.g. play / pause).
@@ -66,7 +69,7 @@ class Interaction {
   void glideTo(Vec2d center, double scale, double t);
   void stopMotion();
   void focus(uint32_t pos, double t);
-  void unfocus();
+  void unfocus(bool smoothZoom = false);
   void resetFocusZoom(bool immediate);
   void clampFocusPan();
   void beginDrag();

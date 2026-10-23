@@ -254,6 +254,7 @@ int App::run(const Options& options) {
     camera.viewport = {double(pw), double(ph)};
     Interaction ui(camera, *layout, config.maxPhotoZoom);
     Screensaver screensaver(config.screensaverHold);
+    screensaver.setSlowZoom(config.screensaverSlowZoom);
     auto setScreensaver = [&](bool on) {
       if (on == screensaver.active()) return;
       if (on) {
@@ -321,6 +322,7 @@ int App::run(const Options& options) {
       // With stats shown, keep rendering at the display rate so the numbers mean something.
       const bool wait = ui.idle() && !animating && !prewarming && !indexer && !options.snapshot && !options.bench &&
                         !showStats && !background.animated() && !(player && player->active()) &&
+                        !screensaver.animating() &&
                         (!session.streamer || session.streamer->stats().pendingRequests == 0);
       SDL_Event ev;
       bool have = wait ? SDL_WaitEventTimeout(&ev, 100) : SDL_PollEvent(&ev);
@@ -485,7 +487,13 @@ int App::run(const Options& options) {
             focusedTile.emplace(key, ti);
             continue;
           }
-          if (ui.focused()) ti.dim = float(0.85 * ui.focusProgress());
+          if (ui.focused() && config.screensaverPhotoOnly && screensaver.active()) {
+            // Screensaver "photo only": the other photos fade out to the background.
+            ti.alpha = float(1 - ui.focusProgress());
+            if (ti.alpha <= 0) continue;
+          } else if (ui.focused()) {
+            ti.dim = float(0.85 * ui.focusProgress());
+          }
           keyed.emplace_back(key, ti);
         }
         std::sort(keyed.begin(), keyed.end(), [](const auto& x, const auto& y) { return x.first < y.first; });

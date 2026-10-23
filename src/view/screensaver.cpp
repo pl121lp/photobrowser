@@ -1,5 +1,8 @@
 #include "view/screensaver.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace pb {
 
 Screensaver::Screensaver(double holdSeconds, uint32_t seed) : hold_(holdSeconds), rng_(seed) {}
@@ -19,6 +22,7 @@ void Screensaver::update(Interaction& ui, uint32_t count, double t) {
   switch (phase_) {
     case Phase::Off: return;
     case Phase::Holding:
+      if (slowZoom_ > 1) ui.setFocusZoom(std::pow(slowZoom_, std::min(1.0, (t - since_) / hold_)));
       if (t - since_ < hold_ || count < 2) return;
       [[fallthrough]];
     case Phase::Starting:

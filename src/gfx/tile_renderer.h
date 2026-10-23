@@ -13,6 +13,7 @@ struct TileInstance {
   float uvPrev[4];  // in the previous (coarser) texture, for cross-fades
   float fade;       // weight of the current texture, 0..1
   float dim;        // 0 = normal, 1 = black
+  float alpha = 1;  // opacity; below 1 blends over the background
 };
 
 // Draws textured screen-space quads with one instanced draw per texture pair.

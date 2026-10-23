@@ -60,6 +60,8 @@ struct Config {
   GpuPreference gpu = GpuPreference::Auto;
   bool screensaver = false;      // start in screensaver mode (F5 toggles)
   double screensaverHold = 30;   // seconds on each photo (1..3600)
+  double screensaverSlowZoom = 1;  // zoom reached by the end of each hold (1 = off, max 2)
+  bool screensaverPhotoOnly = false;  // hide the other photos while one is shown
   friend bool operator==(const Config&, const Config&) = default;
 };
 

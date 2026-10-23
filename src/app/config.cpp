@@ -214,6 +214,19 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number of seconds");
       }
+    } else if (key == "screensaver.slow_zoom") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 1 || *d > 2) warn(key + " must be between 1 and 2; clamped");
+        c.screensaverSlowZoom = std::clamp(*d, 1.0, 2.0);
+      } else {
+        bad("a number");
+      }
+    } else if (key == "screensaver.photo_only") {
+      if (auto b = parseBool(value)) {
+        c.screensaverPhotoOnly = *b;
+      } else {
+        bad("on/off");
+      }
     } else if (section.starts_with("background.") && (key.ends_with(".color") || key.ends_with(".color2"))) {
       const std::string preset = section.substr(11);
       if (!isPresetName(preset)) continue;  // warned at the section header
@@ -273,6 +286,11 @@ std::string defaultConfigText() {
 # enabled = off
 # Seconds to stay on each photo.
 # hold = 30
+# Slow zoom into each photo while it is shown, for a "Ken Burns" effect: the zoom
+# reached by the end of the hold. 1 = off, 1.15 = gentle, up to 2.
+# slow_zoom = 1
+# on = hide the other photos while one is shown (just the photo on the background).
+# photo_only = off
 
 [background]
 # The starting background; F6 steps through solid, every preset and your shader file.

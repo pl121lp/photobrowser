@@ -35,7 +35,7 @@ bool TileRenderer::init() {
   attr(0, 4, offsetof(TileInstance, rect));
   attr(1, 4, offsetof(TileInstance, uv));
   attr(2, 4, offsetof(TileInstance, uvPrev));
-  attr(3, 2, offsetof(TileInstance, fade));
+  attr(3, 3, offsetof(TileInstance, fade));
   return true;
 }
 
@@ -62,7 +62,14 @@ void TileRenderer::draw(GLuint tex, GLuint texPrev, std::span<const TileInstance
   // Orphan the buffer so the driver never waits on the previous draw's data.
   gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(capacity_), nullptr, GL_STREAM_DRAW);
   gl::BufferSubData(GL_ARRAY_BUFFER, 0, GLsizeiptr(bytes), tiles.data());
+  // Blending only when needed: opaque tiles (nearly always) skip the framebuffer read.
+  const bool blend = std::any_of(tiles.begin(), tiles.end(), [](const TileInstance& t) { return t.alpha < 1; });
+  if (blend) {
+    gl::Enable(GL_BLEND);
+    gl::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  }
   gl::DrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, GLsizei(tiles.size()));
+  if (blend) gl::Disable(GL_BLEND);
 }
 
 }  // namespace pb

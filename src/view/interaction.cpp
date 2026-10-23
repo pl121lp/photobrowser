@@ -104,15 +104,20 @@ void Interaction::focus(uint32_t pos, double t) {
   glideTo(layout_.place(pos).cell.center(), cam_.scale, t);
 }
 
-void Interaction::unfocus() {
+void Interaction::unfocus(bool smoothZoom) {
   if (!focusTarget_) return;
   focusTarget_ = false;
   focusRectValid_ = false;
-  resetFocusZoom(true);
+  resetFocusZoom(!smoothZoom);
   focusTween_ = {focusProgress_, 0, now_, kFocusS};
 }
 
 double Interaction::focusZoom() const { return std::exp(focusLogZoom_.current); }
+
+void Interaction::setFocusZoom(double zoom) {
+  focusLogZoom_.current = focusLogZoom_.target = std::log(std::clamp(zoom, 1.0, maxPhotoZoom_));
+  clampFocusPan();
+}
 
 void Interaction::setFocusRect(const Rect& screen) {
   focusRect_ = screen;
@@ -375,7 +380,9 @@ void Interaction::update(double t, double dt) {
   if (momentum_.active && !pressed_) cam_.center = cam_.center - momentum_.step(dt) / cam_.scale;
   clampCenter();
 
-  if (!focusLogZoom_.settled() && focusRectValid_) {
+  if (!focusLogZoom_.settled() && !focusRectValid_ && !focusTarget_) {
+    focusLogZoom_.step(dt);  // closing: ease back to fit even before the next rect
+  } else if (!focusLogZoom_.settled() && focusRectValid_) {
     const double before = focusZoom();
     const Vec2d oldCenter = focusRect_.center() + focusPan_;
     focusLogZoom_.step(dt);

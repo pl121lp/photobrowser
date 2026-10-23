@@ -3,13 +3,13 @@
 layout(location = 0) in vec4 aRect;    // screen px: x0, y0, x1, y1
 layout(location = 1) in vec4 aUv;      // u0, v0, u1, v1 in uTex
 layout(location = 2) in vec4 aUvPrev;  // same in uTexPrev
-layout(location = 3) in vec2 aParams;  // fade (weight of uTex), dim
+layout(location = 3) in vec3 aParams;  // fade (weight of uTex), dim, alpha
 
 uniform vec2 uViewport;
 
 out vec2 vUv;
 out vec2 vUvPrev;
-flat out vec2 vParams;
+flat out vec3 vParams;
 
 void main() {
   vec2 corner = vec2(gl_VertexID & 1, gl_VertexID >> 1);
