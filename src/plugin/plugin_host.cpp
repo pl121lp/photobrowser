@@ -164,6 +164,20 @@ std::vector<fs::path> pluginCandidates(const std::string& nameOrPath, const std:
   return out;
 }
 
+std::vector<std::string> discoverPlugins(const std::vector<fs::path>& searchDirs) {
+  std::vector<std::string> names;
+  for (const auto& dir : searchDirs) {
+    std::error_code ec;
+    for (const auto& e : fs::directory_iterator(dir, ec)) {
+      if (!e.is_regular_file(ec)) continue;
+      if (auto name = pluginNameFromLibraryFile(toUtf8(e.path().filename()))) names.push_back(*name);
+    }
+  }
+  std::sort(names.begin(), names.end());
+  names.erase(std::unique(names.begin(), names.end()), names.end());
+  return names;
+}
+
 std::optional<std::string> PluginHost::load(const std::string& nameOrPath, const std::vector<fs::path>& searchDirs) {
   const auto candidates = pluginCandidates(nameOrPath, searchDirs);
   fs::path path;

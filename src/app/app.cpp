@@ -167,7 +167,7 @@ int App::run(const Options& options) {
   PluginHost& plugins = *pluginHost;
   static const PngHandler pngHandler;  // built in; registered first so no plugin can replace it
   plugins.addBuiltinFormat(".png", &pngHandler, kPngOrigin);
-  if (!options.plugins.empty()) {
+  if (!options.plugins.empty() || options.allPlugins) {
     std::vector<fs::path> pluginDirs;
     if (const char* base = SDL_GetBasePath()) pluginDirs = {fromUtf8(base) / "plugins", fromUtf8(base)};
     for (const auto& name : options.plugins) {
@@ -175,6 +175,12 @@ int App::run(const Options& options) {
         std::fprintf(stderr, "photobrowse: %s\n", err->c_str());
         SDL_Quit();
         return 2;
+      }
+    }
+    // --all-plugins: the rest of the plugin folder; one that can't load is skipped.
+    if (options.allPlugins) {
+      for (const auto& name : discoverPlugins(pluginDirs)) {
+        if (auto err = plugins.load(name, pluginDirs)) std::fprintf(stderr, "photobrowse: warning: %s\n", err->c_str());
       }
     }
     for (const auto& p : plugins.plugins()) {

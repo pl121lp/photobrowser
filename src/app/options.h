@@ -19,6 +19,7 @@ struct Options {
   bool windowed = false;  // start in a window despite [display] fullscreen
   std::optional<std::filesystem::path> snapshot;  // dev aid: save a frame as JPEG and exit
   std::vector<std::string> plugins;  // --plugin <name|path>, in order
+  bool allPlugins = false;           // --all-plugins: also every plugin in the plugin folder
   bool help = false;
 };
 

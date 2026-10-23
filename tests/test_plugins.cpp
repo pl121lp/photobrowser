@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -151,6 +152,34 @@ TEST_CASE("plugins: candidates for a name or a path") {
   CHECK(pb::pluginCandidates("libpb_video.so", dirs) == std::vector<fs::path>{"libpb_video.so"});
 }
 
+TEST_CASE("plugins: plugin name from a library file name") {
+  CHECK(pb::pluginNameFromLibraryFile(pb::sharedLibraryName("video")) == "video");
+  CHECK(pb::pluginNameFromLibraryFile(pb::sharedLibraryName("testfake_v1")) == "testfake_v1");
+  CHECK_FALSE(pb::pluginNameFromLibraryFile(pb::sharedLibraryName("")));
+  CHECK_FALSE(pb::pluginNameFromLibraryFile("libfoo.so"));
+  CHECK_FALSE(pb::pluginNameFromLibraryFile("readme.txt"));
+}
+
+TEST_CASE("plugins: discover every plugin in the search dirs") {
+  pbtest::TempDir a, b;
+  pbtest::writeFile(a.path / pb::sharedLibraryName("video"), "x");
+  pbtest::writeFile(a.path / pb::sharedLibraryName("heif"), "x");
+  pbtest::writeFile(a.path / "other.txt", "x");
+  fs::create_directories(a.path / pb::sharedLibraryName("folder"));
+  pbtest::writeFile(b.path / pb::sharedLibraryName("video"), "x");  // found once
+  pbtest::writeFile(b.path / pb::sharedLibraryName("maptiles"), "x");
+  CHECK(pb::discoverPlugins({a.path, "/nonexistent", b.path}) ==
+        std::vector<std::string>{"heif", "maptiles", "video"});
+  CHECK(pb::discoverPlugins({}).empty());
+}
+
+TEST_CASE("plugins: test fakes are not in the plugin folder") {
+  // --all-plugins loads everything in the plugin folder; the fakes live elsewhere.
+  const auto names = pb::discoverPlugins({fs::path(PB_TEST_PLUGIN_DIR)});
+  CHECK(std::find(names.begin(), names.end(), "testfake") == names.end());
+  CHECK_FALSE(pb::discoverPlugins({fs::path(PB_TEST_FAKE_PLUGIN_DIR)}).empty());
+}
+
 TEST_CASE("plugins: missing plugin is a readable error") {
   pb::PluginHost host;
   auto err = host.load("nosuchplugin", {fs::path(PB_TEST_PLUGIN_DIR)});
@@ -164,14 +193,14 @@ TEST_CASE("plugins: built-in formats come first and join the signature") {
   FakeHandler builtin;
   pb::PluginHost host;
   host.addBuiltinFormat(".png", &builtin, "core png 1");
-  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));
   CHECK(host.formats().signature() == ".fake .png (core png 1, testfake 1.0)");
   CHECK(host.formats().find("a.PNG") == &builtin);
 }
 
 TEST_CASE("plugins: parse_exif gives plugins date and GPS") {
   pb::PluginHost host;
-  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));
   const pb::MediaHandler* h = host.formats().find("x.fake");
   REQUIRE(h);
   pbtest::TempDir dir;
@@ -189,8 +218,8 @@ TEST_CASE("plugins: parse_exif gives plugins date and GPS") {
 
 TEST_CASE("plugins: load the test plugin and use its formats and players") {
   pb::PluginHost host;
-  REQUIRE_FALSE(host.load("testfake", {"/nonexistent", fs::path(PB_TEST_PLUGIN_DIR)}));
-  CHECK_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));  // twice is fine
+  REQUIRE_FALSE(host.load("testfake", {"/nonexistent", fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));
+  CHECK_FALSE(host.load("testfake", {fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));  // twice is fine
   REQUIRE(host.plugins().size() == 1);
   CHECK(host.plugins()[0].name == "testfake");
   CHECK(host.plugins()[0].extensions == std::vector<std::string>{".fake"});
@@ -244,7 +273,7 @@ TEST_CASE("plugins: tile source from a plugin") {
   pbtest::TempDir dir;
   pb::PluginHost host(nullptr, {}, dir.path / "pbcache");
   CHECK_FALSE(host.tileSource());
-  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));
   CHECK(fs::is_directory(dir.path / "pbcache"));
   const pb::TileSource* src = host.tileSource();
   REQUIRE(src);
@@ -263,7 +292,7 @@ TEST_CASE("plugins: tile source from a plugin") {
 
 TEST_CASE("plugins: tile source results are validated") {
   pb::PluginHost host;
-  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));
   const pb::TileSource* src = host.tileSource();
   REQUIRE(src);
   CHECK(src->get(5, 0, 0).status == pb::TileStatus::Missing);
@@ -274,14 +303,14 @@ TEST_CASE("plugins: tile source results are validated") {
 
 TEST_CASE("plugins: settings reach the plugin") {
   pb::PluginHost host(nullptr, {{"testfake", {{"mode", "offline"}}}});
-  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));
   REQUIRE(host.tileSource());
   CHECK(host.tileSource()->get(1, 0, 0).status == pb::TileStatus::Offline);
 }
 
 TEST_CASE("plugins: a v1-sized plugin table has no tile source") {
   pb::PluginHost host;
-  REQUIRE_FALSE(host.load("testfake_v1", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  REQUIRE_FALSE(host.load("testfake_v1", {fs::path(PB_TEST_FAKE_PLUGIN_DIR)}));
   REQUIRE(host.plugins().size() == 1);
   CHECK(host.plugins()[0].name == "testfake_v1");
   CHECK_FALSE(host.tileSource());

@@ -271,14 +271,17 @@ plugin as a `MediaHandler` (§13), so the core gains no codec dependencies.
 **Principle.** The core stays small and fast: only SDL3, OpenGL and libjpeg-turbo (plus vendored stb_image for the built-in PNG format).
 Any larger feature, especially one that brings a new dependency, is a **plugin**: a
 shared library that is loaded only when the user asks for it with `--plugin <name|path>`
-(repeatable). The application never links against, names, or special-cases a plugin;
-without `--plugin` no plugin code is loaded at all, and a build without a plugin's
+(repeatable) or `--all-plugins` (every `libpb_*` library in the plugin folders, sorted by
+name, after any `--plugin` ones; failures are warnings). The application never links
+against, names, or special-cases a plugin; without either option no plugin code is
+loaded at all, and a build without a plugin's
 dependencies simply doesn't build that plugin.
 
 **Where plugins live.** Source in `plugins/<name>/`; built into `<build>/plugins/` as
 `libpb_<name>.so` (`pb_<name>.dll`, `libpb_<name>.dylib`). `--plugin video` looks in
 `plugins/` next to the executable, then next to it; anything containing a path
-separator or ending in a library extension is used as a path.
+separator or ending in a library extension is used as a path. The test fakes are built
+into `<build>/test_plugins/` instead, so `--all-plugins` never picks them up.
 
 **ABI: plain C** (`src/plugin/photobrowse_plugin.h`), so plugins can be built with a
 different compiler or C++ runtime (important on Windows), and the ABI stays stable while

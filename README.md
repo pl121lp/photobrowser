@@ -55,6 +55,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | `--stats` | start with the F3 stats display on |
 | `--bench` | fullscreen scripted pan/zoom tour; prints frame-time percentiles and exits |
 | `--plugin <name\|path>` | load a plugin, e.g. `--plugin video` (repeatable; see [Plugins](#plugins)) |
+| `--all-plugins` | load every plugin in the `plugins/` folder (after any `--plugin` ones); one that fails to load is skipped with a warning |
 | `--snapshot <file.jpg>` | save the settled start view (or the end of `--bench`) and exit |
 
 The first run on a folder indexes it (progress in the window title): dates and the
@@ -165,7 +166,7 @@ mistakes in the settings file are reported with the line number.
 
 The core stays small; optional features with their own dependencies are plugins
 (shared libraries in `build/<preset>/plugins/`), loaded only when named on the command
-line. Design and API: [docs/architecture.md §13](docs/architecture.md#13-plugins).
+line, or all at once with `--all-plugins`. Design and API: [docs/architecture.md §13](docs/architecture.md#13-plugins).
 
 | Plugin | Needs | What it does |
 |---|---|---|

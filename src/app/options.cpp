@@ -22,6 +22,8 @@ std::string usage() {
          "  --bench               run a scripted pan/zoom benchmark, print frame times, exit\n"
          "  --plugin <name|path>  load a plugin, e.g. --plugin video (repeatable); a name is\n"
          "                        looked up in the plugins/ folder next to the program\n"
+         "  --all-plugins         load every plugin in that folder (after any --plugin ones);\n"
+         "                        one that fails to load is skipped with a warning\n"
          "  --snapshot <file.jpg> save the start view (or the end of --bench) as JPEG and exit\n"
          "  --help                show this help\n"
          "\n"
@@ -68,6 +70,8 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv) {
       auto v = value();
       if (!v || v->empty()) return std::string("--plugin needs a plugin name or file");
       o.plugins.push_back(*v);
+    } else if (a == "--all-plugins") {
+      o.allPlugins = true;
     } else if (a == "--windowed") {
       o.windowed = true;
     } else if (a == "--stats") {

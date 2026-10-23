@@ -122,4 +122,7 @@ class PluginHost {
 std::vector<std::filesystem::path> pluginCandidates(const std::string& nameOrPath,
                                                     const std::vector<std::filesystem::path>& searchDirs);
 
+// Names of the plugin libraries in searchDirs (--all-plugins), sorted, each once.
+std::vector<std::string> discoverPlugins(const std::vector<std::filesystem::path>& searchDirs);
+
 }  // namespace pb

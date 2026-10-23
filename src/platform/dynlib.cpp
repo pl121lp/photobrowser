@@ -39,4 +39,15 @@ std::string sharedLibraryName(const std::string& name) { return "libpb_" + name 
 #endif
 #endif
 
+std::optional<std::string> pluginNameFromLibraryFile(const std::string& fileName) {
+  const std::string pattern = sharedLibraryName("*");
+  const std::string prefix = pattern.substr(0, pattern.find('*'));
+  const std::string suffix = pattern.substr(pattern.find('*') + 1);
+  if (fileName.size() <= prefix.size() + suffix.size() || !fileName.starts_with(prefix) ||
+      !fileName.ends_with(suffix)) {
+    return std::nullopt;
+  }
+  return fileName.substr(prefix.size(), fileName.size() - prefix.size() - suffix.size());
+}
+
 }  // namespace pb

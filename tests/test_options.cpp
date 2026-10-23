@@ -83,6 +83,11 @@ TEST_CASE("options: plugins") {
   CHECK(std::get<pb::Options>(r).plugins == std::vector<std::string>{"video", "/x/libpb_other.so"});
   CHECK(std::holds_alternative<std::string>(parse({"--plugin"})));
   CHECK(std::get<pb::Options>(parse({})).plugins.empty());
+  CHECK_FALSE(std::get<pb::Options>(parse({})).allPlugins);
+  auto all = parse({"--all-plugins", "--plugin", "video"});
+  REQUIRE(std::holds_alternative<pb::Options>(all));
+  CHECK(std::get<pb::Options>(all).allPlugins);
+  CHECK(std::get<pb::Options>(all).plugins == std::vector<std::string>{"video"});
 }
 
 TEST_CASE("options: help lists the plugins and how to combine them") {
@@ -91,4 +96,5 @@ TEST_CASE("options: help lists the plugins and how to combine them") {
   CHECK(u.find("video") != std::string::npos);
   CHECK(u.find("heif ") != std::string::npos);
   CHECK(u.find("--plugin heif --plugin video --plugin maptiles") != std::string::npos);
+  CHECK(u.find("--all-plugins") != std::string::npos);
 }

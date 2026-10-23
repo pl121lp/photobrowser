@@ -89,6 +89,7 @@ target_link_libraries(pb_core PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
 # when installed). They include only src/plugin/photobrowse_plugin.h and never link
 # against the application.
 set(PB_PLUGIN_DIR "${CMAKE_BINARY_DIR}/plugins")
+set(PB_TEST_FAKE_PLUGIN_DIR "${CMAKE_BINARY_DIR}/test_plugins")
 add_custom_target(photobrowse_plugins)  # builds every enabled plugin
 function(pb_add_plugin target name)
   add_library(${target} MODULE ${ARGN})
@@ -140,10 +141,15 @@ target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
 target_compile_definitions(pb_tests PRIVATE PB_TEST_PHOTOS_DIR="${CMAKE_SOURCE_DIR}/photos"
                                            PB_TEST_PLUGIN_DIR="${PB_PLUGIN_DIR}"
+                                           PB_TEST_FAKE_PLUGIN_DIR="${PB_TEST_FAKE_PLUGIN_DIR}"
                                            PB_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 pb_add_plugin(pb_test_plugin testfake tests/plugins/test_plugin.c)
 pb_add_plugin(pb_test_plugin_v1 testfake_v1 tests/plugins/test_plugin.c)  # version-1-sized table
 target_compile_definitions(pb_test_plugin_v1 PRIVATE PB_TEST_V1_SIZE)
+# Fakes live outside the plugin folder, so --all-plugins never loads them.
+set_target_properties(pb_test_plugin pb_test_plugin_v1 PROPERTIES
+  LIBRARY_OUTPUT_DIRECTORY "${PB_TEST_FAKE_PLUGIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${PB_TEST_FAKE_PLUGIN_DIR}")
 add_dependencies(pb_tests pb_test_plugin pb_test_plugin_v1)
 add_test(NAME pb_tests COMMAND pb_tests)
 
