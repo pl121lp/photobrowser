@@ -5,6 +5,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <vector>
 
 #include "core/geom.h"
 #include "library/exif.h"
@@ -61,6 +62,13 @@ class MapView {
   void tileResults(std::span<const TileStatus> results);
   std::optional<MapNotice> takeNotice();
 
+  const std::vector<Vec2d>& dots() const { return dots_; }  // world positions, deduplicated
+  bool singleMode() const { return single_; }
+  std::optional<double> pulse(double t) const;  // halo phase 0..1 while pulsing
+  std::string_view status() const;              // "" or why there are no dots
+  bool dimmed() const { return !status().empty(); }
+  bool animating(double t) const;               // needs redrawing (sliding, moving, pulsing, refit due)
+
   MapCamera& camera() { return cam_; }
   const MapCamera& camera() const { return cam_; }
 
@@ -68,6 +76,9 @@ class MapView {
   void setOpen(bool open, double t);
   double panelWidth(Vec2d window) const;
   Vec2d toPanel(Vec2d px) const;
+  void updateSingle(double t, const Subject& s);
+  void updateGrid(double t, const Subject& s);
+  std::optional<MapCamera::View> fit() const;
 
   MapSettings settings_;
   MapCamera cam_;
@@ -76,6 +87,20 @@ class MapView {
   double slide_ = 0;
   Vec2d window_;
   bool captured_ = false;
+
+  // What the map shows.
+  bool starting_ = false;  // opened: place the camera on the next update
+  bool single_ = false;
+  std::optional<uint32_t> photo_;
+  std::vector<Vec2d> dots_;
+  bool noDots_ = false;
+  bool pulsePending_ = false;
+  double pulseStart_ = -1e9;
+  double lastGridMove_ = -1e9;
+  bool refitDue_ = false;
+  std::vector<Vec2d> fitted_;         // dots the view was last fitted to
+  bool fitPaused_ = false;            // the user moved the map ...
+  std::vector<Vec2d> pausedDots_;     // ... while these dots were shown
 
   // Errors: until the first good tile after opening, only offline results means no internet.
   bool probing_ = false;

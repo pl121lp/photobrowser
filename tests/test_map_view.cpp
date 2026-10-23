@@ -163,3 +163,183 @@ TEST_CASE("map view: refused posts its message once") {
   f.map.tileResults(quiet);
   CHECK_FALSE(f.map.takeNotice());
 }
+
+namespace {
+const pb::GeoPos kOslo{59.9139, 10.7522, {}};
+const pb::GeoPos kBergen{60.3913, 5.3221, {}};
+const pb::GeoPos kRome{41.9028, 12.4964, {}};
+
+void checkCentre(const pb::MapView& m, const pb::GeoPos& p) {
+  const pb::GeoPos c = pb::toLatLon(m.camera().center);
+  CHECK(c.lat == doctest::Approx(p.lat).epsilon(1e-9));
+  CHECK(c.lon == doctest::Approx(p.lon).epsilon(1e-9));
+}
+}  // namespace
+
+TEST_CASE("map view: opening on a photo starts at zoom 4 and flies to photo zoom") {
+  Fixture f;
+  f.subject.photo = 7;
+  f.subject.photoGps = kOslo;
+  f.map.toggle(f.t, &f.source);
+  f.step();
+  CHECK(f.map.singleMode());
+  CHECK(f.map.camera().zoom == doctest::Approx(4).epsilon(0.01));
+  checkCentre(f.map, kOslo);
+  CHECK(f.map.dots().size() == 1);
+  CHECK(f.map.status().empty());
+  f.run(3.5);
+  CHECK(f.map.camera().zoom == doctest::Approx(15));
+  checkCentre(f.map, kOslo);
+  CHECK(f.map.pulse(f.t));
+  CHECK(f.map.animating(f.t));
+  f.run(2.1);
+  CHECK_FALSE(f.map.pulse(f.t));
+  CHECK_FALSE(f.map.animating(f.t));
+}
+
+TEST_CASE("map view: changing photo flies to the next location, even after a manual pan") {
+  Fixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.run(3.5);
+  CHECK(f.map.pointerDown({900, 400}, f.t));
+  f.map.pointerMove({800, 300}, f.t + 0.5);
+  f.map.pointerUp({800, 300}, f.t + 1);
+  f.run(1);
+  f.subject.photo = 2;
+  f.subject.photoGps = kBergen;
+  f.step();
+  CHECK(f.map.camera().flying());
+  f.run(3.1);
+  checkCentre(f.map, kBergen);
+  CHECK(f.map.camera().zoom == doctest::Approx(15));
+}
+
+TEST_CASE("map view: photo without GPS keeps the view, dimmed with a message") {
+  Fixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.run(3.5);
+  const pb::Vec2d c = f.map.camera().center;
+  f.subject.photo = 2;
+  f.subject.photoGps.reset();
+  f.run(1);
+  CHECK(f.map.camera().center == c);
+  CHECK(f.map.status() == "No location for this photo");
+  CHECK(f.map.dimmed());
+  CHECK(f.map.dots().empty());
+  f.subject.photo = 3;
+  f.subject.photoGps = kRome;
+  f.run(3.2);
+  checkCentre(f.map, kRome);
+  CHECK_FALSE(f.map.dimmed());
+}
+
+TEST_CASE("map view: grid dots are the visible photos, deduplicated") {
+  Fixture f;
+  const std::vector<pb::GeoPos> gps = {kOslo, kBergen, kOslo};
+  f.subject.visibleGps = gps;
+  f.open();
+  CHECK_FALSE(f.map.singleMode());
+  CHECK(f.map.dots().size() == 2);
+  // Opened onto the fit at once: both inside the panel.
+  for (const pb::Vec2d& d : f.map.dots()) {
+    const pb::Vec2d s = f.map.camera().worldToScreen(d);
+    CHECK(s.x >= 0);
+    CHECK(s.x <= 400);
+  }
+}
+
+TEST_CASE("map view: auto-fit waits for 300 ms of grid rest") {
+  Fixture f;
+  const std::vector<pb::GeoPos> first = {kOslo, kBergen}, second = {kRome};
+  f.subject.visibleGps = first;
+  f.open();
+  const pb::Vec2d c = f.map.camera().center;
+  f.subject.visibleGps = second;
+  f.subject.gridMoving = true;
+  f.run(1);
+  CHECK(f.map.dots().size() == 1);  // dots follow every frame
+  CHECK(f.map.camera().center == c);
+  f.subject.gridMoving = false;
+  f.run(0.2);
+  CHECK(f.map.camera().center == c);
+  CHECK(f.map.animating(f.t));  // waiting to refit
+  f.run(0.15);
+  CHECK(f.map.camera().flying());
+  f.run(3.1);
+  checkCentre(f.map, kRome);
+  CHECK(f.map.camera().zoom == doctest::Approx(15));  // one dot: photo zoom
+}
+
+TEST_CASE("map view: manual map move pauses auto-fit until the visible set changes") {
+  Fixture f;
+  const std::vector<pb::GeoPos> first = {kOslo, kBergen}, second = {kRome, kOslo};
+  f.subject.visibleGps = first;
+  f.open();
+  f.map.wheel({800, 400}, 2);
+  f.run(1);
+  const pb::Vec2d moved = f.map.camera().center;
+  f.subject.gridMoving = true;  // the grid moves but shows the same located photos
+  f.run(0.2);
+  f.subject.gridMoving = false;
+  f.run(1);
+  CHECK(f.map.camera().center == moved);
+  f.subject.visibleGps = second;
+  f.subject.gridMoving = true;
+  f.run(0.2);
+  f.subject.gridMoving = false;
+  f.run(0.4);
+  CHECK(f.map.camera().flying());
+}
+
+TEST_CASE("map view: no visible locations shows a message") {
+  Fixture f;
+  f.open();
+  CHECK(f.map.status() == "No locations among the visible photos");
+  CHECK(f.map.dimmed());
+  CHECK(f.map.camera().zoom == 2);
+  CHECK_FALSE(f.map.animating(f.t));
+}
+
+TEST_CASE("map view: switching photo to grid and back keeps the map open") {
+  Fixture f;
+  const std::vector<pb::GeoPos> grid = {kOslo, kBergen, kRome};
+  f.subject.visibleGps = grid;
+  f.open();
+  CHECK(f.map.dots().size() == 3);
+  f.subject.photo = 4;
+  f.subject.photoGps = kBergen;
+  f.step();
+  CHECK(f.map.singleMode());
+  CHECK(f.map.dots().size() == 1);
+  CHECK(f.map.camera().flying());
+  f.run(3.2);
+  f.subject.photo.reset();
+  f.subject.photoGps.reset();
+  f.run(0.5);
+  CHECK(f.map.isOpen());
+  CHECK_FALSE(f.map.singleMode());
+  CHECK(f.map.dots().size() == 3);
+  CHECK(f.map.camera().flying());  // refits to the grid's photos
+}
+
+TEST_CASE("map view: non-finite photo positions are ignored") {
+  Fixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = pb::GeoPos{NAN, 10, {}};
+  f.open();
+  CHECK(f.map.status() == "No location for this photo");
+  CHECK(std::isfinite(f.map.camera().center.x));
+  CHECK(std::isfinite(f.map.camera().center.y));
+  f.subject.photo.reset();
+  f.subject.photoGps.reset();
+  const std::vector<pb::GeoPos> gps = {kOslo, pb::GeoPos{INFINITY, 1, {}}};
+  f.subject.visibleGps = gps;
+  f.run(0.5);
+  CHECK(f.map.dots().size() == 1);
+  CHECK(std::isfinite(f.map.camera().center.x));
+  CHECK(std::isfinite(f.map.camera().zoom));
+}

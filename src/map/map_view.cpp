@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "map/mercator.h"
+
 namespace pb {
 
 std::string_view mapNoticeText(MapNotice n) {
@@ -23,6 +25,7 @@ void MapView::setOpen(bool open, double t) {
   if (open) {
     probing_ = true;
     probeOffline_ = 0;
+    starting_ = true;
   }
 }
 
@@ -86,12 +89,81 @@ bool MapView::wheel(Vec2d px, double notches) {
   return true;
 }
 
-void MapView::update(double t, double dt, Vec2d window, double uiScale, const Subject& /*s*/, size_t tilesPending) {
+std::optional<MapCamera::View> MapView::fit() const {
+  return MapCamera::fitView(dots_, cam_.viewport, cam_.uiScale, kPadding, kGridMaxZoom, settings_.photoZoom,
+                            cam_.minZoom);
+}
+
+void MapView::updateSingle(double t, const Subject& s) {
+  const std::optional<Vec2d> at = s.photoGps ? toWorld(*s.photoGps) : std::nullopt;
+  const bool changed = !single_ || photo_ != s.photo || starting_;
+  single_ = true;
+  photo_ = s.photo;
+  dots_.clear();
+  if (at) dots_.push_back(*at);
+  if (!changed || !at) return;
+  if (starting_) cam_.jumpTo(*at, kOpenZoom);
+  cam_.flyTo(*at, settings_.photoZoom, t);
+  pulsePending_ = true;
+  pulseStart_ = -1e9;
+}
+
+void MapView::updateGrid(double t, const Subject& s) {
+  if (single_) {  // back from a photo: fit the grid's photos once it rests
+    fitted_.clear();
+    fitPaused_ = false;
+  }
+  single_ = false;
+  photo_.reset();
+  pulsePending_ = false;
+  dots_.clear();
+  for (const GeoPos& g : s.visibleGps) {
+    if (auto w = toWorld(g)) dots_.push_back(*w);
+  }
+  std::sort(dots_.begin(), dots_.end(), [](Vec2d a, Vec2d b) { return a.x != b.x ? a.x < b.x : a.y < b.y; });
+  dots_.erase(std::unique(dots_.begin(), dots_.end()), dots_.end());
+
+  if (starting_) {
+    const auto v = fit();
+    cam_.jumpTo(v ? v->center : Vec2d{0.5, 0.5}, v ? v->zoom : cam_.minZoom);
+    fitted_ = dots_;
+    fitPaused_ = false;
+    return;
+  }
+  if (cam_.takeUserMoved()) {
+    fitPaused_ = true;
+    pausedDots_ = dots_;
+  }
+  if (fitPaused_ && dots_ != pausedDots_) fitPaused_ = false;
+  if (s.gridMoving) lastGridMove_ = t;
+  refitDue_ = !fitPaused_ && !dots_.empty() && dots_ != fitted_;
+  if (refitDue_ && !s.gridMoving && t - lastGridMove_ >= kRestS) {
+    if (const auto v = fit()) cam_.flyTo(v->center, v->zoom, t);
+    fitted_ = dots_;
+    refitDue_ = false;
+  }
+}
+
+void MapView::update(double t, double dt, Vec2d window, double uiScale, const Subject& s, size_t tilesPending) {
   window_ = window;
   slide_ = std::clamp(slideTween_.value(t), 0.0, 1.0);
   cam_.viewport = {panelWidth(window), window.y};
   cam_.uiScale = uiScale;
+  if (open_) {
+    if (s.photo) {
+      updateSingle(t, s);
+    } else {
+      updateGrid(t, s);
+    }
+    starting_ = false;
+    noDots_ = dots_.empty();
+  }
   cam_.update(t, dt);
+  if (single_) cam_.takeUserMoved();  // manual moves are not sticky with a single photo
+  if (pulsePending_ && cam_.idle()) {
+    pulsePending_ = false;
+    pulseStart_ = t;
+  }
 
   if (open_ && probing_ && probeOffline_ > 0 && tilesPending == 0) {
     probing_ = false;
@@ -122,6 +194,21 @@ void MapView::tileResults(std::span<const TileStatus> results) {
       case TileStatus::Error: break;
     }
   }
+}
+
+std::optional<double> MapView::pulse(double t) const {
+  const double e = t - pulseStart_;
+  if (e < 0 || e >= kPulseS || !single_ || dots_.empty()) return std::nullopt;
+  return e - std::floor(e);
+}
+
+std::string_view MapView::status() const {
+  if (!noDots_) return {};
+  return single_ ? "No location for this photo" : "No locations among the visible photos";
+}
+
+bool MapView::animating(double t) const {
+  return !slideTween_.done(t) || !cam_.idle() || pulsePending_ || pulse(t) || (open_ && refitDue_);
 }
 
 std::optional<MapNotice> MapView::takeNotice() {
