@@ -196,7 +196,7 @@ TEST_CASE("help: lists every key binding in printable ASCII") {
     return std::any_of(entries.begin(), entries.end(), [&](const pb::HelpEntry& e) { return e.key == key; });
   };
   for (auto key : {"F1", "F2", "F3", "F5", "F6", "F11 / F", "Arrows", "+ / -", "Home", "Enter", "Esc", "Q", "Drag",
-                   "Wheel", "Double-click", "Right-click"}) {
+                   "Wheel", "Double-click", "Right-click", "M", "On the map"}) {
     CHECK_MESSAGE(has(key), key);
   }
   for (const auto& e : entries) {
@@ -293,7 +293,80 @@ TEST_CASE("photo info: GPS line with hemispheres and altitude") {
   p.gps = pb::GeoPos{40.752153, -73.98535, 64.4};
   auto lines = pb::photoInfoLines(p);
   REQUIRE(lines.size() == 5);
-  CHECK(lines[4] == "GPS 40.75215 N, 73.98535 W  64 m");
+  CHECK(lines[4] == "GPS 40.75215\u00b0 N, 73.98535\u00b0 W  64 m");
   p.gps = pb::GeoPos{-33.875, 151.21, std::nullopt};
-  CHECK(pb::photoInfoLines(p)[4] == "GPS 33.87500 S, 151.21000 E");
+  CHECK(pb::photoInfoLines(p)[4] == "GPS 33.87500\u00b0 S, 151.21000\u00b0 E");
+}
+
+namespace {
+// kFont plus the two extra glyphs after '~' (the solid cell moves behind them).
+const char32_t kExtras[] = {0xA9, 0xB0};
+const pb::FontInfo kFontX{13, 25, 208, 150, 16, 32, 126, 97, kExtras, 2, 95};
+
+void checkSameCell(const pb::OverlayQuad& a, std::string_view ascii) {
+  std::vector<pb::OverlayQuad> e;
+  pb::layoutText(ascii, {0, 0}, 1.0, kWhite, kFontX, e);
+  REQUIRE(e.size() == 1);
+  CHECK(a.uv.u0 == e[0].uv.u0);
+  CHECK(a.uv.v0 == e[0].uv.v0);
+}
+}  // namespace
+
+TEST_CASE("overlay: UTF-8 text uses the extra glyphs") {
+  std::vector<pb::OverlayQuad> q;
+  pb::layoutText("\u00a9 2\u00b0", {0, 0}, 1.0, kWhite, kFontX, q);
+  REQUIRE(q.size() == 3);
+  const float cellU = 13.0f / 208, cellV = 25.0f / 150;
+  // Cell 95 (column 15, row 5) and 96 (column 0, row 6).
+  CHECK(q[0].uv.u0 == doctest::Approx(15 * cellU + 0.5f / 208));
+  CHECK(q[0].uv.v0 == doctest::Approx(5 * cellV + 0.5f / 150));
+  checkSameCell(q[1], "2");
+  CHECK(q[2].uv.u0 == doctest::Approx(0.5f / 208));
+  CHECK(q[2].uv.v0 == doctest::Approx(6 * cellV + 0.5f / 150));
+  CHECK(q[1].rect.x0 == 2 * 13);  // columns count characters, not bytes
+  CHECK(q[2].rect.x0 == 3 * 13);
+  q.clear();
+  pb::layoutText("\u00e9x\xff", {0, 0}, 1.0, kWhite, kFontX, q);  // unknown character, then a malformed byte
+  REQUIRE(q.size() == 3);
+  checkSameCell(q[0], "?");
+  checkSameCell(q[1], "x");
+  checkSameCell(q[2], "?");
+  CHECK(q[1].rect.x0 == 13);
+  CHECK(pb::textColumns("\u00a9 2\u00b0") == 4);
+}
+
+TEST_CASE("overlay: message panel is centred near the top") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Rect panel = pb::buildMessage("Map tile server refused requests", kFont, 2.0, {1920, 1080}, q);
+  CHECK(panel.center().x == doctest::Approx(960));
+  CHECK(panel.y0 == doctest::Approx(48 * 2));
+  CHECK(q.size() == 1 + 28);
+  CHECK(q[0].rect == panel);
+}
+
+TEST_CASE("overlay: map status is centred in the panel") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Rect area{1152, 0, 1920, 1080};
+  const pb::Rect panel = pb::buildMapStatus("No location for this photo", kFont, 1.0, area, q);
+  CHECK(panel.center().x == doctest::Approx(area.center().x));
+  CHECK(panel.center().y == doctest::Approx(area.center().y));
+  CHECK(panel.width() < area.width());
+}
+
+TEST_CASE("overlay: attribution sits in the panel's bottom-right corner") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Rect area{1152, 0, 1920, 1080};
+  const pb::Rect panel = pb::buildAttribution("\u00a9 OpenStreetMap contributors", kFontX, 2.0, area, q);
+  CHECK(panel.x1 == doctest::Approx(area.x1 - 8));
+  CHECK(panel.y1 == doctest::Approx(area.y1 - 8));
+  CHECK(panel.x0 > area.x0);
+  CHECK(q[0].color[3] < 1);
+  REQUIRE(q.size() == 1 + 26);  // panel + visible characters, the © included
+  CHECK(q[1].rect.height() == doctest::Approx(25 * 2 * 0.75));
+}
+
+TEST_CASE("overlay: photo effect label right edge follows the given viewport") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Rect panel = pb::buildPhotoEffectLabel("1: Sharpen", kFont, 1.5, {600, 800}, q);
+  CHECK(panel.x1 == doctest::Approx(600 - 16 * 1.5));
 }

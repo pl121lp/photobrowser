@@ -18,6 +18,9 @@ struct FontInfo {
   int cols;              // cells per atlas row
   int firstChar, lastChar;
   int solidIndex;        // a fully covered cell, for filled rectangles
+  const char32_t* extraChars = nullptr;  // characters beyond ASCII (e.g. © °), in cells ...
+  int extraCount = 0;
+  int extraFirstIndex = 0;               // ... from this one on
 };
 
 struct OverlayQuad {
@@ -35,9 +38,12 @@ struct OverlayStats {
   double tilePx = 0;  // on-screen size of one photo
 };
 
-// Appends one quad per visible character (unknown characters show as '?').
+// Appends one quad per visible character of UTF-8 `text` (unknown characters show as '?').
 void layoutText(std::string_view text, Vec2d origin, double scale, const float color[4], const FontInfo& font,
                 std::vector<OverlayQuad>& out);
+
+// Characters (columns) `text` takes: UTF-8 code points, a malformed byte counting as one.
+size_t textColumns(std::string_view text);
 
 std::vector<std::string> overlayLines(const OverlayStats& s);
 // Window-title form of the stats, for windowed mode (UTF-8).
@@ -71,6 +77,16 @@ std::string photoEffectLabel(int effect);
 // One-line label panel in the top-right corner of a `viewport`-sized screen. Returns the panel rect.
 Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double scale, Vec2d viewport,
                            std::vector<OverlayQuad>& out);
+
+// A notice (e.g. "Map unavailable: ...") centred near the top of a `viewport`-sized screen.
+Rect buildMessage(std::string_view text, const FontInfo& font, double scale, Vec2d viewport,
+                  std::vector<OverlayQuad>& out);
+// A message centred in `area` (the map panel). Returns the panel rect.
+Rect buildMapStatus(std::string_view text, const FontInfo& font, double scale, const Rect& area,
+                    std::vector<OverlayQuad>& out);
+// Small attribution text in the bottom-right corner of `area` (the map panel).
+Rect buildAttribution(std::string_view text, const FontInfo& font, double scale, const Rect& area,
+                      std::vector<OverlayQuad>& out);
 
 // Help (F1): every key and mouse binding. An entry with an empty key and action is a gap.
 struct HelpEntry {

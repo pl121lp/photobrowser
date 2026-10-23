@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Bakes printable ASCII (32..126) from a TTF into src/gfx/font_data.h.
+"""Bakes printable ASCII (32..126) and a few extra characters (EXTRA: the copyright and
+degree signs) from a TTF into src/gfx/font_data.h.
 
-The atlas is a grid of fixed cells, one byte of coverage per texel. The cell after
-'~' is solid (used to draw filled rectangles with the same texture).
+The atlas is a grid of fixed cells, one byte of coverage per texel: ASCII, then the
+extra characters, then a solid cell (used to draw filled rectangles with the same
+texture).
 
     python3 tools/gen_font.py /usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf
 """
@@ -14,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 FONT_PX = 20
 COLS = 16
 FIRST, LAST = 32, 126
+EXTRA = [0xA9, 0xB0]  # (c) and degree sign
 
 
 def main() -> int:
@@ -22,12 +25,13 @@ def main() -> int:
     ascent, descent = font.getmetrics()
     cell_w = int(round(font.getlength("M"))) + 1
     cell_h = ascent + descent + 1
-    count = LAST - FIRST + 2  # + solid cell
+    chars = list(range(FIRST, LAST + 1)) + EXTRA
+    count = len(chars) + 1  # + solid cell
     rows = (count + COLS - 1) // COLS
     w, h = COLS * cell_w, rows * cell_h
     img = Image.new("L", (w, h), 0)
     draw = ImageDraw.Draw(img)
-    for i, code in enumerate(range(FIRST, LAST + 1)):
+    for i, code in enumerate(chars):
         x, y = (i % COLS) * cell_w, (i // COLS) * cell_h
         draw.text((x, y), chr(code), font=font, fill=255)
     solid = count - 1
@@ -46,6 +50,8 @@ def main() -> int:
         f"inline constexpr uint32_t kCellW = {cell_w}, kCellH = {cell_h}, kCols = {COLS};",
         f"inline constexpr uint32_t kAtlasW = {w}, kAtlasH = {h};",
         f"inline constexpr int kFirstChar = {FIRST}, kLastChar = {LAST}, kSolidIndex = {solid};",
+        "inline constexpr char32_t kExtraChars[] = {" + ", ".join(hex(c) for c in EXTRA) + "};",
+        f"inline constexpr int kExtraCount = {len(EXTRA)}, kExtraFirstIndex = {LAST - FIRST + 1};",
         "inline constexpr uint8_t kAtlas[] = {",
     ]
     for i in range(0, len(data), 24):

@@ -12,7 +12,8 @@ constexpr int kFloatsPerQuad = 12;
 
 FontInfo OverlayRenderer::font() {
   return {float(font::kCellW), float(font::kCellH), float(font::kAtlasW), float(font::kAtlasH), int(font::kCols),
-          font::kFirstChar,    font::kLastChar,     font::kSolidIndex};
+          font::kFirstChar,    font::kLastChar,     font::kSolidIndex,   font::kExtraChars,
+          font::kExtraCount,   font::kExtraFirstIndex};
 }
 
 OverlayRenderer::~OverlayRenderer() {
