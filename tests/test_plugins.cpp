@@ -159,6 +159,15 @@ TEST_CASE("plugins: missing plugin is a readable error") {
   CHECK(host.formats().signature().empty());
 }
 
+TEST_CASE("plugins: built-in formats come first and join the signature") {
+  FakeHandler builtin;
+  pb::PluginHost host;
+  host.addBuiltinFormat(".png", &builtin, "core png 1");
+  REQUIRE_FALSE(host.load("testfake", {fs::path(PB_TEST_PLUGIN_DIR)}));
+  CHECK(host.formats().signature() == ".fake .png (core png 1, testfake 1.0)");
+  CHECK(host.formats().find("a.PNG") == &builtin);
+}
+
 TEST_CASE("plugins: load the test plugin and use its formats and players") {
   pb::PluginHost host;
   REQUIRE_FALSE(host.load("testfake", {"/nonexistent", fs::path(PB_TEST_PLUGIN_DIR)}));

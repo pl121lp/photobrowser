@@ -4,6 +4,7 @@
 
 #include "library/exif.h"
 #include "library/indexer.h"
+#include "library/png_handler.h"
 #include "library/scanner.h"
 #include "platform/paths.h"
 #include "test_util.h"
@@ -88,4 +89,39 @@ TEST_CASE("indexer: full decode at screen size") {
   auto f = pb::decodeFull(dir / e.relPath, q.rec, 2000);
   REQUIRE(f);
   CHECK(f->h == 2040);  // 1/2 scale
+}
+
+TEST_CASE("indexer: PNG through the built-in handler") {
+  // Big-endian TIFF: IFD0 {ExifIFD ptr}, ExifIFD {DateTimeOriginal}.
+  auto be16 = [](std::vector<uint8_t>& v, uint16_t x) { v.push_back(uint8_t(x >> 8)); v.push_back(uint8_t(x)); };
+  auto be32 = [&](std::vector<uint8_t>& v, uint32_t x) { be16(v, uint16_t(x >> 16)); be16(v, uint16_t(x)); };
+  auto entry = [&](std::vector<uint8_t>& v, uint16_t tag, uint16_t type, uint32_t count, uint32_t value) {
+    be16(v, tag); be16(v, type); be32(v, count); be32(v, value);
+  };
+  std::vector<uint8_t> tiff = {'M', 'M', 0, 42};
+  be32(tiff, 8);
+  be16(tiff, 1);
+  entry(tiff, 0x8769, 4, 1, 26);  // 8 + 2 + 12 + 4
+  be32(tiff, 0);
+  be16(tiff, 1);
+  entry(tiff, 0x9003, 2, 20, 26 + 2 + 12 + 4);
+  be32(tiff, 0);
+  for (char c : std::string("2026:06:16 21:56:20")) tiff.push_back(uint8_t(c));
+  tiff.push_back(0);
+
+  pbtest::TempDir dir;
+  const auto png = pbtest::makePng(300, 200, std::vector<uint8_t>(300 * 200 * 4, 200), tiff);
+  pbtest::writeFile(dir.path / "a.png", std::string(png.begin(), png.end()));
+  static const pb::PngHandler handler;
+  pb::MediaFormats formats;
+  formats.add(".png", &handler, pb::kPngOrigin);
+  const auto scan = pb::scanFolder(dir.path, formats);
+  REQUIRE(scan.size() == 1);
+  const auto q = pb::quickIndex(dir.path, scan[0], formats);
+  CHECK((q.rec.flags & pb::kBroken) == 0);
+  CHECK(q.rec.width == 300);
+  CHECK(q.rec.height == 200);
+  CHECK(q.rec.takenAt == *pb::parseExifDateTime("2026:06:16 21:56:20"));
+  CHECK_FALSE(q.l0.rgba.empty());
+  CHECK_FALSE(q.l1.rgba.empty());
 }

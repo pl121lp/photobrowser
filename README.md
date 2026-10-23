@@ -18,7 +18,7 @@ Design documents: [docs/spec.md](docs/spec.md), [docs/architecture.md](docs/arch
 | libcurl (optional, maptiles plugin) | `sudo apt install libcurl4-openssl-dev` | vcpkg `curl` |
 
 Everything else (doctest, Khronos GL headers, stb_image v2.30 — public domain / MIT) is
-vendored in `third_party/`.
+vendored in `third_party/`. Supported files: JPEG and PNG built in; video, HEIC etc. via plugins.
 Without SDL3/libjpeg-turbo the core library and its tests still build. Plugins build
 only when their dependencies are found (`-DPB_BUILD_PLUGINS=OFF` skips them all); the
 program itself never needs them.

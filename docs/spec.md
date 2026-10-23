@@ -27,7 +27,7 @@ the primary requirement; features come second.
 
 **Non-goals (for now)**
 - Editing, rating, tagging, deleting, moving, or otherwise changing photos.
-- RAW, HEIC, PNG in the core (JPEG only; other formats come from plugins).
+- RAW and HEIC in the core (JPEG and PNG are built in; other formats come from plugins).
 - Network/cloud libraries, multi-user, sharing.
 
 **Anti-goals** (would count as failure even if "working")
@@ -203,6 +203,7 @@ Decided by the user:
 - `[plugin.video] loop = off | on` (default off): on restarts a video at its end. The
   screensaver ignores it (it moves on when a video ends): the host sends the player
   `PB_EVENT_PLAY_ONCE` while the screensaver runs, `PB_EVENT_PLAY_NORMAL` otherwise.
+- PNG is a built-in format (vendored stb_image decoder, EXIF from the eXIf chunk, orientation applied); RAW and HEIC stay out of the core.
 - Map view (`M`): OpenStreetMap raster tiles via a plugin, fly between locations;
   decisions in [map-spec.md §8](map-spec.md).
 

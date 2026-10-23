@@ -91,6 +91,12 @@ class PluginHost {
   // pluginCandidates). Returns an error message on failure.
   std::optional<std::string> load(const std::string& nameOrPath, const std::vector<std::filesystem::path>& searchDirs);
 
+  // Registers a format handled by the application itself. Call before load(), so that a
+  // plugin claiming the same extension does not replace it. `handler` must outlive the host.
+  void addBuiltinFormat(std::string ext, const MediaHandler* handler, std::string origin) {
+    formats_.add(std::move(ext), handler, std::move(origin));
+  }
+
   const std::vector<Info>& plugins() const { return infos_; }
   const MediaFormats& formats() const { return formats_; }
   // Player for a file, or nullptr if no loaded plugin offers live content for it.

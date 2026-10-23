@@ -25,6 +25,7 @@
 #include "imaging/jpeg.h"
 #include "layout/content.h"
 #include "layout/layout.h"
+#include "library/png_handler.h"
 #include "map/map_view.h"
 #include "platform/paths.h"
 #include "plugin/plugin_host.h"
@@ -164,6 +165,8 @@ int App::run(const Options& options) {
   SdlAudio audio;
   auto pluginHost = std::make_unique<PluginHost>(&audio, config.pluginSettings, cacheRoot / "photobrowse");
   PluginHost& plugins = *pluginHost;
+  static const PngHandler pngHandler;  // built in; registered first so no plugin can replace it
+  plugins.addBuiltinFormat(".png", &pngHandler, kPngOrigin);
   if (!options.plugins.empty()) {
     std::vector<fs::path> pluginDirs;
     if (const char* base = SDL_GetBasePath()) pluginDirs = {fromUtf8(base) / "plugins", fromUtf8(base)};

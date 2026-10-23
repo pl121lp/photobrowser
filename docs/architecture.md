@@ -268,7 +268,7 @@ plugin as a `MediaHandler` (§13), so the core gains no codec dependencies.
 
 ## 13. Plugins
 
-**Principle.** The core stays small and fast: only SDL3, OpenGL and libjpeg-turbo.
+**Principle.** The core stays small and fast: only SDL3, OpenGL and libjpeg-turbo (plus vendored stb_image for the built-in PNG format).
 Any larger feature, especially one that brings a new dependency, is a **plugin**: a
 shared library that is loaded only when the user asks for it with `--plugin <name|path>`
 (repeatable). The application never links against, names, or special-cases a plugin;
