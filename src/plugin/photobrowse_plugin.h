@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#define PB_PLUGIN_ABI_VERSION 2u
+#define PB_PLUGIN_ABI_VERSION 3u
 #define PB_PLUGIN_ENTRY_NAME "pb_plugin_entry"
 
 #if defined(_WIN32)
@@ -79,6 +79,11 @@ typedef struct PbMediaInfo {
   uint32_t width, height; /* as displayed (after any rotation), in pixels */
   int64_t taken_at;       /* capture time, seconds since 1970 in local wall-clock time
                            * (like EXIF DateTimeOriginal); 0 = unknown (file time is used) */
+  /* ---- Since version 3 ---- */
+  int32_t has_gps;            /* nonzero: latitude / longitude are set */
+  int32_t has_altitude;       /* nonzero: altitude is set (only with has_gps) */
+  double latitude, longitude; /* WGS 84 degrees, north / east positive */
+  double altitude;            /* meters above sea level */
 } PbMediaInfo;
 
 /* Destination for decoded pixels: alloc returns a buffer of width*height*4 bytes

@@ -33,6 +33,9 @@ static int probe(void* self, const char* path, PbMediaInfo* out) {
   out->width = 40;
   out->height = 20;
   out->taken_at = 1234;
+  out->has_gps = 1;
+  out->latitude = -33.5;
+  out->longitude = 151.25;
   return 1;
 }
 

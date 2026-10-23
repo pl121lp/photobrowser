@@ -29,6 +29,8 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
+#include "iso6709.h"
+
 #include "plugin/photobrowse_plugin.h"
 
 namespace {
@@ -332,6 +334,18 @@ int probe(void*, const char* path, PbMediaInfo* out) {
   if (!t) t = av_dict_get(s->videoStream()->metadata, "creation_time", nullptr, 0);
   if (t) {
     if (auto utc = parseIsoUtc(t->value)) out->taken_at = utcToLocalWallClock(*utc);
+  }
+  // "location" (Android, most MP4s; FFmpeg's name for the ©xyz atom) or Apple's key.
+  const AVDictionaryEntry* loc = av_dict_get(s->fmt->metadata, "location", nullptr, 0);
+  if (!loc) loc = av_dict_get(s->fmt->metadata, "com.apple.quicktime.location.ISO6709", nullptr, 0);
+  if (loc) {
+    if (auto p = pbvideo::parseIso6709(loc->value)) {
+      out->has_gps = 1;
+      out->latitude = p->lat;
+      out->longitude = p->lon;
+      out->has_altitude = p->altitude.has_value();
+      out->altitude = p->altitude.value_or(0);
+    }
   }
   return 1;
 }
@@ -677,7 +691,7 @@ const PbPlugin kPlugin = {
     PB_PLUGIN_ABI_VERSION,
     sizeof(PbPlugin),
     "video",
-    "1.0",
+    "1.1",
     "Video files (FFmpeg): first frame in the grid, click to play / pause in whole-photo view",
     nullptr,
     kExtensions,

@@ -1,5 +1,6 @@
 #include "plugin/plugin_host.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -33,7 +34,13 @@ class PluginMediaHandler final : public MediaHandler {
     if (!p_.probe) return std::nullopt;
     PbMediaInfo info{};
     if (!p_.probe(p_.self, toUtf8(abs).c_str(), &info)) return std::nullopt;
-    return MediaProbe{info.width, info.height, info.taken_at};
+    MediaProbe probe{info.width, info.height, info.taken_at, std::nullopt};
+    if (info.has_gps && std::isfinite(info.latitude) && std::isfinite(info.longitude) &&
+        std::abs(info.latitude) <= 90 && std::abs(info.longitude) <= 180) {
+      probe.gps = GeoPos{info.latitude, info.longitude, std::nullopt};
+      if (info.has_altitude && std::isfinite(info.altitude)) probe.gps->altitude = info.altitude;
+    }
+    return probe;
   }
 
   std::optional<Image> decodeStill(const fs::path& abs, uint32_t minLongEdge) const override {
@@ -225,9 +232,10 @@ std::optional<std::string> PluginHost::load(const std::string& nameOrPath, const
   Info info{p.name ? p.name : l->name, p.version ? p.version : "", p.description ? p.description : "", {}, path};
   if (p.name) l->name = p.name;
   l->media = std::make_unique<PluginMediaHandler>(p);
+  const std::string origin = info.version.empty() ? info.name : info.name + " " + info.version;
   for (const char* const* e = p.extensions; e && *e; ++e) {
     info.extensions.emplace_back(*e);
-    formats_.add(*e, l->media.get());
+    formats_.add(*e, l->media.get(), origin);
   }
   if (p.struct_size >= kPluginTilesEnd && p.tile_get) {
     if (tiles_) {

@@ -21,7 +21,7 @@ namespace {
 struct FakeHandler final : pb::MediaHandler {
   std::optional<pb::MediaProbe> probe(const fs::path& abs) const override {
     if (pbtest::readFile(abs.string(), 1) == std::vector<uint8_t>{'x'}) return std::nullopt;
-    return pb::MediaProbe{30, 10, 777};
+    return pb::MediaProbe{30, 10, 777, pb::GeoPos{60.39, 5.32, 12.5}};
   }
   std::optional<pb::Image> decodeStill(const fs::path&, uint32_t) const override {
     pb::Image img{30, 10, {}};
@@ -47,6 +47,10 @@ TEST_CASE("media formats: extension lookup is case-insensitive, JPEG always acce
   CHECK(f.accepts("c.mov"));
   CHECK_FALSE(f.accepts("c.png"));
   CHECK(f.signature() == ".mov .mp4");
+  pb::MediaFormats tagged;
+  tagged.add(".mp4", &h, "video 1.1");
+  tagged.add(".avi", &h, "video 1.1");
+  CHECK(tagged.signature() == ".avi .mp4 (video 1.1)");  // a plugin upgrade re-indexes
   CHECK(pb::lowerExtension("a.b/c") == "");
   CHECK(pb::lowerExtension("x/Y.JPG") == ".jpg");
 }
@@ -81,6 +85,10 @@ TEST_CASE("media formats: indexer uses the handler for size, date and thumbnails
   CHECK(q.rec.width == 30);
   CHECK(q.rec.height == 10);
   CHECK(q.rec.takenAt == 777);
+  REQUIRE(q.rec.gps);
+  CHECK(q.rec.gps->lat == 60.39);
+  CHECK(q.rec.gps->lon == 5.32);
+  CHECK(q.rec.gps->altitude == 12.5);
   CHECK(q.l1.w == 30);  // never upscaled
   CHECK(q.l0.w == 30);
   auto levels = pb::buildLazyLevels(dir.path / "v.mp4", q.rec, 3, &h);
@@ -142,7 +150,7 @@ TEST_CASE("plugins: load the test plugin and use its formats and players") {
   REQUIRE(host.plugins().size() == 1);
   CHECK(host.plugins()[0].name == "testfake");
   CHECK(host.plugins()[0].extensions == std::vector<std::string>{".fake"});
-  CHECK(host.formats().signature() == ".fake");
+  CHECK(host.formats().signature() == ".fake (testfake 1.0)");
 
   pbtest::TempDir dir;
   pbtest::writeFile(dir.path / "clip.fake", "A");
@@ -152,6 +160,10 @@ TEST_CASE("plugins: load the test plugin and use its formats and players") {
   REQUIRE(probe);
   CHECK(probe->width == 40);
   CHECK(probe->takenAt == 1234);
+  REQUIRE(probe->gps);
+  CHECK(probe->gps->lat == -33.5);
+  CHECK(probe->gps->lon == 151.25);
+  CHECK_FALSE(probe->gps->altitude);
   CHECK_FALSE(h->probe(dir.path / "missing.fake"));
   auto still = h->decodeStill(dir.path / "clip.fake", 128);
   REQUIRE(still);
@@ -239,6 +251,7 @@ TEST_CASE("video plugin: still, metadata and playback of a sample clip") {
   CHECK(probe->width > 0);
   CHECK(probe->height > 0);
   CHECK(probe->takenAt > 1'600'000'000);
+  CHECK(probe->gps);  // every sample clip has a location
   auto still = h->decodeStill(clip, 256);
   REQUIRE(still);
   CHECK(std::max(still->w, still->h) == 256);

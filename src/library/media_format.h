@@ -8,12 +8,14 @@
 #include <vector>
 
 #include "imaging/image.h"
+#include "library/exif.h"
 
 namespace pb {
 
 struct MediaProbe {
   uint32_t width = 0, height = 0;  // as displayed
   int64_t takenAt = 0;             // seconds, local wall-clock as UTC; 0 = unknown
+  std::optional<GeoPos> gps;
 };
 
 // A non-JPEG file type the library can show (provided by a plugin). Called from
@@ -33,16 +35,23 @@ class MediaFormats {
   static const MediaFormats& none();  // JPEG only
 
   // `ext` like ".mp4" (any case). A later handler for the same extension is ignored.
-  void add(std::string ext, const MediaHandler* handler);
+  // `origin` names who handles it (e.g. "video 1.1"); it is part of the signature.
+  void add(std::string ext, const MediaHandler* handler, std::string origin = {});
   // Handler for a path's extension; nullptr for JPEG and unknown types.
   const MediaHandler* find(std::string_view path) const;
   bool accepts(std::string_view path) const;  // JPEG or a registered extension
-  // Stable text naming the registered extensions ("" if none); stored with the
-  // catalog so enabling or disabling a plugin re-indexes the library.
+  // Stable text naming the registered extensions and their origins ("" if none);
+  // stored with the catalog so enabling, disabling or upgrading a plugin re-indexes
+  // the library.
   std::string signature() const;
 
  private:
-  std::vector<std::pair<std::string, const MediaHandler*>> handlers_;
+  struct Entry {
+    std::string ext;
+    const MediaHandler* handler;
+    std::string origin;
+  };
+  std::vector<Entry> handlers_;
 };
 
 std::string lowerExtension(std::string_view path);  // ".jpg" for "a/B.JPG"; "" if none

@@ -132,14 +132,15 @@ Options: `--cache-dir <dir>`, `--rebuild-cache`, `--layout square-crop`,
 
 ### 3.7 Plugins
 Optional features ship as plugins (shared libraries) and are enabled per run with
-`--plugin <name>`; see architecture §13 for the API. Enabling or disabling a plugin
-that adds file types re-indexes the library once.
+`--plugin <name>`; see architecture §13 for the API. Enabling, disabling or upgrading a
+plugin that adds file types re-indexes the library once.
 
 **Video plugin** (`--plugin video`, needs FFmpeg): `.mp4 .mov .m4v .mkv .webm .avi .3gp`
 files join the grid in time order, shown as their first frame with a play badge. Open
 one in the whole-photo view and click it to play with sound; click again to pause; at
 the end a click plays it again. Leaving the photo stops it. HDR phone videos are
-tone-mapped to look right on a normal display. No seeking (yet).
+tone-mapped to look right on a normal display. No seeking (yet). Phone videos with a
+recorded location (Android and iPhone both store one) appear on the map like photos.
 
 **Map tiles plugin** (`--plugin maptiles`, needs libcurl): OpenStreetMap tiles for the
 map view (`M`, [map-spec.md](map-spec.md)), cached on disk.

@@ -427,8 +427,9 @@ Ordered roughly by value for effort.
     split view.
 11. **Screensaver map**: show the map inset while the screensaver flies between
     photos, travelling along with it.
-12. **Video locations**: extend the plugin media probe with latitude/longitude (phone
-    videos store it in the container metadata) so videos get dots too.
+12. ~~**Video locations**~~ — done 2026-10-23: `PbMediaInfo` has latitude/longitude/
+    altitude (ABI v3); the video plugin parses the ISO 6709 `location` /
+    `com.apple.quicktime.location.ISO6709` tag (`plugins/video/iso6709.h`).
 13. **Offline fallback basemap**: a built-in world outline (Natural Earth, public
     domain, a few hundred KB) shown when offline, so the map works for zoomed-out
     views without a network.

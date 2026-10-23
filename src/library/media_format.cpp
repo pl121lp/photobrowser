@@ -19,18 +19,18 @@ const MediaFormats& MediaFormats::none() {
   return empty;
 }
 
-void MediaFormats::add(std::string ext, const MediaHandler* handler) {
+void MediaFormats::add(std::string ext, const MediaHandler* handler, std::string origin) {
   std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(std::tolower(c)); });
   if (ext.empty() || ext == ".jpg" || ext == ".jpeg" || !handler) return;
-  if (std::any_of(handlers_.begin(), handlers_.end(), [&](const auto& h) { return h.first == ext; })) return;
-  handlers_.emplace_back(std::move(ext), handler);
+  if (std::any_of(handlers_.begin(), handlers_.end(), [&](const Entry& h) { return h.ext == ext; })) return;
+  handlers_.push_back({std::move(ext), handler, std::move(origin)});
 }
 
 const MediaHandler* MediaFormats::find(std::string_view path) const {
   if (handlers_.empty()) return nullptr;
   const std::string e = lowerExtension(path);
-  for (const auto& [ext, h] : handlers_) {
-    if (ext == e) return h;
+  for (const Entry& h : handlers_) {
+    if (h.ext == e) return h.handler;
   }
   return nullptr;
 }
@@ -41,11 +41,18 @@ bool MediaFormats::accepts(std::string_view path) const {
 }
 
 std::string MediaFormats::signature() const {
-  std::vector<std::string> exts;
-  for (const auto& h : handlers_) exts.push_back(h.first);
+  std::vector<std::string> exts, origins;
+  for (const Entry& h : handlers_) {
+    exts.push_back(h.ext);
+    if (!h.origin.empty()) origins.push_back(h.origin);
+  }
   std::sort(exts.begin(), exts.end());
+  std::sort(origins.begin(), origins.end());
+  origins.erase(std::unique(origins.begin(), origins.end()), origins.end());
   std::string s;
   for (const auto& e : exts) s += (s.empty() ? "" : " ") + e;
+  for (size_t i = 0; i < origins.size(); ++i) s += (i ? ", " : " (") + origins[i];
+  if (!origins.empty()) s += ")";
   return s;
 }
 

@@ -52,6 +52,7 @@ void quickIndexWithHandler(const fs::path& abs, const MediaHandler& handler, Qui
     return;
   }
   if (info->takenAt) rec.takenAt = info->takenAt;
+  rec.gps = info->gps;
   rec.width = info->width ? info->width : still->w;
   rec.height = info->height ? info->height : still->h;
   makeSmallLevels(*still, q.l0, q.l1);

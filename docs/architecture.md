@@ -294,7 +294,7 @@ const PbPlugin* pb_plugin_entry(const PbHost* host);
   are callable from any thread.
 - `PbPlugin` (plugin → host): name/version, the **file extensions** it handles, and
   function pointers in two groups:
-  - *Media* — `probe` (display size, capture time) and `decode_still` (an upright RGBA
+  - *Media* — `probe` (display size, capture time, GPS position since version 3) and `decode_still` (an upright RGBA
     image, long edge ≥ a requested size). Called on worker threads, concurrently;
     may do I/O and decoding. The host owns all pixel memory (`PbImageOut.alloc`).
   - *Players* (optional) — live content for an item opened in whole-photo view:
@@ -308,7 +308,7 @@ const PbPlugin* pb_plugin_entry(const PbHost* host);
     `tile_attribution` and the zoom range. Called on the host's two map tile threads;
     may block on the network.
   - `destroy` — stop all plugin threads before unload.
-- Versioning: `PB_PLUGIN_ABI_VERSION` (now 2) plus `struct_size` in each table; structs
+- Versioning: `PB_PLUGIN_ABI_VERSION` (now 3; 3 added GPS to `PbMediaInfo`) plus `struct_size` in each table; structs
   only grow at the end. A plugin built for another version is refused with a clear
   message; a version-2 table only as long as version 1's simply has no tile source.
 
@@ -318,8 +318,10 @@ fake plugin in `tests/plugins/`):
   lazy-level builder and full-resolution loads call the plugin's `decode_still`
   instead of the JPEG decoder. From then on the item is an ordinary photo: same
   pyramid, same caches, same streaming, same layout. Nothing else in the core knows.
-- The catalog stores the set of plugin extensions it was indexed with; loading a
-  different set (enabling or disabling a plugin) re-indexes the library once.
+- The catalog stores the set of plugin extensions it was indexed with, and each
+  plugin's name and version; loading a different set (enabling, disabling or
+  upgrading a plugin) re-indexes the library once. Bump a plugin's `version` when
+  `probe` starts reporting something new.
 - When an item opens in whole-photo view, the app asks the PluginHost for a `Player`.
   A click on the open item (`Interaction::takeActivation`) goes to the player; its
   frames are uploaded through the upload ring into one live texture that replaces the
