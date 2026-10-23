@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -102,6 +103,22 @@ ProgressBar buildProgressBar(double fraction, double scale, Vec2d viewport, cons
 // A frame of `thickness` px just outside `r` (e.g. around a highlighted photo): four bars.
 void buildFrame(const Rect& r, double thickness, const float color[4], const FontInfo& font,
                 std::vector<OverlayQuad>& out);
+
+// First-run indexing (an empty or rebuilt cache): what is happening while no photos show.
+struct IndexingProgress {
+  bool scanned = false;  // file count known
+  uint32_t done = 0, total = 0;
+  std::optional<double> secondsLeft;  // none while still estimating
+};
+// 1234567 -> "1,234,567".
+std::string groupThousands(uint64_t n);
+// "About 45 s left", "About 3 min left", "About 1 h 25 min left".
+std::string formatTimeLeft(double seconds);
+std::vector<std::string> indexingLines(const IndexingProgress& p);
+// Panel centred in a `viewport`-sized screen: the lines, then (once scanned) a progress bar.
+// Returns the panel rect.
+Rect buildIndexingPanel(const IndexingProgress& p, const FontInfo& font, double scale, Vec2d viewport,
+                        std::vector<OverlayQuad>& out);
 
 // Help (F1): every key and mouse binding. An entry with an empty key and action is a gap.
 struct HelpEntry {

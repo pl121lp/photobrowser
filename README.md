@@ -58,8 +58,8 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | `--all-plugins` | load every plugin in the `plugins/` folder (after any `--plugin` ones); one that fails to load is skipped with a warning |
 | `--snapshot <file.jpg>` | save the settled start view (or the end of `--bench`) and exit |
 
-The first run on a folder indexes it (progress in the window title): dates and the
-small preview most cameras embed are read from the start of each file, so 10,000
+The first run on a folder (or `--rebuild-cache`) indexes it, with a centred panel
+showing progress and the estimated time left: dates and the small preview most cameras embed are read from the start of each file, so 10,000
 photos take seconds. Later runs open instantly from the cache in
 `<cache>/photobrowse/<library-hash>/`. The photo folder is never modified. Photos
 added or removed while the app runs show up on the next launch.

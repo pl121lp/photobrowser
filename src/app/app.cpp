@@ -17,6 +17,7 @@
 #include "app/streamer.h"
 #include "core/frame_history.h"
 #include "core/frame_stats.h"
+#include "core/progress_eta.h"
 #include "gfx/background_renderer.h"
 #include "gfx/gl.h"
 #include "gfx/map_renderer.h"
@@ -375,7 +376,9 @@ int App::run(const Options& options) {
     std::vector<TileInstance> batch;
     uint64_t last = SDL_GetTicksNS();
     const uint64_t start = last;
-    uint64_t lastTitle = 0;
+    uint64_t lastTitle = 0, lastIndexingUpdate = 0;
+    IndexingProgress indexing;  // shown while the indexer runs; refreshed once a second
+    ProgressEta indexingEta;
     bool running = exitCode == 0, reportedGlError = false, animating = true;
     bool showStats = config.stats, showInfo = false, showHelp = false, prewarming = false, reportedFirstFrame = false;
     FrameStats intervals, work, backgroundGpu;  // ms; F3 window or the whole --bench run
@@ -491,11 +494,14 @@ int App::run(const Options& options) {
           startSession(indexer->take());
           indexer.reset();
           indexJobs.reset();
-        } else if (now - lastTitle > 250'000'000ULL) {
-          lastTitle = now;
-          const std::string title = indexer->scanned() ? "PhotoBrowse — indexing " + std::to_string(indexer->done()) +
-                                                             "/" + std::to_string(indexer->total())
-                                                       : "PhotoBrowse — scanning…";
+        } else if (lastIndexingUpdate == 0 || now - lastIndexingUpdate >= 1'000'000'000ULL) {
+          lastIndexingUpdate = now;  // the overlay's numbers change once a second
+          indexing = {indexer->scanned(), indexer->done(), indexer->total(), std::nullopt};
+          if (indexing.scanned) indexingEta.add(seconds(now), indexing.done);
+          indexing.secondsLeft = indexingEta.secondsLeft(indexing.total);
+          const std::string title = indexing.scanned ? "PhotoBrowse — indexing " + std::to_string(indexing.done) +
+                                                           "/" + std::to_string(indexing.total)
+                                                     : "PhotoBrowse — scanning…";
           SDL_SetWindowTitle(window, title.c_str());
         }
       }
@@ -820,6 +826,13 @@ int App::run(const Options& options) {
       if (now < noticeUntil) {
         overlayQuads.clear();
         buildMessage(notice, overlayFont, uiScale, windowPx, overlayQuads);
+        overlay.draw(windowPx, overlayQuads);
+      }
+
+      // First-run indexing: what is going on while there is nothing to show yet.
+      if (indexer) {
+        overlayQuads.clear();
+        buildIndexingPanel(indexing, overlayFont, uiScale, windowPx, overlayQuads);
         overlay.draw(windowPx, overlayQuads);
       }
 

@@ -417,3 +417,59 @@ TEST_CASE("overlay: playback progress is clamped to the track") {
   CHECK(after.dot.x == doctest::Approx(after.track.x1));
   CHECK(after.track.width() < 800);
 }
+
+TEST_CASE("overlay: counts get thousands separators") {
+  CHECK(pb::groupThousands(0) == "0");
+  CHECK(pb::groupThousands(999) == "999");
+  CHECK(pb::groupThousands(1000) == "1,000");
+  CHECK(pb::groupThousands(1234567) == "1,234,567");
+}
+
+TEST_CASE("overlay: time left reads naturally") {
+  CHECK(pb::formatTimeLeft(3) == "About 5 s left");
+  CHECK(pb::formatTimeLeft(41) == "About 45 s left");
+  CHECK(pb::formatTimeLeft(59.5) == "About 1 min left");
+  CHECK(pb::formatTimeLeft(150) == "About 3 min left");
+  CHECK(pb::formatTimeLeft(3600 + 25 * 60) == "About 1 h 25 min left");
+}
+
+TEST_CASE("overlay: indexing lines while scanning, then processing") {
+  pb::IndexingProgress p;
+  CHECK(pb::indexingLines(p).front() == "Scanning folder...");
+  p.scanned = true;
+  p.done = 1234;
+  p.total = 5678;
+  auto lines = pb::indexingLines(p);
+  REQUIRE(lines.size() == 4);
+  CHECK(lines[0] == "Processing media...");
+  CHECK(lines[1] == "1,234 of 5,678 files (21%)");
+  CHECK(lines[2] == "Estimating time left...");
+  CHECK(lines[3] == "Photos appear when it is done.");
+  p.secondsLeft = 150;
+  CHECK(pb::indexingLines(p)[2] == "About 3 min left");
+}
+
+TEST_CASE("overlay: indexing panel is centred with a progress bar") {
+  pb::IndexingProgress p{true, 250, 1000, 30};
+  std::vector<pb::OverlayQuad> q;
+  const pb::Rect panel = pb::buildIndexingPanel(p, kFont, 2.0, {1920, 1080}, q);
+  CHECK(panel.center().x == doctest::Approx(960));
+  CHECK(panel.center().y == doctest::Approx(540));
+  CHECK(q[0].rect == panel);
+  // The last two quads: the bar's track and its filled quarter, inside the panel.
+  REQUIRE(q.size() > 3);
+  const pb::Rect track = q[q.size() - 2].rect, fill = q.back().rect;
+  CHECK(track.x0 > panel.x0);
+  CHECK(track.x1 < panel.x1);
+  CHECK(track.y1 < panel.y1);
+  CHECK(fill.x0 == doctest::Approx(track.x0));
+  CHECK(fill.width() == doctest::Approx(track.width() / 4));
+}
+
+TEST_CASE("overlay: no progress bar before the scan is done") {
+  pb::IndexingProgress p;
+  std::vector<pb::OverlayQuad> q;
+  pb::buildIndexingPanel(p, kFont, 1.0, {800, 600}, q);
+  CHECK(std::all_of(q.begin() + 1, q.end(),
+                    [](const pb::OverlayQuad& o) { return o.kind == pb::OverlayQuad::Kind::Text; }));
+}

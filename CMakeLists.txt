@@ -126,6 +126,7 @@ add_executable(pb_tests
   tests/test_options.cpp
   tests/test_bench.cpp
   tests/test_overlay.cpp
+  tests/test_progress_eta.cpp
   tests/test_config.cpp
   tests/test_background.cpp
   tests/test_plugins.cpp

@@ -277,6 +277,64 @@ ProgressBar buildProgressBar(double fraction, double scale, Vec2d viewport, cons
   return bar;
 }
 
+std::string groupThousands(uint64_t n) {
+  std::string s = std::to_string(n);
+  for (size_t i = s.size(); i > 3; i -= 3) s.insert(i - 3, ",");
+  return s;
+}
+
+std::string formatTimeLeft(double seconds) {
+  char t[64];
+  const long s5 = 5 * std::max(1L, long(std::ceil(seconds / 5)));
+  const long minutes = std::lround(seconds / 60);
+  if (s5 < 60) {
+    std::snprintf(t, sizeof t, "About %ld s left", s5);
+  } else if (minutes < 60) {
+    std::snprintf(t, sizeof t, "About %ld min left", std::max(1L, minutes));
+  } else {
+    std::snprintf(t, sizeof t, "About %ld h %ld min left", minutes / 60, minutes % 60);
+  }
+  return t;
+}
+
+std::vector<std::string> indexingLines(const IndexingProgress& p) {
+  const std::string footer = "Photos appear when it is done.";
+  if (!p.scanned) return {"Scanning folder...", footer};
+  const uint64_t percent = p.total ? uint64_t(p.done) * 100 / p.total : 0;
+  return {"Processing media...",
+          groupThousands(p.done) + " of " + groupThousands(p.total) + " files (" + std::to_string(percent) + "%)",
+          p.secondsLeft ? formatTimeLeft(*p.secondsLeft) : "Estimating time left...", footer};
+}
+
+Rect buildIndexingPanel(const IndexingProgress& p, const FontInfo& font, double scale, Vec2d viewport,
+                        std::vector<OverlayQuad>& out) {
+  const auto lines = indexingLines(p);
+  size_t cols = 0;
+  for (const auto& l : lines) cols = std::max(cols, textColumns(l));
+  const double pad = 2 * kPadding * scale, lineH = font.cellH * scale * 1.4, barH = 4 * scale;
+  const double barSpace = p.scanned ? lineH : 0;
+  const Vec2d size{double(cols) * font.cellW * scale + 2 * pad,
+                   double(lines.size() - 1) * lineH + font.cellH * scale + barSpace + 2 * pad};
+  const Vec2d c = viewport * 0.5;
+  const Rect panel{c.x - size.x / 2, c.y - size.y / 2, c.x + size.x / 2, c.y + size.y / 2};
+  out.push_back(solid(OverlayQuad::Kind::Panel, panel, font, 0, 0, 0, 0.75f));
+  const float white[4] = {0.95f, 0.95f, 0.95f, 1}, dim[4] = {0.7f, 0.7f, 0.7f, 1};
+  for (size_t i = 0; i < lines.size(); ++i) {
+    const double x = c.x - double(textColumns(lines[i])) * font.cellW * scale / 2;
+    layoutText(lines[i], {x, panel.y0 + pad + double(i) * lineH}, scale, i + 1 < lines.size() ? white : dim, font,
+               out);
+  }
+  if (p.scanned) {
+    const double fraction = p.total ? std::clamp(double(p.done) / p.total, 0.0, 1.0) : 0;
+    const Rect track{panel.x0 + pad, panel.y1 - pad - barH, panel.x1 - pad, panel.y1 - pad};
+    out.push_back(solid(OverlayQuad::Kind::Panel, track, font, 1, 1, 1, 0.25f));
+    out.push_back(
+        solid(OverlayQuad::Kind::Panel, {track.x0, track.y0, track.x0 + fraction * track.width(), track.y1}, font, 1,
+              1, 1, 0.9f));
+  }
+  return panel;
+}
+
 void buildFrame(const Rect& r, double thickness, const float color[4], const FontInfo& font,
                 std::vector<OverlayQuad>& out) {
   const double t = thickness;
