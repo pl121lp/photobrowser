@@ -227,7 +227,7 @@ TEST_CASE("map view: photo without GPS keeps the view, dimmed with a message") {
   f.subject.photoGps.reset();
   f.run(1);
   CHECK(f.map.camera().center == c);
-  CHECK(f.map.status() == "No location for this photo");
+  CHECK(f.map.status() == "No location for this item");
   CHECK(f.map.dimmed());
   CHECK(f.map.dots().empty());
   f.subject.photo = 3;
@@ -331,7 +331,7 @@ TEST_CASE("map view: non-finite photo positions are ignored") {
   f.subject.photo = 1;
   f.subject.photoGps = pb::GeoPos{NAN, 10, {}};
   f.open();
-  CHECK(f.map.status() == "No location for this photo");
+  CHECK(f.map.status() == "No location for this item");
   CHECK(std::isfinite(f.map.camera().center.x));
   CHECK(std::isfinite(f.map.camera().center.y));
   f.subject.photo.reset();

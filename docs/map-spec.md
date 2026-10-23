@@ -98,7 +98,7 @@ Pointer events over the map panel go to the map, everything else to the content:
 - If the user has panned or zoomed the map manually, the next photo change still
   flies to the new photo (manual view is not sticky in single-photo mode).
 - Photo without GPS: the map keeps its last view, dimmed, with a centred message
-  "No location for this photo". The next photo with GPS flies from there.
+  "No location for this item". The next photo with GPS flies from there.
 
 ### 3.5 Grid view (multiple photos)
 - Dots (smaller: about 8 px) for every **visible** photo with GPS. Visible = its cell

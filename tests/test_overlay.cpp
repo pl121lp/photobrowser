@@ -347,7 +347,7 @@ TEST_CASE("overlay: message panel is centred near the top") {
 TEST_CASE("overlay: map status is centred in the panel") {
   std::vector<pb::OverlayQuad> q;
   const pb::Rect area{1152, 0, 1920, 1080};
-  const pb::Rect panel = pb::buildMapStatus("No location for this photo", kFont, 1.0, area, q);
+  const pb::Rect panel = pb::buildMapStatus("No location for this item", kFont, 1.0, area, q);
   CHECK(panel.center().x == doctest::Approx(area.center().x));
   CHECK(panel.center().y == doctest::Approx(area.center().y));
   CHECK(panel.width() < area.width());

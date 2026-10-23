@@ -206,7 +206,7 @@ std::optional<double> MapView::pulse(double t) const {
 
 std::string_view MapView::status() const {
   if (!noDots_) return {};
-  return single_ ? "No location for this photo" : "No locations among the visible photos";
+  return single_ ? "No location for this item" : "No locations among the visible photos";
 }
 
 bool MapView::animating(double t) const {
