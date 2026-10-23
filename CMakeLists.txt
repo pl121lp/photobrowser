@@ -75,6 +75,7 @@ add_library(pb_core STATIC
   src/layout/square_grid.cpp
   src/map/mercator.cpp
   src/map/map_camera.cpp
+  src/map/fly_path.cpp
 )
 target_include_directories(pb_core PUBLIC src)
 file(GLOB PB_BACKGROUND_SHADERS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/shaders/backgrounds/*.frag")
@@ -125,6 +126,7 @@ add_executable(pb_tests
   tests/test_plugins.cpp
   tests/test_mercator.cpp
   tests/test_map_camera.cpp
+  tests/test_fly_path.cpp
 )
 target_include_directories(pb_tests PRIVATE third_party)
 target_link_libraries(pb_tests PRIVATE pb_core)
