@@ -23,7 +23,13 @@ std::string usage() {
          "  --plugin <name|path>  load a plugin, e.g. --plugin video (repeatable); a name is\n"
          "                        looked up in the plugins/ folder next to the program\n"
          "  --snapshot <file.jpg> save the start view (or the end of --bench) as JPEG and exit\n"
-         "  --help                show this help\n";
+         "  --help                show this help\n"
+         "\n"
+         "Plugins (built when their libraries are installed; see README):\n"
+         "  video                 video files in the grid; click an open one to play (FFmpeg)\n"
+         "  maptiles              map tiles for the map view (M): OpenStreetMap, cached on\n"
+         "                        disk; settings in [plugin.maptiles] (libcurl)\n"
+         "  Several at once:      --plugin video --plugin maptiles\n";
 }
 
 std::variant<Options, std::string> parseOptions(int argc, char** argv) {

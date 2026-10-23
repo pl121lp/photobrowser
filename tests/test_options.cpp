@@ -84,3 +84,10 @@ TEST_CASE("options: plugins") {
   CHECK(std::holds_alternative<std::string>(parse({"--plugin"})));
   CHECK(std::get<pb::Options>(parse({})).plugins.empty());
 }
+
+TEST_CASE("options: help lists the plugins and how to combine them") {
+  const std::string u = pb::usage();
+  CHECK(u.find("maptiles") != std::string::npos);
+  CHECK(u.find("video") != std::string::npos);
+  CHECK(u.find("--plugin video --plugin maptiles") != std::string::npos);
+}
