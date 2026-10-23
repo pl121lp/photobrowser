@@ -240,6 +240,31 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     else()
       message(STATUS "libcurl development files not found: the maptiles plugin will not be built.")
     endif()
+
+    # HEIC / HEIF stills (libheif with an HEVC decoder such as libde265).
+    if(PkgConfig_FOUND)
+      pkg_check_modules(LIBHEIF QUIET IMPORTED_TARGET libheif>=1.16)
+    endif()
+    if(LIBHEIF_FOUND)
+      set(PB_HEIF_TARGET PkgConfig::LIBHEIF)
+    else()
+      find_package(libheif CONFIG QUIET)  # vcpkg
+      if(TARGET heif)
+        set(PB_HEIF_TARGET heif)
+      endif()
+    endif()
+    if(PB_HEIF_TARGET)
+      pb_add_plugin(pb_heif_plugin heif
+        plugins/heif/heif_plugin.cpp
+        plugins/heif/heif_util.cpp)
+      target_link_libraries(pb_heif_plugin PRIVATE ${PB_HEIF_TARGET} Threads::Threads)
+      add_dependencies(photobrowse_plugins pb_heif_plugin)
+      add_dependencies(pb_tests pb_heif_plugin)
+      target_compile_definitions(pb_tests PRIVATE PB_TEST_HEIF_PLUGIN)
+      target_sources(pb_tests PRIVATE tests/test_heif.cpp plugins/heif/heif_util.cpp)
+    else()
+      message(STATUS "libheif not found: the heif plugin will not be built.")
+    endif()
   endif()
 
   add_executable(photobrowse

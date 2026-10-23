@@ -246,7 +246,7 @@ upload only pages near the view first; catalog in SQLite instead of one blob;
 layout `visible()` already O(visible); per-frame instance count at full zoom-out
 capped by drawing a pre-rendered overview mosaic texture instead of 100k instances.
 
-**Other formats.** JPEG is built in. Anything else (PNG, HEIC, RAW, video) comes from a
+**Other formats.** JPEG and PNG are built in. Anything else (HEIC, RAW, video) comes from a
 plugin as a `MediaHandler` (§13), so the core gains no codec dependencies.
 
 ## 11. Testing and measurement
@@ -370,7 +370,17 @@ with an expiry sidecar (`Cache-Control: max-age`, else 7 days), LRU-trimmed to
 `disk_cache` MB; stale tiles are served when offline; 60 s back-off after 403/429;
 identifying User-Agent. Details and policy notes: [map-spec.md §5.5](map-spec.md).
 
-**Future plugin candidates.** Other image formats (HEIC/AVIF, RAW, PNG), metadata and
+**HEIF plugin** (`plugins/heif`, libheif with an HEVC decoder such as libde265).
+Extensions `.heic .heif`. `probe` reports the primary image's size as displayed (libheif
+applies `irot` / `imir`, so EXIF orientation is ignored) and hands the first `Exif`
+item's TIFF block to the host's `parse_exif` for capture time and GPS. `decode_still`
+decodes the smallest embedded thumbnail whose long edge reaches the requested size
+(e.g. iPhones' 320×240 for indexing), else the primary image, as interleaved RGBA. Each
+worker thread keeps its last file (bytes + parsed `heif_context`, keyed by path, size and
+mtime), so the probe-then-decode of indexing reads and parses a file once. Without an
+HEVC decoder the plugin logs an error and offers no extensions.
+
+**Future plugin candidates.** Other image formats (AVIF, RAW), metadata and
 search back-ends (SQLite + FTS5, keywords), face/place clustering, super-resolution
 zoom. Extending the ABI: append new optional function pointers (e.g. metadata
 callbacks, custom overlays, layouts) and bump the ABI version.

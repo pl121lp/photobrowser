@@ -16,6 +16,7 @@ Design documents: [docs/spec.md](docs/spec.md), [docs/architecture.md](docs/arch
 | libjpeg-turbo | `sudo apt install libturbojpeg0-dev` | via vcpkg (`vcpkg.json`) |
 | FFmpeg (optional, video plugin) | `sudo apt install libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev` | vcpkg `ffmpeg` (with `avformat`, `avcodec`, `swscale`, `swresample`) |
 | libcurl (optional, maptiles plugin) | `sudo apt install libcurl4-openssl-dev` | vcpkg `curl` |
+| libheif (optional, heif plugin) | `sudo apt install libheif-dev libheif-plugin-libde265` | vcpkg `libheif` (macOS: Homebrew `libheif`) |
 
 Everything else (doctest, Khronos GL headers, stb_image v2.30 — public domain / MIT) is
 vendored in `third_party/`. Supported files: JPEG and PNG built in; video, HEIC etc. via plugins.
@@ -168,6 +169,7 @@ line. Design and API: [docs/architecture.md §13](docs/architecture.md#13-plugin
 
 | Plugin | Needs | What it does |
 |---|---|---|
+| `heif` | libheif with an HEVC decoder (see Dependencies) | `.heic .heif` photos (e.g. from iPhones) join the grid like JPEGs, upright, with their capture date and GPS position (shown on the map). Indexing decodes the small embedded thumbnail when there is one. |
 | `maptiles` | libcurl (see Dependencies) | Map tiles for the map view (`M`): OpenStreetMap by default, cached on disk. See [Map](#map). |
 | `video` | FFmpeg (see Dependencies) | `.mp4 .mov .m4v .mkv .webm .avi .3gp` join the grid as their first frame with a play badge. Open one (double-click) and click it to play with sound, click again to pause; at the end a click plays it again (or it loops, see below). A bar at the bottom shows how far it has played. HDR phone videos are tone-mapped. No seeking yet. |
 
