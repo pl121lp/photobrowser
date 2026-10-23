@@ -480,3 +480,66 @@ TEST_CASE("interaction: start view and Home go to the start position") {
   f.ui.resetView();
   CHECK(f.cam.center == f.layout.place(f.layout.centerPosition()).cell.center());
 }
+
+TEST_CASE("interaction: start zoom modes") {
+  SUBCASE("focus: about three photos across the short side (default)") {
+    Fixture f;
+    CHECK(f.cam.scale == doctest::Approx(800.0 / 3));
+  }
+  SUBCASE("photo: the start photo opens in whole-photo view at once") {
+    Fixture f;
+    f.ui.setStartPosition(7);
+    f.ui.setStartZoom(pb::StartZoom::Photo);
+    f.ui.resetView();
+    REQUIRE(f.ui.focused());
+    CHECK(*f.ui.focused() == 7);
+    CHECK(f.ui.focusProgress() == doctest::Approx(1));
+    CHECK(f.cam.scale == doctest::Approx(800.0 / 3));  // Esc leaves to the usual grid view
+    CHECK(f.cam.center == f.layout.place(7).cell.center());
+    // Arrows step through photos; Home returns to the start photo, still whole.
+    f.ui.onKey(pb::Key::Right, f.t);
+    f.run(0.6);
+    CHECK(*f.ui.focused() == 8);
+    f.ui.onKey(pb::Key::Home, f.t);
+    f.run(0.6);
+    REQUIRE(f.ui.focused());
+    CHECK(*f.ui.focused() == 7);
+    CHECK(f.ui.focusProgress() == doctest::Approx(1));
+    // From the grid, Home opens it again.
+    f.ui.onKey(pb::Key::Escape, f.t);
+    f.run(0.6);
+    CHECK_FALSE(f.ui.focused());
+    f.ui.onKey(pb::Key::Home, f.t);
+    f.run(0.6);
+    REQUIRE(f.ui.focused());
+    CHECK(*f.ui.focused() == 7);
+  }
+  SUBCASE("full: the whole library, centred") {
+    Fixture f;
+    f.ui.setStartPosition(7);
+    f.ui.setStartZoom(pb::StartZoom::Full);
+    f.ui.resetView();
+    CHECK(f.cam.scale == doctest::Approx(f.ui.minScale()));
+    CHECK(f.cam.center == f.layout.bounds().center());
+    // Home comes back to the same view.
+    f.click(f.screenOf(0));
+    f.ui.onWheel({500, 400}, 3);
+    f.run(1.0);
+    f.ui.onKey(pb::Key::Home, f.t);
+    f.run(1.0);
+    CHECK(f.cam.scale == doctest::Approx(f.ui.minScale()));
+    CHECK(f.cam.center.x == doctest::Approx(f.layout.bounds().center().x));
+    CHECK(f.cam.center.y == doctest::Approx(f.layout.bounds().center().y));
+  }
+}
+
+TEST_CASE("interaction: full start view stays centred when the window grows (going fullscreen)") {
+  Fixture f;
+  f.ui.setStartZoom(pb::StartZoom::Full);
+  f.ui.resetView();
+  f.ui.setViewport({3840, 2160});  // the minimum zoom rises above the start zoom
+  f.run(1.0);
+  CHECK(f.cam.scale == doctest::Approx(f.ui.minScale()));
+  CHECK(f.cam.center.x == doctest::Approx(f.layout.bounds().center().x));
+  CHECK(f.cam.center.y == doctest::Approx(f.layout.bounds().center().y));
+}

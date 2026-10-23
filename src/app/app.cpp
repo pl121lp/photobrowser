@@ -277,6 +277,7 @@ int App::run(const Options& options) {
       ui.layoutChanged();
       ui.setStartPosition(startPosition(config.startAt, layout->count(), layout->centerPosition(),
                                         config.newestFirst, std::random_device{}()));
+      ui.setStartZoom(config.startZoom);
       ui.resetView();
       const size_t l0Pages = (session.lib.catalog.photos.size() + 16383) / 16384;
       const size_t fullReserve = size_t(Streamer::kFullSlots) * 3840 * 2880 * 4 * 4 / 3;

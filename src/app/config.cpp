@@ -154,6 +154,14 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("center, oldest, newest or random");
       }
+    } else if (key == "view.start_focus") {
+      static const std::map<std::string, StartZoom, std::less<>> kZoom = {
+          {"focus", StartZoom::Focus}, {"photo", StartZoom::Photo}, {"full", StartZoom::Full}};
+      if (auto it = kZoom.find(value); it != kZoom.end()) {
+        c.startZoom = it->second;
+      } else {
+        bad("focus, photo or full");
+      }
     } else if (key == "view.fit") {
       if (value == "fit" || value == "letterbox") {
         c.letterbox = value == "letterbox";
@@ -297,6 +305,11 @@ std::string defaultConfigText() {
 #   newest : the newest photo
 #   random : a different random photo each time the program starts
 # start_at = center
+# How far zoomed in the view starts (Home returns to it too):
+#   focus : the start photo with its neighbours around it
+#   photo : the start photo opened whole (arrow keys step to the next photo)
+#   full  : all photos visible, centred (start_at doesn't matter then)
+# start_focus = focus
 # How a photo fills its square:
 #   fit       : fill the square; the photo's edges are cropped to fit it
 #   letterbox : the whole photo, with black bars on the sides it doesn't fill

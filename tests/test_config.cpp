@@ -305,3 +305,16 @@ TEST_CASE("config: sort order and start position") {
   CHECK(text.find("# sort = oldest_first\n") != std::string::npos);
   CHECK(text.find("# start_at = center\n") != std::string::npos);
 }
+
+TEST_CASE("config: start zoom") {
+  CHECK(pb::Config{}.startZoom == pb::StartZoom::Focus);
+  CHECK(pb::parseConfig("[view]\nstart_focus = photo\n").config.startZoom == pb::StartZoom::Photo);
+  auto r = pb::parseConfig("[view]\nstart_focus = full\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.startZoom == pb::StartZoom::Full);
+  CHECK(pb::parseConfig("[view]\nstart_focus = focus\n").config.startZoom == pb::StartZoom::Focus);
+  auto bad = pb::parseConfig("[view]\nstart_focus = huge\n");
+  CHECK(bad.config.startZoom == pb::StartZoom::Focus);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# start_focus = focus\n") != std::string::npos);
+}

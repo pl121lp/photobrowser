@@ -69,7 +69,7 @@ the primary requirement; features come second.
 | Left-click on the open photo | In whole-photo view, the item's plugin action if it has one (video: play / pause; restart once ended). Otherwise nothing. |
 | Arrow keys | Move one cell (eased). In whole-photo view: ←/→ previous/next photo in time order; ↑/↓ the closest photo one row up/down (stays put on the top/bottom row). |
 | `+` / `-` | Zoom in/out around screen center. |
-| `Home` | Return to the start view (the `[view] start_at` photo; centre by default). |
+| `Home` | Return to the start view (`[view] start_at` photo at the `start_focus` zoom; centre photo with its neighbours by default). |
 | `F11` or `F` | Toggle **fullscreen** (borderless desktop fullscreen on the current monitor). The app starts fullscreen unless `[display] fullscreen = false` or `--windowed`. |
 | `Esc` | Close the help; otherwise leave whole-photo view; otherwise leave fullscreen; otherwise nothing. |
 | `Q` / window close | Quit. |
@@ -211,6 +211,13 @@ Calls made by Claude (open to change):
 - `[view] start_at = center | oldest | newest | random` (default center): the photo
   the start view centres on, at the usual start zoom; `Home` returns to the same photo
   (random picks once per launch).
+- `[view] start_focus = focus | photo | full` (default focus = about three photos across
+  the short side): photo = the start photo already open in the whole-photo view (arrows
+  step through photos; Esc leaves to the focus-level grid); full = every photo visible,
+  centred on the library (start_at is then irrelevant). Home returns to the same view
+  (in photo mode, also from inside the whole-photo view).
+- A window resize that pushes a resting zoom outside the new limits (e.g. going
+  fullscreen) snaps it about the screen centre, so the view never drifts.
 - `[view] fit = fit | letterbox` (default fit = today's square fill with a centre crop):
   letterbox shows each photo whole inside its square with black bars; opening a photo
   then grows from the letterboxed photo. Done in the tile shader (image-area mask), so

@@ -74,6 +74,7 @@ sort = oldest_first        # oldest_first | newest_first
 [view]
 gap = 0.03                 # space around photos, 0 = none, max 0.2
 start_at = center          # center | oldest | newest | random (Home returns there)
+start_focus = focus        # focus (photo + neighbours) | photo (opened whole; arrows step on) | full (all photos)
 fit = fit                  # fit = fill each square (edges cropped) | letterbox = whole photo, black bars
 corner_radius = 0          # rounded corners: fraction of the shorter side, 0.05 = subtle, max 0.5
 max_photo_zoom = 4         # focused-photo zoom limit, relative to fit (1 to 16)

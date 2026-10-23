@@ -38,6 +38,7 @@ void Interaction::computeLimits() {
 }
 
 double Interaction::startScale() const {
+  if (startZoom_ == StartZoom::Full) return minScale_;  // Photo: the usual grid zoom behind it
   return std::clamp(std::min(cam_.viewport.x, cam_.viewport.y) / 3, minScale_, maxScale_);
 }
 
@@ -46,9 +47,12 @@ void Interaction::setViewport(Vec2d px) {
   if (focusTarget_) focusRectValid_ = false;
   computeLimits();
   const double lo = std::log(minScale_), hi = std::log(maxScale_);
+  // A zoom at rest that the new limits push out of range snaps to them at once (about
+  // the screen centre); easing would zoom about a stale pivot and shift the view.
+  const bool wasSettled = logZoom_.settled();
   logZoom_.target = std::clamp(logZoom_.target, lo, hi);
   if (tween_.active) tween_.logScale.to = std::clamp(tween_.logScale.to, lo, hi);
-  if (!tween_.active && logZoom_.settled()) {
+  if (!tween_.active && wasSettled) {
     logZoom_.current = logZoom_.target;
     cam_.scale = std::exp(logZoom_.current);
   }
@@ -68,15 +72,25 @@ uint32_t startPosition(StartAt at, uint32_t count, uint32_t centerPos, bool newe
   return centerPos;
 }
 
+uint32_t Interaction::startPos() const {
+  return start_ && *start_ < layout_.count() ? *start_ : layout_.centerPosition();
+}
+
 Vec2d Interaction::startCenter() const {
-  if (layout_.count() == 0) return layout_.bounds().center();
-  const uint32_t pos = start_ && *start_ < layout_.count() ? *start_ : layout_.centerPosition();
-  return layout_.place(pos).cell.center();
+  if (layout_.count() == 0 || startZoom_ == StartZoom::Full) return layout_.bounds().center();
+  return layout_.place(startPos()).cell.center();
 }
 
 void Interaction::resetView() {
   stopMotion();
   cam_.center = startCenter();
+  if (startZoom_ == StartZoom::Photo && layout_.count() > 0) {
+    // Start in whole-photo view on the start photo, already open (no transition).
+    focus(startPos(), now_);
+    focusTween_ = {1, 1, now_, 0};
+    focusProgress_ = 1;
+    tween_.active = false;
+  }
   cam_.scale = startScale();
   logZoom_.current = logZoom_.target = std::log(cam_.scale);
 }
@@ -347,6 +361,9 @@ bool Interaction::onKey(Key k, double t) {
         if (auto p = closestInRow(*focused_, k == Key::Up ? -1 : 1)) showFocused(*p, t);
         return true;
       case Key::ZoomOut: unfocus(); return true;
+      case Key::Home:  // start view "photo": back to the start photo, still whole
+        if (startZoom_ == StartZoom::Photo) showFocused(startPos(), t);
+        return true;
       default: return true;
     }
   }
@@ -364,7 +381,13 @@ bool Interaction::onKey(Key k, double t) {
     }
     case Key::ZoomIn: onWheel(screenMid, 1); return true;
     case Key::ZoomOut: onWheel(screenMid, -1); return true;
-    case Key::Home: glideTo(startCenter(), startScale(), t); return true;
+    case Key::Home:
+      if (startZoom_ == StartZoom::Photo && layout_.count() > 0) {
+        focus(startPos(), t);
+        return true;
+      }
+      glideTo(startCenter(), startScale(), t);
+      return true;
     case Key::Enter:
       if (auto p = nearestPosition(cam_.center)) focus(*p, t);
       return true;
