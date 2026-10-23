@@ -12,17 +12,20 @@
 #include "app/config.h"
 #include "app/gpu_textures.h"
 #include "app/library_index.h"
+#include "app/map_tiles.h"
 #include "app/sdl_audio.h"
 #include "app/streamer.h"
 #include "core/frame_history.h"
 #include "core/frame_stats.h"
 #include "gfx/background_renderer.h"
 #include "gfx/gl.h"
+#include "gfx/map_renderer.h"
 #include "gfx/overlay_renderer.h"
 #include "gfx/tile_renderer.h"
 #include "imaging/jpeg.h"
 #include "layout/content.h"
 #include "layout/layout.h"
+#include "map/map_view.h"
 #include "platform/paths.h"
 #include "plugin/plugin_host.h"
 #include "view/camera.h"
@@ -103,6 +106,17 @@ void setUv(float (&dst)[4], const UvRect& u) {
   dst[3] = u.v1;
 }
 
+// Limits drawing to `r` (window px, top-left origin) in a window `windowHeight` px tall.
+void scissor(const Rect& r, double windowHeight) {
+  const long x0 = std::lround(r.x0), x1 = std::lround(r.x1), y0 = std::lround(r.y0), y1 = std::lround(r.y1);
+  gl::Scissor(GLint(x0), GLint(std::lround(windowHeight) - y1), GLsizei(std::max(0L, x1 - x0)),
+              GLsizei(std::max(0L, y1 - y0)));
+}
+
+constexpr uint64_t kNoticeNs = 4'000'000'000ULL;  // map notices stay this long
+const Rgb8 kMapBackground{0x24, 0x24, 0x28};     // map panel where no tile is loaded yet
+const Rgb8 kDotColor{0xe8, 0x45, 0x2c};
+
 // Everything that exists once the library is loaded.
 struct Session {
   LibraryState lib;
@@ -127,7 +141,8 @@ int App::run(const Options& options) {
   }
   const size_t vramBudget = size_t(config.gpuMemoryMB) << 20;
   const auto diskCacheCap = uint64_t(config.diskCacheGB * double(uint64_t(1) << 30));
-  const fs::path libDir = libraryCacheDir(config.cacheDir.empty() ? defaultCacheRoot() : fs::absolute(config.cacheDir), root);
+  const fs::path cacheRoot = config.cacheDir.empty() ? defaultCacheRoot() : fs::absolute(config.cacheDir);
+  const fs::path libDir = libraryCacheDir(cacheRoot, root);
   if (options.rebuildCache) fs::remove_all(libDir, ec);
   fs::create_directories(libDir, ec);
 
@@ -147,7 +162,7 @@ int App::run(const Options& options) {
   // Plugins (--plugin): looked up in plugins/ next to the executable, then beside it.
   // Declared before everything that uses their formats or players.
   SdlAudio audio;
-  auto pluginHost = std::make_unique<PluginHost>(&audio);
+  auto pluginHost = std::make_unique<PluginHost>(&audio, config.pluginSettings, cacheRoot / "photobrowse");
   PluginHost& plugins = *pluginHost;
   if (!options.plugins.empty()) {
     std::vector<fs::path> pluginDirs;
@@ -213,7 +228,25 @@ int App::run(const Options& options) {
     GpuTextures textures;
     TileRenderer renderer;
     OverlayRenderer overlay;
-    if (!renderer.init() || !overlay.init()) exitCode = 1;
+    MapRenderer mapRenderer;
+    if (!renderer.init() || !overlay.init() || !mapRenderer.init()) exitCode = 1;
+    // Map (M): tiles come from a plugin's tile source, fetched on their own threads.
+    const TileSource* tileSource = plugins.tileSource();
+    std::unique_ptr<MapTiles> mapTiles;
+    if (tileSource) {
+      mapTiles = std::make_unique<MapTiles>(*tileSource, textures);
+      textures.wantMapPage();
+    }
+    MapView map({config.mapWidth, config.mapPhotoZoom});
+    if (config.mapOpen) map.toggle(seconds(SDL_GetTicksNS()), tileSource);
+    std::vector<MapTileDraw> mapDraws;
+    std::vector<TileInstance> mapInstances;
+    std::vector<MapDot> mapDots;
+    std::vector<uint32_t> visiblePositions;
+    std::vector<GeoPos> visibleGps;
+    bool mapTilesCancelled = true;
+    std::string notice;
+    uint64_t noticeUntil = 0;
     renderer.setCornerRadius(float(config.cornerRadius));
     renderer.setTransparentBars(config.letterbox && config.transparentBars);
     BackgroundRenderer background;
@@ -267,6 +300,7 @@ int App::run(const Options& options) {
     int pw = 0, ph = 0;
     SDL_GetWindowSizeInPixels(window, &pw, &ph);
     camera.viewport = {double(pw), double(ph)};
+    Vec2d windowPx = camera.viewport;  // drawable size; the content (camera) gets its left part
     Interaction ui(camera, *layout, config.maxPhotoZoom);
     Screensaver screensaver(config.screensaverHold);
     screensaver.setSlowZoom(config.screensaverSlowZoom);
@@ -294,7 +328,8 @@ int App::run(const Options& options) {
       ui.resetView();
       const size_t l0Pages = (session.lib.catalog.photos.size() + 16383) / 16384;
       const size_t fullReserve = size_t(Streamer::kFullSlots) * 3840 * 2880 * 4 * 4 / 3;
-      const size_t budget = vramBudget - std::min(vramBudget / 2, l0Pages * kPageBytes + fullReserve);
+      const size_t mapReserve = tileSource ? kPageBytes : 0;
+      const size_t budget = vramBudget - std::min(vramBudget / 2, l0Pages * kPageBytes + fullReserve + mapReserve);
       prewarmPages = l0Pages + budget / kPageBytes;
       session.streamer =
           std::make_unique<Streamer>(session.lib.catalog, root, thumbs, *jobs, textures, budget, formats);
@@ -343,7 +378,9 @@ int App::run(const Options& options) {
       // With stats shown, keep rendering at the display rate so the numbers mean something.
       const bool wait = ui.idle() && !animating && !prewarming && !indexer && !options.snapshot && !options.bench &&
                         !showStats && !background.animated() && !(player && player->active()) &&
-                        !screensaver.animating() &&
+                        !screensaver.animating() && !map.animating(seconds(SDL_GetTicksNS())) &&
+                        (!map.shown() || !mapTiles ||
+                         (mapTiles->pending() == 0 && !mapTiles->fading(seconds(SDL_GetTicksNS())))) &&
                         (!session.streamer || session.streamer->stats().pendingRequests == 0);
       SDL_Event ev;
       bool have = wait ? SDL_WaitEventTimeout(&ev, 100) : SDL_PollEvent(&ev);
@@ -354,21 +391,34 @@ int App::run(const Options& options) {
         switch (ev.type) {
           case SDL_EVENT_QUIT: running = false; break;
           case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-            ui.setViewport({double(ev.window.data1), double(ev.window.data2)});
+            windowPx = {double(ev.window.data1), double(ev.window.data2)};  // the content follows each frame
             break;
-          case SDL_EVENT_MOUSE_BUTTON_DOWN:
+          case SDL_EVENT_MOUSE_BUTTON_DOWN: {
             setScreensaver(false);  // any click, scroll or key (except the F-key toggles) stops it
-            if (ev.button.button == SDL_BUTTON_LEFT) ui.onPointerDown(px(ev.button.x, ev.button.y), t);
-            if (ev.button.button == SDL_BUTTON_RIGHT) ui.onSecondaryClick();
+            // Pointer events over the map panel go to the map, the rest to the content.
+            const Vec2d p = px(ev.button.x, ev.button.y);
+            if (ev.button.button == SDL_BUTTON_LEFT && !map.pointerDown(p, t)) ui.onPointerDown(p, t);
+            if (ev.button.button == SDL_BUTTON_RIGHT && !(map.shown() && map.panelRect(windowPx).contains(p))) {
+              ui.onSecondaryClick();
+            }
             break;
+          }
           case SDL_EVENT_MOUSE_BUTTON_UP:
-            if (ev.button.button == SDL_BUTTON_LEFT) ui.onPointerUp(px(ev.button.x, ev.button.y), t);
+            if (ev.button.button == SDL_BUTTON_LEFT) {
+              const Vec2d p = px(ev.button.x, ev.button.y);
+              if (!map.pointerUp(p, t)) ui.onPointerUp(p, t);
+            }
             break;
-          case SDL_EVENT_MOUSE_MOTION: ui.onPointerMove(px(ev.motion.x, ev.motion.y), t); break;
+          case SDL_EVENT_MOUSE_MOTION: {
+            const Vec2d p = px(ev.motion.x, ev.motion.y);
+            if (!map.pointerMove(p, t)) ui.onPointerMove(p, t);
+            break;
+          }
           case SDL_EVENT_MOUSE_WHEEL: {
             setScreensaver(false);
             const float dy = ev.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -ev.wheel.y : ev.wheel.y;
-            ui.onWheel(px(ev.wheel.mouse_x, ev.wheel.mouse_y), dy);
+            const Vec2d p = px(ev.wheel.mouse_x, ev.wheel.mouse_y);
+            if (!map.wheel(p, dy)) ui.onWheel(p, dy);
             break;
           }
           case SDL_EVENT_KEY_DOWN: {
@@ -383,6 +433,10 @@ int App::run(const Options& options) {
               showHelp = !showHelp;
             } else if (k == SDLK_ESCAPE && showHelp) {
               showHelp = false;  // Esc closes the help before anything else
+            } else if (k == SDLK_M) {
+              map.toggle(t, tileSource);
+            } else if (k == SDLK_ESCAPE && map.escape(t)) {
+              // then the map
             } else if (k == SDLK_F2) {
               showInfo = !showInfo;
             } else if (k == SDLK_F3) {
@@ -449,6 +503,35 @@ int App::run(const Options& options) {
         work.reset();
       }
       if (bench) bench->drive(ui, camera.viewport, seconds(now));
+      // Map: what it shows follows the content (the open photo, else the visible photos);
+      // the content gets the part of the window left of the map panel.
+      const double uiScale = std::max(1.0f, SDL_GetWindowDisplayScale(window));
+      {
+        MapView::Subject subject;
+        visibleGps.clear();
+        if (const auto o = ui.opened(); o && session.streamer && *o < session.lib.catalog.order.size()) {
+          subject.photo = *o;
+          subject.photoGps = session.lib.catalog.photos[session.lib.catalog.order[*o]].gps;
+        } else if (map.shown() && session.streamer) {
+          visiblePositions.clear();
+          layout->visible(camera.visibleWorld(), visiblePositions);
+          for (const uint32_t p : visiblePositions) {
+            if (p >= session.lib.catalog.order.size()) continue;
+            if (const auto& g = session.lib.catalog.photos[session.lib.catalog.order[p]].gps) visibleGps.push_back(*g);
+          }
+          subject.visibleGps = visibleGps;
+        }
+        subject.gridMoving = !ui.idle();
+        map.update(seconds(now), dt, windowPx, uiScale, subject, mapTiles ? mapTiles->pending() : 0);
+        const Rect content = map.contentRect(windowPx);
+        if (const Vec2d size{content.width(), content.height()}; size != camera.viewport) ui.setViewport(size);
+        for (auto n = map.takeNotice(); n; n = map.takeNotice()) {
+          notice = std::string(mapNoticeText(*n));
+          noticeUntil = now + kNoticeNs;
+          std::printf("map: %s\n", notice.c_str());
+          std::fflush(stdout);
+        }
+      }
       ui.update(seconds(now), dt);
       // After ui.update: reacts to a move ending this frame. Stays while the open item plays.
       screensaver.update(ui, layout->count(), seconds(now), player && player->active());
@@ -478,9 +561,24 @@ int App::run(const Options& options) {
       // --- Draw ------------------------------------------------------------------
       const uint64_t tPre = SDL_GetTicksNS();
       const float clear[3] = {background.clearColor()[0], background.clearColor()[1], background.clearColor()[2]};
-      renderer.beginFrame(camera.viewport, clear);
+      renderer.beginFrame(windowPx, clear);
       if (auto gpuMs = background.takeGpuMs(); gpuMs && bench) backgroundGpu.add(*gpuMs);
-      background.draw(camera.viewport, seconds(now - start));
+      background.draw(windowPx, seconds(now - start));
+      // Map tiles: requested and uploaded only while the map is shown.
+      mapDraws.clear();
+      if (mapTiles && map.shown()) {
+        mapTiles->frame(seconds(now), map.camera(), mapDraws);
+        map.tileResults(mapTiles->takeResults());
+        mapTilesCancelled = false;
+      } else if (mapTiles && !mapTilesCancelled) {
+        mapTiles->cancelAll();
+        mapTilesCancelled = true;
+      }
+      if (!session.streamer) textures.endFrame();
+      if (map.shown()) {
+        gl::Enable(GL_SCISSOR_TEST);
+        scissor(map.contentRect(windowPx), windowPx.y);
+      }
       const uint64_t tBegin = SDL_GetTicksNS();
       uint64_t tStream = tBegin;
       animating = false;
@@ -555,6 +653,55 @@ int App::run(const Options& options) {
         }
       }
 
+      // Map panel: background, tiles (blurry ancestors until loaded), dots, separator.
+      if (map.shown()) {
+        const Rect panel = map.panelRect(windowPx);
+        scissor(panel, windowPx.y);
+        const auto bg = toLinear(kMapBackground);
+        gl::ClearColor(bg[0], bg[1], bg[2], 1);
+        gl::Clear(GL_COLOR_BUFFER_BIT);
+        mapInstances.clear();
+        for (const MapTileDraw& d : mapDraws) {
+          TileInstance ti{};
+          setRect(ti.rect, {d.screen.x0 + panel.x0, d.screen.y0 + panel.y0, d.screen.x1 + panel.x0, d.screen.y1 + panel.y0});
+          setUv(ti.uv, d.uv);
+          setUv(ti.uvPrev, d.uvPrev);
+          ti.fade = d.fade;
+          ti.dim = map.dimmed() ? 0.6f : 0.0f;
+          mapInstances.push_back(ti);
+        }
+        renderer.setCornerRadius(0);
+        renderer.setTransparentBars(false);
+        renderer.draw(textures.mapTexture(), textures.mapTexture(), mapInstances);
+        renderer.setCornerRadius(float(config.cornerRadius));
+        renderer.setTransparentBars(config.letterbox && config.transparentBars);
+        mapDots.clear();
+        const auto dotColor = toLinear(kDotColor);
+        const MapCamera& mc = map.camera();
+        const bool single = map.singleMode();
+        const std::optional<double> pulse = map.pulse(seconds(now));
+        for (Vec2d d : map.dots()) {
+          d.x -= std::round(d.x - mc.center.x);  // the copy of the world nearest the view
+          const Vec2d s = mc.worldToScreen(d) + Vec2d{panel.x0, panel.y0};
+          mapDots.push_back({{float(s.x), float(s.y)},
+                             float((single ? 5 : 3) * uiScale),
+                             float((single ? 1.5 : 1) * uiScale),
+                             {dotColor[0], dotColor[1], dotColor[2], 1},
+                             single && pulse ? float(std::max(*pulse, 1e-3)) : 0.0f});
+        }
+        mapRenderer.draw(windowPx, mapDots);
+        // Separator: one dark device pixel along the panel's left edge.
+        scissor({panel.x0, 0, panel.x0 + 1, windowPx.y}, windowPx.y);
+        gl::ClearColor(0, 0, 0, 1);
+        gl::Clear(GL_COLOR_BUFFER_BIT);
+        gl::Disable(GL_SCISSOR_TEST);
+        overlayQuads.clear();
+        if (map.dimmed()) buildMapStatus(map.status(), overlayFont, uiScale, panel, overlayQuads);
+        if (tileSource) buildAttribution(tileSource->attribution(), overlayFont, uiScale, panel, overlayQuads);
+        overlay.draw(windowPx, overlayQuads);
+        animating |= std::any_of(mapDraws.begin(), mapDraws.end(), [](const MapTileDraw& d) { return d.fade < 1; });
+      }
+
       // Stats: drawn as an overlay in fullscreen (no title bar there), else in the title.
       const bool fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN;
       OverlayStats os;
@@ -572,9 +719,8 @@ int App::run(const Options& options) {
       }
       if (showStats && fullscreen && session.streamer) {
         overlayQuads.clear();
-        buildOverlay(os, history, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), overlayQuads,
-                     config.statsGraph);
-        overlay.draw(camera.viewport, overlayQuads);
+        buildOverlay(os, history, overlayFont, uiScale, overlayQuads, config.statsGraph);
+        overlay.draw(windowPx, overlayQuads);
       }
 
       // Photo info (F2): only once a photo is fully open in whole-photo view.
@@ -584,24 +730,29 @@ int App::run(const Options& options) {
         const PhotoInfo info{rec.relPath, rec.width, rec.height, rec.takenAt, rec.takenAt == rec.mtime,
                              rec.fileSize, rec.gps};
         overlayQuads.clear();
-        buildPhotoInfo(info, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,
-                       overlayQuads);
-        overlay.draw(camera.viewport, overlayQuads);
+        buildPhotoInfo(info, overlayFont, uiScale, camera.viewport, overlayQuads);
+        overlay.draw(windowPx, overlayQuads);
       }
 
       // Photo effect (number keys): its name in the top-right corner while one is on.
       if (const std::string label = photoEffectLabel(ui.photoEffect()); !label.empty()) {
         overlayQuads.clear();
-        buildPhotoEffectLabel(label, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,
-                              overlayQuads);
-        overlay.draw(camera.viewport, overlayQuads);
+        buildPhotoEffectLabel(label, overlayFont, uiScale, camera.viewport, overlayQuads);  // top right of the content
+        overlay.draw(windowPx, overlayQuads);
+      }
+
+      // Map notices (e.g. no internet): a few seconds near the top centre.
+      if (now < noticeUntil) {
+        overlayQuads.clear();
+        buildMessage(notice, overlayFont, uiScale, windowPx, overlayQuads);
+        overlay.draw(windowPx, overlayQuads);
       }
 
       // Help (F1): every key binding, centered on top of everything.
       if (showHelp) {
         overlayQuads.clear();
-        buildHelp(overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport, overlayQuads);
-        overlay.draw(camera.viewport, overlayQuads);
+        buildHelp(overlayFont, uiScale, windowPx, overlayQuads);
+        overlay.draw(windowPx, overlayQuads);
       }
 
       if (GLenum err = gl::GetError(); err != GL_NO_ERROR && !reportedGlError) {
@@ -611,7 +762,7 @@ int App::run(const Options& options) {
       const uint64_t beforeSwap = SDL_GetTicksNS();
       if (bench && bench->done(seconds(now))) {
         std::printf("bench: %zu frames in %.1f s, %dx%d px\n", intervals.count(), seconds(now - benchStart),
-                    int(camera.viewport.x), int(camera.viewport.y));
+                    int(windowPx.x), int(windowPx.y));
         std::printf("bench: frame interval ms p50=%.2f p95=%.2f p99=%.2f max=%.2f, >20ms: %zu\n",
                     intervals.percentile(50), intervals.percentile(95), intervals.percentile(99), intervals.max(),
                     intervals.countAbove(20));
@@ -622,12 +773,15 @@ int App::run(const Options& options) {
           std::printf("bench: background shader GPU ms p50=%.2f p99=%.2f max=%.2f\n", backgroundGpu.percentile(50),
                       backgroundGpu.percentile(99), backgroundGpu.max());
         }
-        if (options.snapshot && !saveSnapshot(*options.snapshot, camera.viewport)) exitCode = 1;
+        if (options.snapshot && !saveSnapshot(*options.snapshot, windowPx)) exitCode = 1;
         running = false;
       }
-      if (!options.bench && options.snapshot && session.streamer && ui.idle() && !animating &&
+      // With the map shown, also wait for its tiles (but no more than 10 s).
+      const bool mapSettled = !map.shown() || now - start > 10'000'000'000ULL ||
+                              (!map.animating(seconds(now)) && (!mapTiles || mapTiles->pending() == 0));
+      if (!options.bench && options.snapshot && session.streamer && ui.idle() && !animating && mapSettled &&
           session.streamer->stats().pendingRequests == 0 && now - start > 1'500'000'000ULL) {
-        if (!saveSnapshot(*options.snapshot, camera.viewport)) {
+        if (!saveSnapshot(*options.snapshot, windowPx)) {
           std::fprintf(stderr, "could not write snapshot %s\n", toUtf8(*options.snapshot).c_str());
           exitCode = 1;
         }
@@ -667,6 +821,7 @@ int App::run(const Options& options) {
     }
 
     *stopBackground = true;
+    mapTiles.reset();
     player.reset();
     session.streamer.reset();
     indexer.reset();
