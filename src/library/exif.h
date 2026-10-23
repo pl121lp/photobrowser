@@ -14,6 +14,17 @@ struct GeoPos {
   std::optional<double> altitude;
 };
 
+// Metadata shared by every container that carries an EXIF/TIFF block.
+struct ExifInfo {
+  std::optional<std::string> dateTimeOriginal;  // "YYYY:MM:DD HH:MM:SS"
+  int orientation = 1;                          // EXIF 1..8
+  std::optional<GeoPos> gps;                    // only when latitude and longitude are both present
+};
+
+// Parses a bare TIFF/EXIF block starting at "II*\0" or "MM\0*". Returns nullopt if the
+// header is not TIFF; a truncated block yields what was found.
+std::optional<ExifInfo> parseExifBlock(std::span<const uint8_t> tiff);
+
 struct JpegHeaderInfo {
   std::optional<std::string> dateTimeOriginal;  // "YYYY:MM:DD HH:MM:SS"
   int orientation = 1;                          // EXIF 1..8

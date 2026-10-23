@@ -1,6 +1,7 @@
 #include "library/exif.h"
 
 #include <cctype>
+#include <utility>
 
 namespace pb {
 
@@ -83,7 +84,7 @@ std::optional<double> dms(const TiffReader& r, uint16_t type, uint32_t count, si
   return v[0] + v[1] / 60 + v[2] / 3600;
 }
 
-void parseGps(const TiffReader& r, uint32_t ifd, JpegHeaderInfo& info) {
+void parseGps(const TiffReader& r, uint32_t ifd, ExifInfo& info) {
   std::optional<double> lat, lon, alt;
   char latRef = 'N', lonRef = 'E';
   bool belowSea = false;
@@ -105,20 +106,22 @@ void parseGps(const TiffReader& r, uint32_t ifd, JpegHeaderInfo& info) {
   info.gps = g;
 }
 
-void parseExif(std::span<const uint8_t> tiff, uint64_t tiffFileOffset, JpegHeaderInfo& info) {
-  if (tiff.size() < 8) return;
+// Fills `info` from a TIFF block; returns false if the header is not TIFF. When `thumb` is
+// given, it receives the IFD1 preview JPEG {offset, length} relative to the block start.
+bool parseTiff(std::span<const uint8_t> tiff, ExifInfo& info, std::pair<uint32_t, uint32_t>* thumb) {
+  if (tiff.size() < 8) return false;
   bool be;
   if (tiff[0] == 'M' && tiff[1] == 'M') {
     be = true;
   } else if (tiff[0] == 'I' && tiff[1] == 'I') {
     be = false;
   } else {
-    return;
+    return false;
   }
   TiffReader r(tiff, be);
-  if (r.u16(2) != 42) return;
+  if (r.u16(2) != 42) return false;
   auto ifd0 = r.u32(4);
-  if (!ifd0) return;
+  if (!ifd0) return false;
 
   std::optional<uint32_t> exifIfd, gpsIfd;
   auto ifd1 = walkIfd(r, *ifd0, [&](uint16_t tag, uint16_t type, uint32_t, size_t v) {
@@ -142,16 +145,27 @@ void parseExif(std::span<const uint8_t> tiff, uint64_t tiffFileOffset, JpegHeade
     });
   }
 
-  if (ifd1 && *ifd1 != 0 && *ifd1 != *ifd0) {
+  if (thumb && ifd1 && *ifd1 != 0 && *ifd1 != *ifd0) {
     std::optional<uint32_t> off, len;
     walkIfd(r, *ifd1, [&](uint16_t tag, uint16_t type, uint32_t, size_t v) {
       if (tag == kTagThumbOffset) off = scalar(r, type, v);
       if (tag == kTagThumbLength) len = scalar(r, type, v);
     });
-    if (off && len && *off > 0 && *len > 0) {
-      info.thumbOffset = tiffFileOffset + *off;
-      info.thumbLength = *len;
-    }
+    if (off && len && *off > 0 && *len > 0) *thumb = {*off, *len};
+  }
+  return true;
+}
+
+void parseExif(std::span<const uint8_t> tiff, uint64_t tiffFileOffset, JpegHeaderInfo& info) {
+  ExifInfo e;
+  std::pair<uint32_t, uint32_t> thumb{0, 0};
+  if (!parseTiff(tiff, e, &thumb)) return;
+  info.orientation = e.orientation;
+  if (e.dateTimeOriginal) info.dateTimeOriginal = std::move(e.dateTimeOriginal);
+  if (e.gps) info.gps = e.gps;
+  if (thumb.second > 0) {
+    info.thumbOffset = tiffFileOffset + thumb.first;
+    info.thumbLength = thumb.second;
   }
 }
 
@@ -160,6 +174,12 @@ bool isSof(uint8_t m) {
 }
 
 }  // namespace
+
+std::optional<ExifInfo> parseExifBlock(std::span<const uint8_t> tiff) {
+  ExifInfo info;
+  if (!parseTiff(tiff, info, nullptr)) return std::nullopt;
+  return info;
+}
 
 std::optional<JpegHeaderInfo> parseJpegHeader(std::span<const uint8_t> d) {
   if (d.size() < 2 || d[0] != 0xFF || d[1] != 0xD8) return std::nullopt;

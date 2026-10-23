@@ -58,7 +58,7 @@ void putEntry(std::vector<uint8_t>& v, uint16_t tag, uint16_t type, uint32_t cou
 
 // Big-endian JPEG whose IFD0 points to a GPS IFD. `coords`: with latitude/longitude
 // (33 deg 52' 30" S, 151 deg 12' 36" W, 122.5 m below sea level); else only the version tag.
-std::vector<uint8_t> syntheticGpsJpeg(bool coords) {
+std::vector<uint8_t> syntheticGpsTiff(bool coords) {
   std::vector<uint8_t> tiff = {'M', 'M', 0, 42};
   put32be(tiff, 8);  // IFD0 at 8
   put16be(tiff, 1);
@@ -86,12 +86,49 @@ std::vector<uint8_t> syntheticGpsJpeg(bool coords) {
     putEntry(tiff, 0, 1, 4, 0x02020000);  // GPSVersionID only
     put32be(tiff, 0);
   }
+  return tiff;
+}
+
+std::vector<uint8_t> syntheticGpsJpeg(bool coords) {
+  auto tiff = syntheticGpsTiff(coords);
   std::vector<uint8_t> j = {0xFF, 0xD8, 0xFF, 0xE1};
   put16be(j, uint16_t(2 + 6 + tiff.size()));
   for (char c : std::string("Exif\0\0", 6)) j.push_back(uint8_t(c));
   j.insert(j.end(), tiff.begin(), tiff.end());
   j.insert(j.end(), {0xFF, 0xDA, 0x00, 0x02});
   return j;
+}
+
+// Big-endian block: IFD0 {Orientation=6, ExifIFD, GPS}, ExifIFD {DateTimeOriginal}, GPS as above.
+std::vector<uint8_t> fullBigEndianTiff() {
+  std::vector<uint8_t> tiff = {'M', 'M', 0, 42};
+  put32be(tiff, 8);
+  put16be(tiff, 3);
+  putEntry(tiff, 0x0112, 3, 1, 6u << 16);
+  putEntry(tiff, 0x8769, 4, 1, 50);  // Exif IFD at 50
+  putEntry(tiff, 0x8825, 4, 1, 88);  // GPS IFD at 88
+  put32be(tiff, 0);
+  put16be(tiff, 1);                        // Exif IFD at 50
+  putEntry(tiff, 0x9003, 2, 20, 68);       // DateTimeOriginal string at 68
+  put32be(tiff, 0);
+  for (char c : std::string("2026:06:16 21:56:20\0", 20)) tiff.push_back(uint8_t(c));
+  const uint32_t data = 88 + 2 + 6 * 12 + 4;  // GPS IFD at 88
+  put16be(tiff, 6);
+  putEntry(tiff, 1, 2, 2, uint32_t('S') << 24);
+  putEntry(tiff, 2, 5, 3, data);
+  putEntry(tiff, 3, 2, 2, uint32_t('W') << 24);
+  putEntry(tiff, 4, 5, 3, data + 24);
+  putEntry(tiff, 5, 1, 1, 1u << 24);
+  putEntry(tiff, 6, 5, 1, data + 48);
+  put32be(tiff, 0);
+  putRational(tiff, 33, 1);
+  putRational(tiff, 52, 1);
+  putRational(tiff, 3000, 100);
+  putRational(tiff, 151, 1);
+  putRational(tiff, 12, 1);
+  putRational(tiff, 36, 1);
+  putRational(tiff, 1225, 10);
+  return tiff;
 }
 
 }  // namespace
@@ -186,4 +223,44 @@ TEST_CASE("exif: GPS block without coordinates is no position") {
   REQUIRE(i);
   CHECK_FALSE(i->gps);
   CHECK_FALSE(pb::parseJpegHeader(syntheticBigEndianJpeg())->gps);
+}
+
+TEST_CASE("exif block: big-endian with orientation, date and GPS") {
+  auto b = fullBigEndianTiff();
+  auto i = pb::parseExifBlock(b);
+  REQUIRE(i);
+  CHECK(i->orientation == 6);
+  REQUIRE(i->dateTimeOriginal);
+  CHECK(*i->dateTimeOriginal == "2026:06:16 21:56:20");
+  REQUIRE(i->gps);
+  CHECK(i->gps->lat == doctest::Approx(-33.875));
+  CHECK(i->gps->lon == doctest::Approx(-151.21));
+  REQUIRE(i->gps->altitude);
+  CHECK(*i->gps->altitude == doctest::Approx(-122.5));
+}
+
+TEST_CASE("exif block: little-endian II header") {
+  std::vector<uint8_t> b = {'I', 'I', 42, 0, 8, 0, 0, 0,  // IFD0 at 8
+                            1, 0,                          // one entry
+                            0x12, 0x01, 3, 0, 1, 0, 0, 0, 3, 0, 0, 0,  // Orientation SHORT 3
+                            0, 0, 0, 0};
+  auto i = pb::parseExifBlock(b);
+  REQUIRE(i);
+  CHECK(i->orientation == 3);
+  CHECK_FALSE(i->gps);
+}
+
+TEST_CASE("exif block: not TIFF") {
+  const uint8_t jpegPrefixed[] = {'E', 'x', 'i', 'f', 0, 0, 'M', 'M', 0, 42, 0, 0, 0, 8};
+  CHECK_FALSE(pb::parseExifBlock(jpegPrefixed));
+  CHECK_FALSE(pb::parseExifBlock({}));
+}
+
+TEST_CASE("exif block: truncated keeps what was read") {
+  auto b = syntheticGpsTiff(true);
+  b.resize(30);
+  auto i = pb::parseExifBlock(b);
+  REQUIRE(i);
+  CHECK_FALSE(i->gps);
+  CHECK(i->orientation == 1);
 }
