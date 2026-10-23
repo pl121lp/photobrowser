@@ -240,3 +240,31 @@ TEST_CASE("help: shrinks to fit a small window") {
   CHECK(panel.x1 <= viewport.x);
   CHECK(panel.y1 <= viewport.y);
 }
+
+TEST_CASE("photo effect: label per effect, none for 0 or unknown") {
+  CHECK(pb::photoEffectLabel(0).empty());
+  CHECK(pb::photoEffectLabel(1) == "1: Sharpen");
+  CHECK(pb::photoEffectLabel(2) == "2: Sobel edges");
+  CHECK(pb::photoEffectLabel(3) == "3: Saturation");
+  CHECK(pb::photoEffectLabel(4).empty());
+  CHECK(pb::photoEffectLabel(-1).empty());
+}
+
+TEST_CASE("photo effect: label panel sits in the top-right corner and holds its text") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::Vec2d viewport{1920, 1080};
+  const pb::Rect panel = pb::buildPhotoEffectLabel("2: Sobel edges", kFont, 1.0, viewport, q);
+  REQUIRE(q.size() == 1 + 12);  // panel + visible characters
+  CHECK(q[0].rect == panel);
+  CHECK(q[0].color[3] < 1);
+  CHECK(panel.x1 < viewport.x);
+  CHECK(panel.x1 > viewport.x - 100);
+  CHECK(panel.y0 > 0);
+  CHECK(panel.y0 < 100);
+  for (const auto& quad : q) {
+    CHECK(quad.rect.x0 >= panel.x0 - 1e-9);
+    CHECK(quad.rect.x1 <= panel.x1 + 1e-9);
+    CHECK(quad.rect.y0 >= panel.y0 - 1e-9);
+    CHECK(quad.rect.y1 <= panel.y1 + 1e-9);
+  }
+}

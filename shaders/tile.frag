@@ -14,10 +14,23 @@ uniform sampler2D uTexPrev;
 
 out vec4 fragColor;
 
+// Neighbour offset for photo effects: one screen pixel, at least one texel of the level.
+vec2 effectStep(sampler2D tex, vec2 uv) {
+  return max(fwidth(uv), 1.0 / vec2(textureSize(tex, 0)));
+}
+
+// Photo effect (shaders/photo/*.frag, keys 1-3 on the open photo): the renderer inserts
+// `#define PHOTO_EFFECT` and the effect's `vec3 photoEffect(sampler2D, vec2, vec3)` here.
+//@photo_effect
+
 void main() {
   // Both samples are unconditional so implicit derivatives (mip selection) stay valid.
   vec4 cur = texture(uTex, vUv);
   vec4 prev = texture(uTexPrev, vUvPrev);
+#ifdef PHOTO_EFFECT
+  cur.rgb = photoEffect(uTex, vUv, cur.rgb);
+  prev.rgb = photoEffect(uTexPrev, vUvPrev, prev.rgb);
+#endif
   vec3 c = mix(prev.rgb, cur.rgb, vParams.x) * (1.0 - vParams.y);
   // Letterbox: black outside the image area (a full-tile area costs nothing visible).
   // The photo itself gets the rounded corners too, sized from its own shorter side.

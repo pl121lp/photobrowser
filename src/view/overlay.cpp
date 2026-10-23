@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <iterator>
 
 namespace pb {
 
@@ -159,6 +160,24 @@ Rect buildPhotoInfo(const PhotoInfo& p, const FontInfo& font, double scale, Vec2
   return panel;
 }
 
+std::string photoEffectLabel(int effect) {
+  // Same order as the shaders in src/gfx/tile_renderer.cpp.
+  constexpr const char* kNames[] = {"Sharpen", "Sobel edges", "Saturation"};
+  if (effect < 1 || effect > int(std::size(kNames))) return {};
+  return std::to_string(effect) + ": " + kNames[effect - 1];
+}
+
+Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double scale, Vec2d viewport,
+                           std::vector<OverlayQuad>& out) {
+  const double pad = kPadding * scale;
+  const double x1 = viewport.x - kMargin * scale, y0 = kMargin * scale;
+  const Rect panel{x1 - double(label.size()) * font.cellW * scale - 2 * pad, y0, x1, y0 + font.cellH * scale + 2 * pad};
+  out.push_back(solid(OverlayQuad::Kind::Panel, panel, font, 0, 0, 0, 0.6f));
+  const float white[4] = {0.95f, 0.95f, 0.95f, 1};
+  layoutText(label, {panel.x0 + pad, y0 + pad}, scale, white, font, out);
+  return panel;
+}
+
 std::vector<HelpEntry> helpEntries() {
   return {
       {"F1", "show / hide this help"},
@@ -175,6 +194,7 @@ std::vector<HelpEntry> helpEntries() {
       {"+ / -", "zoom in / out"},
       {"Home", "back to the start view"},
       {"Enter", "open the centered photo whole"},
+      {"1 / 2 / 3 / 0", "whole-photo view: sharpen / edges / saturate / no effect"},
       {"Esc", "close help, leave whole-photo view, then fullscreen"},
       {"Q", "quit"},
       {"", ""},

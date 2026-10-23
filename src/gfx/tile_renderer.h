@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <span>
 
 #include "core/geom.h"
@@ -20,6 +21,9 @@ struct TileInstance {
 // Draws textured screen-space quads with one instanced draw per texture pair.
 class TileRenderer {
  public:
+  // Photo effects (shaders/photo/*.frag), numbered from 1; 0 = none.
+  static constexpr int kPhotoEffects = 3;
+
   ~TileRenderer();
   bool init();
   void beginFrame(Vec2d viewportPx, const float clearRgb[3]);
@@ -27,11 +31,18 @@ class TileRenderer {
   void setCornerRadius(float fraction) { cornerRadius_ = fraction; }
   // Letterbox bars (outside a tile's image area) transparent instead of black.
   void setTransparentBars(bool on) { transparentBars_ = on; }
-  void draw(GLuint tex, GLuint texPrev, std::span<const TileInstance> tiles);
+  // `effect`: photo effect 1..kPhotoEffects for these tiles, 0 (or out of range) = none.
+  void draw(GLuint tex, GLuint texPrev, std::span<const TileInstance> tiles, int effect = 0);
 
  private:
-  GLuint program_ = 0, vao_ = 0, vbo_ = 0;
-  GLint uViewport_ = -1, uCornerRadius_ = -1, uTransparentBars_ = -1;
+  struct Program {
+    GLuint id = 0;
+    GLint uViewport = -1, uCornerRadius = -1, uTransparentBars = -1;
+  };
+  bool buildTileProgram(Program& p, const char* effectSource);
+
+  std::array<Program, kPhotoEffects + 1> programs_;  // [0] plain, [i] photo effect i
+  GLuint vao_ = 0, vbo_ = 0;
   float cornerRadius_ = 0;
   bool transparentBars_ = false;
   size_t capacity_ = 0;

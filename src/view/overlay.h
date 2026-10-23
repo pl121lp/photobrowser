@@ -64,6 +64,12 @@ std::vector<std::string> photoInfoLines(const PhotoInfo& p);
 Rect buildPhotoInfo(const PhotoInfo& p, const FontInfo& font, double scale, Vec2d viewport,
                     std::vector<OverlayQuad>& out);
 
+// Photo effect (keys 1-3 in whole-photo view): "<n>: <name>", empty for 0 or an unknown effect.
+std::string photoEffectLabel(int effect);
+// One-line label panel in the top-right corner of a `viewport`-sized screen. Returns the panel rect.
+Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double scale, Vec2d viewport,
+                           std::vector<OverlayQuad>& out);
+
 // Help (F1): every key and mouse binding. An entry with an empty key and action is a gap.
 struct HelpEntry {
   std::string key, action;

@@ -61,6 +61,11 @@ class Interaction {
   // True once per click on the open photo in whole-photo view (e.g. play / pause).
   bool takeActivation() { return std::exchange(activated_, false); }
 
+  // Shader effect on the open photo (keys 0-3; 0 = none). Ignored (false) unless a photo
+  // is open or opening; leaving the whole-photo view resets it to 0.
+  bool setPhotoEffect(int effect);
+  int photoEffect() const { return photoEffect_; }
+
   std::optional<uint32_t> focused() const;
   // Like focused(), but only while opening or open, not while closing.
   std::optional<uint32_t> opened() const { return focusTarget_ ? focused_ : std::nullopt; }
@@ -129,6 +134,7 @@ class Interaction {
   Vec2d focusZoomPivot_;
   Vec2d focusPan_;
   bool activated_ = false;
+  int photoEffect_ = 0;
 
   Vec2d velocityPx_;
 };

@@ -59,6 +59,14 @@ std::optional<Key> mapKey(SDL_Keycode k) {
   }
 }
 
+// Photo effect for keys 0-3 (top row or keypad); -1 for any other key.
+int photoEffectKey(SDL_Keycode k) {
+  if (k >= SDLK_0 && k <= SDLK_0 + TileRenderer::kPhotoEffects) return int(k - SDLK_0);
+  if (k == SDLK_KP_0) return 0;
+  if (k >= SDLK_KP_1 && k < SDLK_KP_1 + TileRenderer::kPhotoEffects) return int(k - SDLK_KP_1) + 1;
+  return -1;
+}
+
 double seconds(uint64_t ns) { return double(ns) * 1e-9; }
 
 // Reads the back buffer (call before swap) and writes it as a JPEG.
@@ -387,6 +395,9 @@ int App::run(const Options& options) {
               const bool fs = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN;
               SDL_SetWindowFullscreenMode(window, nullptr);  // borderless desktop
               SDL_SetWindowFullscreen(window, !fs);
+            } else if (const int effect = photoEffectKey(k); effect >= 0) {
+              setScreensaver(false);
+              ui.setPhotoEffect(effect);  // ignored outside the whole-photo view
             } else if (auto key = mapKey(k)) {
               setScreensaver(false);
               const bool arrow = *key == Key::Left || *key == Key::Right || *key == Key::Up || *key == Key::Down;
@@ -539,7 +550,8 @@ int App::run(const Options& options) {
         }
         if (focusedTile) {
           const uint64_t key = focusedTile->first;
-          renderer.draw(GLuint(key >> 32), GLuint(key & 0xffffffffu), std::span(&focusedTile->second, 1));
+          renderer.draw(GLuint(key >> 32), GLuint(key & 0xffffffffu), std::span(&focusedTile->second, 1),
+                        ui.photoEffect());
         }
       }
 
@@ -573,6 +585,14 @@ int App::run(const Options& options) {
         overlayQuads.clear();
         buildPhotoInfo(info, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,
                        overlayQuads);
+        overlay.draw(camera.viewport, overlayQuads);
+      }
+
+      // Photo effect (keys 1-3): its name in the top-right corner while one is on.
+      if (const std::string label = photoEffectLabel(ui.photoEffect()); !label.empty()) {
+        overlayQuads.clear();
+        buildPhotoEffectLabel(label, overlayFont, std::max(1.0f, SDL_GetWindowDisplayScale(window)), camera.viewport,
+                              overlayQuads);
         overlay.draw(camera.viewport, overlayQuads);
       }
 

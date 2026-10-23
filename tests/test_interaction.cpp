@@ -578,3 +578,24 @@ TEST_CASE("interaction: shift+arrow hops five photos, stopping at the edges") {
     CHECK(*f.ui.focused() == 5);
   }
 }
+
+TEST_CASE("interaction: photo effect applies only in whole-photo view and resets on leaving it") {
+  Fixture f;
+  CHECK(f.ui.photoEffect() == 0);
+  CHECK_FALSE(f.ui.setPhotoEffect(2));  // grid view: ignored
+  CHECK(f.ui.photoEffect() == 0);
+  f.ui.onKey(pb::Key::Enter, f.t);
+  f.run(0.5);
+  CHECK(f.ui.setPhotoEffect(2));
+  CHECK(f.ui.photoEffect() == 2);
+  f.ui.onKey(pb::Key::Right, f.t);  // stepping to the next photo keeps it
+  CHECK(f.ui.photoEffect() == 2);
+  CHECK(f.ui.setPhotoEffect(0));
+  CHECK(f.ui.photoEffect() == 0);
+  f.ui.setPhotoEffect(3);
+  f.ui.onKey(pb::Key::Escape, f.t);
+  CHECK(f.ui.photoEffect() == 0);
+  f.run(0.5);
+  f.ui.onKey(pb::Key::Enter, f.t);  // the next photo opens without an effect
+  CHECK(f.ui.photoEffect() == 0);
+}

@@ -137,8 +137,15 @@ void Interaction::unfocus(bool smoothZoom) {
   if (!focusTarget_) return;
   focusTarget_ = false;
   focusRectValid_ = false;
+  photoEffect_ = 0;
   resetFocusZoom(!smoothZoom);
   focusTween_ = {focusProgress_, 0, now_, kFocusS};
+}
+
+bool Interaction::setPhotoEffect(int effect) {
+  if (!focusTarget_) return false;
+  photoEffect_ = std::max(0, effect);
+  return true;
 }
 
 double Interaction::focusZoom() const { return std::exp(focusLogZoom_.current); }
