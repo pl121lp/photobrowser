@@ -14,6 +14,15 @@ std::string lowerExtension(std::string_view path) {
   return e;
 }
 
+bool hasType(std::string_view path, const std::vector<std::string>& types) {
+  const std::string e = lowerExtension(path);
+  if (e.empty()) return false;
+  const bool jpeg = e == ".jpg" || e == ".jpeg";
+  return std::any_of(types.begin(), types.end(), [&](const std::string& t) {
+    return e.compare(1, std::string::npos, t) == 0 || (jpeg && (t == "jpg" || t == "jpeg"));
+  });
+}
+
 const MediaFormats& MediaFormats::none() {
   static const MediaFormats empty;
   return empty;

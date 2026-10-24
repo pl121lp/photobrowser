@@ -128,7 +128,7 @@ way to see one photo whole:
 ### 3.6 Running it
 `photobrowse [photo-folder]` — defaults to `./photos`.
 Options: `--cache-dir <dir>`, `--rebuild-cache`, `--layout square-crop`,
-`--plugin <name|path>` (repeatable).
+`--plugin <name|path>` (repeatable), `--filter <types>` (hide file types, e.g. `png,mp4`).
 
 ### 3.7 Plugins
 Optional features ship as plugins (shared libraries) and are enabled per run with

@@ -335,6 +335,9 @@ int App::run(const Options& options) {
     auto startSession = [&](LibraryState lib) {
       session.lib = std::move(lib);
       session.lib.catalog.sortOrder(config.newestFirst);  // saved oldest first; cheap to redo
+      std::erase_if(session.lib.catalog.order, [&](PhotoId id) {  // --filter: hidden, still cached
+        return hasType(session.lib.catalog.photos[id].relPath, options.filterTypes);
+      });
       layout->build(uint32_t(session.lib.catalog.order.size()));
       ui.layoutChanged();
       ui.setStartPosition(startPosition(config.startAt, layout->count(), layout->centerPosition(),

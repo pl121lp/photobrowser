@@ -58,6 +58,19 @@ TEST_CASE("media formats: extension lookup is case-insensitive, JPEG always acce
   CHECK(pb::lowerExtension("x/Y.JPG") == ".jpg");
 }
 
+TEST_CASE("media formats: file type filter") {
+  const std::vector<std::string> types{"png", "mp4"};
+  CHECK(pb::hasType("a/b.PNG", types));
+  CHECK(pb::hasType("clip.mp4", types));
+  CHECK_FALSE(pb::hasType("a.jpg", types));
+  CHECK_FALSE(pb::hasType("png", types));  // no extension
+  CHECK_FALSE(pb::hasType("a.png", {}));
+  // jpg and jpeg name the same type.
+  CHECK(pb::hasType("x.jpeg", {"jpg"}));
+  CHECK(pb::hasType("x.JPG", {"jpeg"}));
+  CHECK_FALSE(pb::hasType("x.png", {"jpg"}));
+}
+
 TEST_CASE("media formats: scanner includes registered extensions") {
   pbtest::TempDir dir;
   pbtest::writeFile(dir.path / "a.jpg", "1");

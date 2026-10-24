@@ -56,6 +56,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | `--bench` | fullscreen scripted pan/zoom tour; prints frame-time percentiles and exits |
 | `--plugin <name\|path>` | load a plugin, e.g. `--plugin video` (repeatable; see [Plugins](#plugins)) |
 | `--all-plugins` | load every plugin in the `plugins/` folder (after any `--plugin` ones); one that fails to load is skipped with a warning |
+| `--filter <types>` | leave these file types out of the grid, e.g. `--filter png,mp4` (`jpg` also covers `.jpeg`); they stay in the cache, so changing the filter needs no re-index |
 | `--snapshot <file.jpg>` | save the settled start view (or the end of `--bench`) and exit |
 
 The first run on a folder (or `--rebuild-cache`) indexes it, with a centred panel

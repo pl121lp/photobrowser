@@ -98,3 +98,15 @@ TEST_CASE("options: help lists the plugins and how to combine them") {
   CHECK(u.find("--plugin heif --plugin video --plugin maptiles") != std::string::npos);
   CHECK(u.find("--all-plugins") != std::string::npos);
 }
+
+TEST_CASE("options: filter hides file types") {
+  auto o = std::get<pb::Options>(parse({"--filter", "PNG,.mp4, heic"}));
+  CHECK(o.filterTypes == std::vector<std::string>{"png", "mp4", "heic"});
+  CHECK(std::get<pb::Options>(parse({})).filterTypes.empty());
+  auto twice = std::get<pb::Options>(parse({"--filter", "png", "--filter", "mov"}));
+  CHECK(twice.filterTypes == std::vector<std::string>{"png", "mov"});
+  CHECK(std::holds_alternative<std::string>(parse({"--filter"})));
+  CHECK(std::holds_alternative<std::string>(parse({"--filter", ""})));
+  CHECK(std::holds_alternative<std::string>(parse({"--filter", "png,,jpg"})));
+  CHECK(pb::usage().find("--filter") != std::string::npos);
+}

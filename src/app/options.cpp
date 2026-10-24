@@ -1,5 +1,7 @@
 #include "app/options.h"
 
+#include <algorithm>
+#include <cctype>
 #include <string_view>
 
 #include "layout/layout.h"
@@ -24,6 +26,8 @@ std::string usage() {
          "                        looked up in the plugins/ folder next to the program\n"
          "  --all-plugins         load every plugin in that folder (after any --plugin ones);\n"
          "                        one that fails to load is skipped with a warning\n"
+         "  --filter <types>      leave these file types out, e.g. --filter png,mp4 (jpg also\n"
+         "                        covers .jpeg); the cache keeps them, so no re-index\n"
          "  --snapshot <file.jpg> save the start view (or the end of --bench) as JPEG and exit\n"
          "  --help                show this help\n"
          "\n"
@@ -70,6 +74,19 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv) {
       auto v = value();
       if (!v || v->empty()) return std::string("--plugin needs a plugin name or file");
       o.plugins.push_back(*v);
+    } else if (a == "--filter") {
+      auto v = value();
+      if (!v || v->empty()) return std::string("--filter needs file types, e.g. --filter png,mp4");
+      for (size_t start = 0; start <= v->size();) {
+        const size_t comma = std::min(v->find(',', start), v->size());
+        std::string t = v->substr(start, comma - start);
+        std::erase_if(t, [](unsigned char c) { return std::isspace(c); });
+        if (t.starts_with('.')) t.erase(0, 1);
+        if (t.empty()) return "--filter: empty file type in '" + *v + "'";
+        std::transform(t.begin(), t.end(), t.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        o.filterTypes.push_back(std::move(t));
+        start = comma + 1;
+      }
     } else if (a == "--all-plugins") {
       o.allPlugins = true;
     } else if (a == "--windowed") {

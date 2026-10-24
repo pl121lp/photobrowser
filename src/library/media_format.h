@@ -57,5 +57,8 @@ class MediaFormats {
 };
 
 std::string lowerExtension(std::string_view path);  // ".jpg" for "a/B.JPG"; "" if none
+// Whether a path's extension is one of `types` (lower case, no dot, e.g. "png");
+// "jpg" and "jpeg" name the same type.
+bool hasType(std::string_view path, const std::vector<std::string>& types);
 
 }  // namespace pb
