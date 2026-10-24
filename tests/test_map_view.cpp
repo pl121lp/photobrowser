@@ -648,3 +648,28 @@ TEST_CASE("map view: no trail when the content asks for none (random screensaver
   f.show(4, kOslo);
   CHECK(f.map.trailSegments().size() == 1);  // a new trail from Rome
 }
+
+TEST_CASE("map view: a photo the content is still flying to: the map lands with it, then pulses once open") {
+  Fixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.run(5.5);  // arrived, pulse over
+  // The screensaver flies through the grid to photo 2, arriving in 5 s.
+  f.subject.photo = 2;
+  f.subject.photoGps = kRome;
+  f.subject.arriveIn = 5.0;
+  f.step();
+  CHECK(f.map.camera().flying());
+  f.run(4.8);
+  CHECK(f.map.camera().flying());  // not before the content
+  f.run(0.3);
+  CHECK_FALSE(f.map.camera().flying());
+  checkCentre(f.map, kRome);
+  CHECK_FALSE(f.map.pulse(f.t));  // still flying in the grid
+  // The photo opens: no new flight, and now the pulse.
+  f.subject.arriveIn.reset();
+  f.step();
+  CHECK_FALSE(f.map.camera().flying());
+  CHECK(f.map.pulse(f.t));
+}

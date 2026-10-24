@@ -623,3 +623,16 @@ TEST_CASE("interaction: narrowing viewport keeps the centre photo centred and th
     CHECK(r.y1 <= vp.y + 1e-9);
   }
 }
+
+TEST_CASE("interaction: flightEnd tells when a flyTo lands") {
+  Fixture f(400);
+  CHECK_FALSE(f.ui.flightEnd());
+  f.ui.flyTo(0, f.t);
+  REQUIRE(f.ui.flightEnd());
+  const double end = *f.ui.flightEnd();
+  CHECK(end > f.t + 2 - 1e-9);
+  while (f.ui.flying()) f.run(0.01);
+  CHECK(f.t >= end);
+  CHECK(f.t < end + 0.02);
+  CHECK_FALSE(f.ui.flightEnd());
+}

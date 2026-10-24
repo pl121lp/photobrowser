@@ -198,7 +198,7 @@ void MapView::updateSingle(double t, const Subject& s) {
   if (at) dots_.push_back(*at);
   if (!changed || !at) return;
   if (starting_) cam_.jumpTo(*at, kOpenZoom);
-  cam_.flyTo(*at, settings_.photoZoom, t);
+  cam_.flyTo(*at, settings_.photoZoom, t, s.arriveIn);
   pulsePending_ = true;
   pulseStart_ = -1e9;
 }
@@ -280,7 +280,7 @@ void MapView::update(double t, double dt, Vec2d window, double uiScale, const Su
   }
   cam_.update(t, dt);
   if (single_) cam_.takeUserMoved();  // manual moves are not sticky with a single photo
-  if (pulsePending_ && cam_.idle()) {
+  if (pulsePending_ && cam_.idle() && !s.arriveIn) {  // once the photo is shown
     pulsePending_ = false;
     pulseStart_ = t;
   }

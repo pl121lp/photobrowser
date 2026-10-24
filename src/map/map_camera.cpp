@@ -112,7 +112,7 @@ void MapCamera::onWheel(Vec2d px, double notches) {
 
 double MapCamera::widthAt(double z) const { return viewport.x / (kTilePx * std::exp2(z) * uiScale); }
 
-void MapCamera::flyTo(Vec2d worldCenter, double newZoom, double t) {
+void MapCamera::flyTo(Vec2d worldCenter, double newZoom, double t, std::optional<double> duration) {
   stopMotion();
   newZoom = std::clamp(newZoom, minZoom, maxZoom);
   if (viewport.x < 1) {  // nothing to see (e.g. a minimised window): no path to fly
@@ -124,11 +124,11 @@ void MapCamera::flyTo(Vec2d worldCenter, double newZoom, double t) {
   if (target.x - center.x > 0.5) target.x -= 1;  // the short way around the world
   if (center.x - target.x > 0.5) target.x += 1;
   FlyPath path(center, widthAt(zoom), target, widthAt(newZoom));
-  if (path.length() < 1e-9) {
+  if (path.length() < 1e-9 || (duration && *duration <= 0)) {
     jumpTo(worldCenter, newZoom);
     return;
   }
-  flight_ = Flight{path, target, newZoom, t, std::clamp(path.length(), kFlyMinS, kFlyMaxS)};
+  flight_ = Flight{path, target, newZoom, t, duration ? *duration : std::clamp(path.length(), kFlyMinS, kFlyMaxS)};
 }
 
 std::optional<MapCamera::View> MapCamera::fitView(std::span<const Vec2d> points, Vec2d viewport, double uiScale,

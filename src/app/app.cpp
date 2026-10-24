@@ -547,6 +547,11 @@ int App::run(const Options& options) {
         if (const auto o = ui.opened(); o && session.streamer && *o < session.lib.catalog.order.size()) {
           subject.photo = *o;
           subject.photoGps = session.lib.catalog.photos[session.lib.catalog.order[*o]].gps;
+        } else if (const auto h = screensaver.heading(); h && session.streamer && *h < session.lib.catalog.order.size()) {
+          // Screensaver flying to the next photo: the map flies along and lands with it.
+          subject.photo = *h;
+          subject.photoGps = session.lib.catalog.photos[session.lib.catalog.order[*h]].gps;
+          subject.arriveIn = std::max(0.0, ui.flightEnd().value_or(seconds(now)) - seconds(now));
         } else if (map.shown() && session.streamer && !screensaver.active()) {
           visiblePositions.clear();
           layout->visible(camera.visibleWorld(), visiblePositions);
@@ -570,7 +575,7 @@ int App::run(const Options& options) {
         subject.gridMoving = !ui.idle();
         // A trail only for photos stepped through in order (not a random screensaver).
         subject.trail = !screensaver.active() || config.screensaverOrder == ScreensaverOrder::Sequential;
-        // Screensaver between photos: the map stays on the last one until the next opens.
+        // Screensaver between photos (before the next flight starts): the map stays put.
         subject.frozen = screensaver.active() && !subject.photo;
         map.update(seconds(now), dt, windowPx, uiScale, subject, mapTiles ? mapTiles->pending() : 0);
         const Rect content = map.contentRect(windowPx);

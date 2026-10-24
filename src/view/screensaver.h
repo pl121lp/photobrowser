@@ -35,6 +35,8 @@ class Screensaver {
   void update(Interaction& ui, uint32_t count, double t, bool busy = false);
   // True once each time a photo has fully opened (to start its live content).
   bool takeArrived() { return std::exchange(arrived_, false); }
+  // The photo it is flying to, until it starts opening (e.g. for the map to fly along).
+  std::optional<uint32_t> heading() const { return phase_ == Phase::Flying ? target_ : std::nullopt; }
 
  private:
   enum class Phase { Off, Starting, Flying, Opening, Holding };

@@ -97,9 +97,10 @@ Pointer events over the map panel go to the map, everything else to the content:
   flies in to `photo_zoom` during the slide-in.
 - If the user has panned or zoomed the map manually, the next photo change still
   flies to the new photo (manual view is not sticky in single-photo mode).
-- Screensaver: while it flies through the grid to the next photo, the map keeps the
-  last photo's dot and view (no grid dots, no auto-fit); once the next photo opens the
-  map flies to it as above.
+- Screensaver: as soon as it starts flying through the grid to the next photo, the map
+  flies to that photo's location too, taking exactly as long as the grid flight (not
+  clamped), so both land together; the pulse waits until the photo opens. A photo
+  without GPS dims the map from the start of the flight.
 - Photo without GPS: the map keeps its last view, dimmed, with a centred message
   "No location for this item". The next photo with GPS flies from there.
 - **Trail** (added 2026-10-23; with `[map] trip_path = on`, see §3.5): stepping through
@@ -398,6 +399,8 @@ Calls made by Claude (open to change):
   dedicated fetch threads; 500 MB disk tile cache shared by all libraries.
 - ABI extended generically (tile source + host settings/cache dir), version 2.
 - Error messages as a 4-second panel near the top centre.
+- Screensaver (2026-10-23): the map and the grid fly to the next photo at the same
+  time and land together (before, the map waited for the photo to open).
 
 ## 9. Open questions (decide during implementation)
 - Map panel colours on the app's dark background: OSM's bright standard style may

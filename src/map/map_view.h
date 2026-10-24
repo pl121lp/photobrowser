@@ -41,6 +41,8 @@ class MapView {
   struct Subject {
     std::optional<uint32_t> photo;       // open photo (layout position); nullopt = grid
     std::optional<GeoPos> photoGps;      // its position, if any
+    std::optional<double> arriveIn;      // the content still flies to `photo` (screensaver),
+                                         // arriving in this many seconds: the map flies along
     std::span<const GeoPos> visibleGps;  // grid: GPS of the visible photos (any order, duplicates ok)
     std::span<const uint32_t> visiblePos;  // their layout positions, same order (empty: unknown)
     std::span<const int64_t> visibleTakenAt;  // their capture times, same order (empty: no trip path)

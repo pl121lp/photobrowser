@@ -262,3 +262,18 @@ TEST_CASE("map camera: a zero-width viewport never produces NaN or an endless fl
   REQUIRE(v);
   CHECK(std::isfinite(v->zoom));
 }
+
+TEST_CASE("map camera: flyTo with a given duration takes exactly that long, beyond the clamp") {
+  Fixture f;
+  f.cam.jumpTo(pb::toWorld(59.9, 10.7), 15);
+  f.cam.flyTo(pb::toWorld(48.85, 2.35), 15, f.t, 5.0);
+  f.run(4.9);
+  CHECK(f.cam.flying());
+  f.run(0.11);
+  CHECK_FALSE(f.cam.flying());
+  CHECK(pb::toLatLon(f.cam.center).lat == doctest::Approx(48.85));
+  // Nothing left to wait: lands at once.
+  f.cam.flyTo(pb::toWorld(41.9, 12.5), 15, f.t, 0.0);
+  CHECK_FALSE(f.cam.flying());
+  CHECK(pb::toLatLon(f.cam.center).lat == doctest::Approx(41.9));
+}

@@ -45,8 +45,9 @@ class MapCamera {
   bool idle() const;  // nothing moving
   // Eased flight to a view along the van Wijk & Nuij path (zooming out on the way as the
   // distance needs), from the current state, even mid-flight. Takes the short way around
-  // the world. A drag, wheel or jumpTo ends it.
-  void flyTo(Vec2d worldCenter, double newZoom, double t);
+  // the world. A drag, wheel or jumpTo ends it. `duration`: seconds it takes (unclamped;
+  // <= 0 lands at once) instead of the path length's.
+  void flyTo(Vec2d worldCenter, double newZoom, double t, std::optional<double> duration = std::nullopt);
   bool flying() const { return flight_.has_value(); }
   // View showing every point (world) inside the viewport inset by `padding` (fraction per
   // side), zoomed in at most to maxZoom; one point (or all equal) gets singleZoom. Empty: nullopt.

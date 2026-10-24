@@ -57,6 +57,10 @@ class Interaction {
   // Sets the open photo's zoom (1 = fit) at once, about the photo's centre.
   void setFocusZoom(double zoom);
   bool flying() const { return tween_.active; }  // an eased camera move is running
+  // When the running eased move lands (same clock as update()); nullopt if none.
+  std::optional<double> flightEnd() const {
+    return tween_.active ? std::optional(tween_.x.t0 + tween_.x.duration) : std::nullopt;
+  }
 
   // True once per click on the open photo in whole-photo view (e.g. play / pause).
   bool takeActivation() { return std::exchange(activated_, false); }

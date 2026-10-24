@@ -218,3 +218,23 @@ TEST_CASE("screensaver: random order is the default") {
   for (size_t i = 1; i < seen.size(); ++i) consecutive = consecutive && seen[i] == seen[i - 1] + 1;
   CHECK_FALSE(consecutive);
 }
+
+TEST_CASE("screensaver: heading is the photo it flies to, until that photo opens") {
+  Fixture f(100, 1);
+  CHECK_FALSE(f.saver.heading());
+  f.saver.start();
+  f.run(1.0 / 60);
+  REQUIRE(f.saver.heading());
+  const uint32_t target = *f.saver.heading();
+  CHECK(f.ui.flying());
+  CHECK_FALSE(f.ui.opened());
+  while (f.saver.heading()) {
+    CHECK(f.saver.heading() == target);
+    CHECK_FALSE(f.ui.opened());
+    f.run(1.0 / 60);
+    REQUIRE(f.t < 20);
+  }
+  CHECK(f.ui.opened() == target);  // cleared in the frame the photo starts opening
+  f.saver.stop();
+  CHECK_FALSE(f.saver.heading());
+}
