@@ -273,6 +273,17 @@ TEST_CASE("config: screensaver slow zoom and photo only") {
   CHECK(pb::parseConfig(text).warnings.empty());
 }
 
+TEST_CASE("config: screensaver clock") {
+  CHECK_FALSE(pb::Config{}.screensaverClock);
+  auto r = pb::parseConfig("[screensaver]\nclock = on\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.screensaverClock);
+  auto bad = pb::parseConfig("[screensaver]\nclock = sometimes\n");
+  CHECK_FALSE(bad.config.screensaverClock);
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# clock = off\n") != std::string::npos);
+}
+
 TEST_CASE("config: corner radius") {
   CHECK(pb::Config{}.cornerRadius == 0);
   auto r = pb::parseConfig("[view]\ncorner_radius = 0.06\n");

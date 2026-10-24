@@ -1,5 +1,6 @@
 #include "gfx/overlay_renderer.h"
 
+#include "gfx/clock_font_data.h"
 #include "gfx/font_data.h"
 #include "gfx/shader.h"
 #include "shaders_embedded.h"
@@ -8,7 +9,22 @@ namespace pb {
 
 namespace {
 constexpr int kFloatsPerQuad = 12;
+
+GLuint atlasTexture(uint32_t w, uint32_t h, const uint8_t* texels) {
+  GLuint tex = 0;
+  gl::GenTextures(1, &tex);
+  gl::BindTexture(GL_TEXTURE_2D, tex);
+  gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  gl::TexImage2D(GL_TEXTURE_2D, 0, GL_R8, GLsizei(w), GLsizei(h), 0, GL_RED, GL_UNSIGNED_BYTE, texels);
+  gl::PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  return tex;
 }
+}  // namespace
 
 FontInfo OverlayRenderer::font() {
   return {float(font::kCellW), float(font::kCellH), float(font::kAtlasW), float(font::kAtlasH), int(font::kCols),
@@ -16,8 +32,15 @@ FontInfo OverlayRenderer::font() {
           font::kExtraCount,   font::kExtraFirstIndex};
 }
 
+FontInfo OverlayRenderer::clockFont() {
+  namespace cf = clock_font;
+  return {float(cf::kCellW), float(cf::kCellH), float(cf::kAtlasW), float(cf::kAtlasH), int(cf::kCols),
+          cf::kFirstChar,    cf::kLastChar,     cf::kSolidIndex};
+}
+
 OverlayRenderer::~OverlayRenderer() {
   if (fontTex_) gl::DeleteTextures(1, &fontTex_);
+  if (clockTex_) gl::DeleteTextures(1, &clockTex_);
   if (vbo_) gl::DeleteBuffers(1, &vbo_);
   if (vao_) gl::DeleteVertexArrays(1, &vao_);
   if (program_) gl::DeleteProgram(program_);
@@ -30,17 +53,8 @@ bool OverlayRenderer::init() {
   gl::UseProgram(program_);
   gl::Uniform1i(gl::GetUniformLocation(program_, "uFont"), 0);
 
-  gl::GenTextures(1, &fontTex_);
-  gl::BindTexture(GL_TEXTURE_2D, fontTex_);
-  gl::PixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  gl::TexImage2D(GL_TEXTURE_2D, 0, GL_R8, GLsizei(font::kAtlasW), GLsizei(font::kAtlasH), 0, GL_RED,
-                 GL_UNSIGNED_BYTE, font::kAtlas);
-  gl::PixelStorei(GL_UNPACK_ALIGNMENT, 4);
-  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  fontTex_ = atlasTexture(font::kAtlasW, font::kAtlasH, font::kAtlas);
+  clockTex_ = atlasTexture(clock_font::kAtlasW, clock_font::kAtlasH, clock_font::kAtlas);
 
   gl::GenVertexArrays(1, &vao_);
   gl::GenBuffers(1, &vbo_);
@@ -55,7 +69,7 @@ bool OverlayRenderer::init() {
   return true;
 }
 
-void OverlayRenderer::draw(Vec2d viewportPx, const std::vector<OverlayQuad>& quads) {
+void OverlayRenderer::draw(Vec2d viewportPx, const std::vector<OverlayQuad>& quads, Atlas atlas) {
   if (quads.empty()) return;
   scratch_.clear();
   for (const OverlayQuad& q : quads) {
@@ -66,7 +80,7 @@ void OverlayRenderer::draw(Vec2d viewportPx, const std::vector<OverlayQuad>& qua
   gl::Uniform2f(uViewport_, float(viewportPx.x), float(viewportPx.y));
   gl::BindVertexArray(vao_);
   gl::ActiveTexture(GL_TEXTURE0);
-  gl::BindTexture(GL_TEXTURE_2D, fontTex_);
+  gl::BindTexture(GL_TEXTURE_2D, atlas == Atlas::Clock ? clockTex_ : fontTex_);
   gl::BindBuffer(GL_ARRAY_BUFFER, vbo_);
   gl::BufferData(GL_ARRAY_BUFFER, GLsizeiptr(scratch_.size() * sizeof(float)), scratch_.data(), GL_STREAM_DRAW);
   gl::Enable(GL_BLEND);

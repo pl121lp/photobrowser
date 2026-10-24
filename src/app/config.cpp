@@ -318,6 +318,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("on/off");
       }
+    } else if (key == "screensaver.clock") {
+      if (auto b = parseBool(value)) {
+        c.screensaverClock = *b;
+      } else {
+        bad("on/off");
+      }
     } else if (key == "map.width") {
       if (auto d = parseNumber(value)) {
         if (*d < 0.2 || *d > 0.8) warn(key + " must be between 0.2 and 0.8; clamped");
@@ -469,6 +475,8 @@ std::string defaultConfigText() {
 # slow_zoom = 1
 # on = hide the other photos while one is shown (just the photo on the background).
 # photo_only = off
+# on = show a large clock (24-hour HH:MM) in the bottom-right corner.
+# clock = off
 
 [map]
 # The map (M) shows where photos were taken. It needs a map tile plugin: start with

@@ -223,6 +223,44 @@ Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double 
   return panel;
 }
 
+std::string formatClock(int hour, int minute) {
+  char t[8];
+  std::snprintf(t, sizeof t, "%02d:%02d", ((hour % 24) + 24) % 24, ((minute % 60) + 60) % 60);
+  return t;
+}
+
+Rect buildClock(std::string_view text, const FontInfo& font, Vec2d viewport, std::vector<OverlayQuad>& out) {
+  constexpr double kHeight = 0.112, kMargin = 0.035, kColon = 0.5, kShadow = 0.03;  // of the viewport height
+  const double h = kHeight * viewport.y, w = font.cellW * h / font.cellH, colonW = kColon * w;
+  double width = 0;
+  for (char c : text) width += c == ':' ? colonW : w;
+  const double x1 = viewport.x - kMargin * viewport.y, y1 = viewport.y - kMargin * viewport.y;
+  const Rect r{x1 - width, y1 - h, x1, y1};
+  const size_t first = out.size();
+  double x = r.x0;
+  for (char c : text) {
+    UvRect uv = cellUv(cellIndex(char32_t(static_cast<unsigned char>(c)), font), font);
+    const double advance = c == ':' ? colonW : w;
+    if (c == ':') {  // the glyph is centred in its cell: keep the middle part
+      const float mid = (uv.u0 + uv.u1) / 2, half = (uv.u1 - uv.u0) * float(kColon) / 2;
+      uv.u0 = mid - half;
+      uv.u1 = mid + half;
+    }
+    if (c != ' ') out.push_back({OverlayQuad::Kind::Text, {x, r.y0, x + advance, r.y1}, uv, {0.70f, 0.82f, 0.94f, 0.85f}});  // muted light blue
+    x += advance;
+  }
+  // Shadows first (drawn underneath), offset down-right: readable over bright photos.
+  const double d = kShadow * h;
+  std::vector<OverlayQuad> shadows(out.begin() + std::ptrdiff_t(first), out.end());
+  for (OverlayQuad& s : shadows) {
+    s.rect = {s.rect.x0 + d, s.rect.y0 + d, s.rect.x1 + d, s.rect.y1 + d};
+    s.color[0] = s.color[1] = s.color[2] = 0;
+    s.color[3] = 0.5f;
+  }
+  out.insert(out.begin() + std::ptrdiff_t(first), shadows.begin(), shadows.end());
+  return r;
+}
+
 namespace {
 // One line of text on a translucent panel whose top-left corner is `at`.
 Rect textPanel(std::string_view text, const FontInfo& font, double scale, Vec2d at, double pad, float alpha,

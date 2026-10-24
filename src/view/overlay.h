@@ -79,6 +79,12 @@ std::string photoEffectLabel(int effect);
 Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double scale, Vec2d viewport,
                            std::vector<OverlayQuad>& out);
 
+// Clock (screensaver): "HH:MM", 24-hour, zero-padded.
+std::string formatClock(int hour, int minute);
+// Large `text` (digits and ':') in the bottom-right corner of a `viewport`-sized screen, sized
+// to its height, with a soft shadow; `font` is the clock atlas. Returns the text's rect.
+Rect buildClock(std::string_view text, const FontInfo& font, Vec2d viewport, std::vector<OverlayQuad>& out);
+
 // A notice (e.g. "Map unavailable: ...") centred near the top of a `viewport`-sized screen.
 Rect buildMessage(std::string_view text, const FontInfo& font, double scale, Vec2d viewport,
                   std::vector<OverlayQuad>& out);

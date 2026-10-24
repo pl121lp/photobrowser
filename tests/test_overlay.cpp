@@ -473,3 +473,48 @@ TEST_CASE("overlay: no progress bar before the scan is done") {
   CHECK(std::all_of(q.begin() + 1, q.end(),
                     [](const pb::OverlayQuad& o) { return o.kind == pb::OverlayQuad::Kind::Text; }));
 }
+
+TEST_CASE("overlay: clock text is 24-hour HH:MM") {
+  CHECK(pb::formatClock(0, 0) == "00:00");
+  CHECK(pb::formatClock(9, 5) == "09:05");
+  CHECK(pb::formatClock(13, 7) == "13:07");
+  CHECK(pb::formatClock(23, 59) == "23:59");
+}
+
+TEST_CASE("overlay: clock sits large in the bottom-right corner") {
+  // Clock atlas: '0'..':' in 11 cells, then a solid cell.
+  const pb::FontInfo clock{100, 150, 1200, 150, 12, '0', ':', 11};
+  std::vector<pb::OverlayQuad> q;
+  const pb::Vec2d viewport{1920, 1080};
+  const pb::Rect r = pb::buildClock("12:34", clock, viewport, q);
+  REQUIRE(q.size() == 2 * 5);  // a shadow and the glyph per character
+  CHECK(r.x1 < viewport.x);
+  CHECK(r.x1 > viewport.x - 100);
+  CHECK(r.y1 < viewport.y);
+  CHECK(r.y1 > viewport.y - 100);
+  CHECK(r.height() > viewport.y / 12);  // large
+  const auto& digit = q[5];
+  const auto& colon = q[7];
+  CHECK(colon.rect.width() < digit.rect.width());  // the colon takes less room
+  CHECK(colon.rect.height() == doctest::Approx(digit.rect.height()));
+  CHECK(q[0].color[0] < 0.1f);  // shadow first, dark and translucent
+  CHECK(q[0].color[3] < 1);
+  CHECK(digit.color[2] > 0.9f);  // light blue
+  CHECK(digit.color[0] < digit.color[2]);
+  for (int i = 5; i < 10; ++i) {
+    CHECK(q[size_t(i)].rect.x0 >= r.x0 - 1e-9);
+    CHECK(q[size_t(i)].rect.x1 <= r.x1 + 1e-9);
+  }
+  // The colon's texture coordinates stay inside its own cell.
+  CHECK(colon.uv.u0 > 10 * 100.0f / 1200);
+  CHECK(colon.uv.u1 < 11 * 100.0f / 1200);
+}
+
+TEST_CASE("overlay: clock size follows the viewport height") {
+  const pb::FontInfo clock{100, 150, 1200, 150, 12, '0', ':', 11};
+  std::vector<pb::OverlayQuad> small, big;
+  const pb::Rect a = pb::buildClock("08:00", clock, {1280, 720}, small);
+  const pb::Rect b = pb::buildClock("08:00", clock, {3840, 2160}, big);
+  CHECK(b.height() == doctest::Approx(3 * a.height()));
+  CHECK(b.x1 == doctest::Approx(3840 - 3 * (1280 - a.x1)));
+}

@@ -310,6 +310,7 @@ int App::run(const Options& options) {
     background.setDensity(float(config.backgroundDensity));
     setBackground(backgroundSetting(config));
     const FontInfo overlayFont = OverlayRenderer::font();
+    const FontInfo clockFont = OverlayRenderer::clockFont();
     FrameHistory history;  // frame intervals for the fullscreen stats overlay
     std::vector<OverlayQuad> overlayQuads;
 
@@ -869,6 +870,17 @@ int App::run(const Options& options) {
         overlay.draw(windowPx, overlayQuads);
         const MapDot dot{{float(bar.dot.x), float(bar.dot.y)}, float(bar.dotRadius), 0.0f, {1, 1, 1, 1}};
         mapRenderer.draw(windowPx, std::span(&dot, 1));
+      }
+
+      // Screensaver clock: the local time, large in the bottom-right corner of the window (over the map too).
+      if (config.screensaverClock && screensaver.active()) {
+        SDL_Time time = 0;
+        SDL_DateTime dt{};
+        if (SDL_GetCurrentTime(&time) && SDL_TimeToDateTime(time, &dt, true)) {
+          overlayQuads.clear();
+          buildClock(formatClock(dt.hour, dt.minute), clockFont, windowPx, overlayQuads);
+          overlay.draw(windowPx, overlayQuads, OverlayRenderer::Atlas::Clock);
+        }
       }
 
       // Map notices (e.g. no internet): a few seconds near the top centre.
