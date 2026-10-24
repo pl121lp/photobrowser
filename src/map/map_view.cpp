@@ -65,7 +65,8 @@ Vec2d MapView::toPanel(Vec2d px) const {
 
 namespace {
 constexpr double kClickSlopPx = 4;
-constexpr double kDotHitPx = 10;  // grid dot radius incl. ring (6) plus slack, at display scale 1
+constexpr double kDotHitPx = 10;
+constexpr double kTripMinPx = 2;  // trip path vertices closer on screen are merged, at display scale 1  // grid dot radius incl. ring (6) plus slack, at display scale 1
 const std::vector<uint32_t> kNoPhotos;
 }  // namespace
 
@@ -116,6 +117,15 @@ Vec2d MapView::dotScreen(size_t dot) const {
   return cam_.worldToScreen(d) + Vec2d{p.x0, p.y0};
 }
 
+std::vector<TripSegment> MapView::tripSegments() const {
+  if (single_ || trip_.empty()) return {};
+  // The whole path moves to one copy of the world, keeping it unbroken.
+  const double shift = std::round(trip_.front().world.x - cam_.center.x);
+  const Rect p = panelRect(window_);
+  return pb::tripSegments(
+      trip_, [&](Vec2d w) { return cam_.worldToScreen({w.x - shift, w.y}) + Vec2d{p.x0, p.y0}; }, kTripMinPx * uiScale_);
+}
+
 std::optional<size_t> MapView::dotAt(Vec2d px) const {
   if (single_ || !shown()) return std::nullopt;
   std::optional<size_t> best;
@@ -148,6 +158,7 @@ void MapView::updateSingle(double t, const Subject& s) {
   photo_ = s.photo;
   dots_.clear();
   dotPhotos_.clear();
+  trip_.clear();
   if (at) dots_.push_back(*at);
   if (!changed || !at) return;
   if (starting_) cam_.jumpTo(*at, kOpenZoom);
@@ -181,6 +192,14 @@ void MapView::updateGrid(double t, const Subject& s) {
       dotPhotos_.emplace_back();
     }
     if (!s.visiblePos.empty()) dotPhotos_.back().push_back(pos);
+  }
+  trip_.clear();
+  if (settings_.tripPath && s.visibleTakenAt.size() == s.visibleGps.size()) {
+    std::vector<TripStop> stops;
+    for (size_t i = 0; i < s.visibleGps.size(); ++i) {
+      if (auto w = toWorld(s.visibleGps[i])) stops.push_back({*w, s.visibleTakenAt[i]});
+    }
+    trip_ = buildTripPath(std::move(stops), settings_.tripGapS);
   }
 
   if (starting_) {

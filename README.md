@@ -209,6 +209,8 @@ Settings go in the `[map]` and `[plugin.maptiles]` sections of the config file:
 [map]
 width = 0.4        # fraction of the window
 photo_zoom = 15    # zoom for one photo (2-19)
+trip_path = off    # on: line through the visible photos in time order, coloured by date
+trip_gap = 10      # hours without photos after which the trip path breaks (0.5-720)
 
 [plugin.maptiles]
 # url = https://tile.openstreetmap.org/{z}/{x}/{y}.png   ({key} is replaced by api_key)

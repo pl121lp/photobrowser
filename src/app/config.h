@@ -84,6 +84,8 @@ struct Config {
   double mapWidth = 0.4;     // fraction of the window the map panel takes (0.2..0.8)
   double mapPhotoZoom = 15;  // map zoom for a single photo's location (2..19)
   bool mapOpen = false;      // show the map at startup
+  bool mapTripPath = false;  // grid: join the visible photos in time order on the map
+  double mapTripGapHours = 10;  // the trip path breaks where photos are further apart (0.5..720)
   // [plugin.<name>] sections: key -> raw value, handed to that plugin.
   std::map<std::string, std::map<std::string, std::string>> pluginSettings;
   friend bool operator==(const Config&, const Config&) = default;

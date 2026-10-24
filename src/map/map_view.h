@@ -12,6 +12,7 @@
 #include "library/exif.h"
 #include "map/map_camera.h"
 #include "map/tile_source.h"
+#include "map/trip_path.h"
 #include "view/motion.h"
 
 namespace pb {
@@ -22,6 +23,8 @@ std::string_view mapNoticeText(MapNotice n);
 struct MapSettings {
   double width = 0.4;      // fraction of the window the panel takes
   double photoZoom = 15;   // zoom for a single photo's location
+  bool tripPath = false;   // grid: join the visible photos in time order
+  int64_t tripGapS = kTripMaxGapS;  // ... breaking the line where photos are further apart
 };
 
 // The map panel (M): its slide in from the right, the split of the window into content
@@ -39,6 +42,7 @@ class MapView {
     std::optional<GeoPos> photoGps;      // its position, if any
     std::span<const GeoPos> visibleGps;  // grid: GPS of the visible photos (any order, duplicates ok)
     std::span<const uint32_t> visiblePos;  // their layout positions, same order (empty: unknown)
+    std::span<const int64_t> visibleTakenAt;  // their capture times, same order (empty: no trip path)
     std::optional<uint32_t> hoveredPhoto;  // grid: the photo under the pointer (highlights its dot)
     bool gridMoving = false;             // the content is moving
     bool frozen = false;                 // keep showing what was shown (screensaver between photos)
@@ -78,6 +82,9 @@ class MapView {
   const std::vector<uint32_t>& hoveredPhotos() const;
   std::vector<uint32_t> takeClickedPhotos() { return std::exchange(clicked_, {}); }
   bool singleMode() const { return single_; }
+  // Grid with [map] trip_path on: the trip path in window px, on the copy of the world
+  // nearest the view.
+  std::vector<TripSegment> tripSegments() const;
   std::optional<double> pulse(double t) const;  // halo phase 0..1 while pulsing
   std::string_view status() const;              // "" or why there are no dots
   bool dimmed() const { return !status().empty(); }
@@ -109,6 +116,7 @@ class MapView {
   std::optional<uint32_t> photo_;
   std::vector<Vec2d> dots_;
   std::vector<std::vector<uint32_t>> dotPhotos_;  // per dot (grid)
+  std::vector<TripVertex> trip_;                  // grid, trip path on
   std::optional<Vec2d> pointer_;                  // over the panel, not dragging
   std::optional<size_t> hoveredDot_, highlightedDot_;
   Vec2d pressAt_;

@@ -121,6 +121,12 @@ Pointer events over the map panel go to the map, everything else to the content:
   taken there, enlarges the dot and shows a pointing hand; clicking it opens that photo
   (of several at one spot: the one nearest the grid's centre), after which the map flies
   to it as in §3.4. Hovering a photo in the grid enlarges its dot.
+- **Trip path** (added 2026-10-23; `[map] trip_path = on`, off by default; grid only): a
+  3 px line under the dots joins the visible photos in the order they were taken,
+  coloured by date from blue (earliest visible) through yellow to red (latest). It breaks
+  where more than `[map] trip_gap` hours (default 10, 0.5–720) pass between two photos,
+  so separate days or a flight home are not joined; photos in a row at one spot are one point; it crosses the antimeridian the
+  short way; points closer than 2 px on screen are merged. Built in `src/map/trip_path`.
 
 ### 3.6 Errors
 Shown as a message panel centred near the top of the window for 4 s (new overlay
@@ -410,8 +416,7 @@ one to two, phase 5 one. The core logic is the largest part; the plugin is small
 Ordered roughly by value for effort.
 1. **Thumbnail pins**: show the always-resident 32 px thumbnails (L0) as map markers
    instead of dots, in the grid mode. Cheap; very visual.
-2. **Trip path**: connect the visible photos in time order with a line coloured by
-   date (shows the route of a trip, e.g. a road trip).
+2. ~~**Trip path**~~: done (§3.5, `[map] trip_path`).
 3. **Clustering**: zoomed out, merge nearby dots into one bubble with a count.
 4. ~~**Two-way linking**~~: done (§3.5).
 5. **View direction cone**: draw a wedge for the direction the camera faced, from

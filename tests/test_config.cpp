@@ -413,19 +413,32 @@ TEST_CASE("config: map settings") {
   CHECK(d.mapWidth == 0.4);
   CHECK(d.mapPhotoZoom == 15);
   CHECK_FALSE(d.mapOpen);
-  auto r = pb::parseConfig("[map]\nwidth = 0.5\nphoto_zoom = 12\nopen = on\n");
+  CHECK_FALSE(d.mapTripPath);
+  CHECK(d.mapTripGapHours == 10);
+  auto r = pb::parseConfig("[map]\nwidth = 0.5\nphoto_zoom = 12\nopen = on\ntrip_path = on\ntrip_gap = 3.5\n");
   CHECK(r.warnings.empty());
   CHECK(r.config.mapWidth == 0.5);
   CHECK(r.config.mapPhotoZoom == 12);
   CHECK(r.config.mapOpen);
-  auto bad = pb::parseConfig("[map]\nwidth = 0.9\nphoto_zoom = 25\nopen = maybe\n");
+  CHECK(r.config.mapTripPath);
+  CHECK(r.config.mapTripGapHours == 3.5);
+  auto bad = pb::parseConfig("[map]\nwidth = 0.9\nphoto_zoom = 25\nopen = maybe\ntrip_path = often\ntrip_gap = long\n");
   CHECK(bad.config.mapWidth == 0.8);
   CHECK(bad.config.mapPhotoZoom == 19);
   CHECK_FALSE(bad.config.mapOpen);
   CHECK(hasWarning(bad, "map.width"));
   CHECK(hasWarning(bad, "map.photo_zoom"));
   CHECK(hasWarning(bad, "maybe"));
+  CHECK_FALSE(bad.config.mapTripPath);
+  CHECK(hasWarning(bad, "often"));
+  CHECK(bad.config.mapTripGapHours == 10);
+  CHECK(hasWarning(bad, "long"));
+  CHECK(pb::parseConfig("[map]\ntrip_gap = 0.1\n").config.mapTripGapHours == 0.5);
+  CHECK(hasWarning(pb::parseConfig("[map]\ntrip_gap = 1000\n"), "map.trip_gap"));
+  CHECK(pb::parseConfig("[map]\ntrip_gap = 1000\n").config.mapTripGapHours == 720);
+  CHECK(pb::defaultConfigText().find("# trip_gap = 10\n") != std::string::npos);
   CHECK(pb::parseConfig("[map]\nwidth = 0.1\n").config.mapWidth == 0.2);
+  CHECK(pb::defaultConfigText().find("# trip_path = off\n") != std::string::npos);
 }
 
 TEST_CASE("config: plugin sections keep raw values without warnings") {

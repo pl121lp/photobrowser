@@ -16,6 +16,7 @@ struct FakeSource final : pb::TileSource {
 };
 
 struct Fixture {
+  explicit Fixture(pb::MapSettings s = {}) : map(s) {}
   FakeSource source;
   pb::MapView map;
   pb::Vec2d window{1000, 800};
@@ -474,4 +475,64 @@ TEST_CASE("map view: no dot hover or click while a photo is open") {
   f.map.pointerUp(f.map.dotScreen(0), f.t + 0.1);
   CHECK(f.map.takeClickedPhotos().empty());
   (void)at;
+}
+
+TEST_CASE("map view: trip path is off by default") {
+  Fixture f;
+  const std::vector<pb::GeoPos> gps = {kOslo, kBergen};
+  const std::vector<int64_t> taken = {0, 100};
+  f.subject.visibleGps = gps;
+  f.subject.visibleTakenAt = taken;
+  f.open();
+  CHECK(f.map.tripSegments().empty());
+}
+
+TEST_CASE("map view: trip path joins the visible photos in time order, grid only") {
+  pb::MapSettings s;
+  s.tripPath = true;
+  Fixture f(s);
+  const std::vector<pb::GeoPos> gps = {kBergen, kOslo, kRome};
+  const std::vector<int64_t> taken = {100, 0, 200};
+  f.subject.visibleGps = gps;
+  f.subject.visibleTakenAt = taken;
+  f.open();
+  const auto segs = f.map.tripSegments();
+  REQUIRE(segs.size() == 2);
+  // In window px, from Oslo (earliest) via Bergen to Rome.
+  auto screen = [&](const pb::GeoPos& g) {
+    return f.map.camera().worldToScreen(*pb::toWorld(g)) + pb::Vec2d{f.map.panelRect(f.window).x0, 0};
+  };
+  CHECK(length(segs[0].a - screen(kOslo)) < 1e-6);
+  CHECK(length(segs[0].b - screen(kBergen)) < 1e-6);
+  CHECK(length(segs[1].b - screen(kRome)) < 1e-6);
+  CHECK(segs[0].dateA == 0);
+  CHECK(segs[1].dateB == 1);
+
+  f.subject.photo = 0;
+  f.subject.photoGps = kOslo;
+  f.step();
+  CHECK(f.map.tripSegments().empty());
+}
+
+TEST_CASE("map view: trip path breaks after the configured gap") {
+  pb::MapSettings s;
+  s.tripPath = true;
+  s.tripGapS = 50;
+  Fixture f(s);
+  const std::vector<pb::GeoPos> gps = {kOslo, kBergen, kRome};
+  const std::vector<int64_t> taken = {0, 40, 200};
+  f.subject.visibleGps = gps;
+  f.subject.visibleTakenAt = taken;
+  f.open();
+  CHECK(f.map.tripSegments().size() == 1);
+}
+
+TEST_CASE("map view: trip path needs the photos' times") {
+  pb::MapSettings s;
+  s.tripPath = true;
+  Fixture f(s);
+  const std::vector<pb::GeoPos> gps = {kOslo, kBergen};
+  f.subject.visibleGps = gps;
+  f.open();
+  CHECK(f.map.tripSegments().empty());
 }

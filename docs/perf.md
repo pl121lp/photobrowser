@@ -199,6 +199,22 @@ rest), its whole-photo steps fly the map between locations. Frame interval in ms
 No measurable cost. The map page (one 4096² page, ~85 MB with mips) is created by the
 idle prewarm when a tile source is loaded and comes out of the `gpu_memory` budget.
 
+## 2026-10-23 — Map trip path
+
+Release builds, fullscreen 3840×2160 on the RTX 2080 Super, the `photos/` sample library
+(recursive), `--plugin maptiles` with `[map] open = on`, `--bench` two runs each, runs
+interleaved. The bench's zoom-out and flings change the visible photos, so the path is
+rebuilt (sort by time) and redrawn every frame. Frame interval in ms.
+
+| Build / setting | p50 | p95 | p99 | max | frames > 20 ms |
+|---|---|---|---|---|---|
+| base `13ebca8` | 16.67–16.68 | 17.71–17.74 | 18.35–19.25 | 25.03–34.09 | 5, 2 |
+| trip path off | 16.65–16.68 | 17.66–17.71 | 18.31–18.33 | 19.71–32.61 | 0, 2 |
+| trip path on | 16.66 | 17.65–17.69 | 18.19–18.24 | 19.27–33.59 | 0, 2 |
+
+No measurable cost (CPU work p50 0.67–0.82 ms in every row). The single >30 ms frames
+happen with and without the change.
+
 ## 2026-10-23 — Video HDR tone mapping (spline curve, threaded)
 
 The HLG tone curve changed from "reference white = SDR white, shoulder above 75 %" to

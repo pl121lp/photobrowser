@@ -247,7 +247,8 @@ int App::run(const Options& options) {
       mapTiles = std::make_unique<MapTiles>(*tileSource, textures);
       textures.wantMapPage();
     }
-    MapView map({config.mapWidth, config.mapPhotoZoom});
+    MapView map({config.mapWidth, config.mapPhotoZoom, config.mapTripPath,
+                 int64_t(std::lround(config.mapTripGapHours * 3600))});
     if (config.mapOpen) map.toggle(seconds(SDL_GetTicksNS()), tileSource);
     std::vector<MapTileDraw> mapDraws;
     std::vector<TileInstance> mapInstances;
@@ -255,6 +256,8 @@ int App::run(const Options& options) {
     std::vector<uint32_t> visiblePositions;
     std::vector<GeoPos> visibleGps;
     std::vector<uint32_t> visibleGpsPos;     // layout positions of visibleGps
+    std::vector<int64_t> visibleGpsTaken;    // capture times of visibleGps (trip path)
+    std::vector<MapLine> mapLines;
     std::optional<Vec2d> pointerPx;          // mouse in the window (hover links grid and map)
     std::vector<OverlayQuad> highlightFrames;
     SDL_Cursor* handCursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
@@ -538,6 +541,7 @@ int App::run(const Options& options) {
         MapView::Subject subject;
         visibleGps.clear();
         visibleGpsPos.clear();
+        visibleGpsTaken.clear();
         if (const auto o = ui.opened(); o && session.streamer && *o < session.lib.catalog.order.size()) {
           subject.photo = *o;
           subject.photoGps = session.lib.catalog.photos[session.lib.catalog.order[*o]].gps;
@@ -546,13 +550,16 @@ int App::run(const Options& options) {
           layout->visible(camera.visibleWorld(), visiblePositions);
           for (const uint32_t p : visiblePositions) {
             if (p >= session.lib.catalog.order.size()) continue;
-            if (const auto& g = session.lib.catalog.photos[session.lib.catalog.order[p]].gps) {
-              visibleGps.push_back(*g);
+            const PhotoRecord& rec = session.lib.catalog.photos[session.lib.catalog.order[p]];
+            if (rec.gps) {
+              visibleGps.push_back(*rec.gps);
               visibleGpsPos.push_back(p);
+              if (config.mapTripPath) visibleGpsTaken.push_back(rec.takenAt);
             }
           }
           subject.visibleGps = visibleGps;
           subject.visiblePos = visibleGpsPos;
+          subject.visibleTakenAt = visibleGpsTaken;
           // The grid photo under the pointer highlights its dot.
           if (pointerPx && map.contentRect(windowPx).contains(*pointerPx)) {
             subject.hoveredPhoto = layout->hit(camera.screenToWorld(*pointerPx));
@@ -743,6 +750,22 @@ int App::run(const Options& options) {
         renderer.draw(textures.mapTexture(), textures.mapTexture(), mapInstances);
         renderer.setCornerRadius(float(config.cornerRadius));
         renderer.setTransparentBars(config.letterbox && config.transparentBars);
+        // Trip path, under the dots.
+        mapLines.clear();
+        for (const TripSegment& s : map.tripSegments()) {
+          auto color = [](double date) {
+            const auto t = tripColor(date);
+            auto u8 = [](float v) { return uint8_t(std::lround(v * 255)); };
+            const auto c = toLinear(Rgb8{u8(t[0]), u8(t[1]), u8(t[2])});
+            return std::array<float, 4>{c[0], c[1], c[2], 1};
+          };
+          const auto ca = color(s.dateA), cb = color(s.dateB);
+          mapLines.push_back({{float(s.a.x), float(s.a.y), float(s.b.x), float(s.b.y)},
+                              {ca[0], ca[1], ca[2], ca[3]},
+                              {cb[0], cb[1], cb[2], cb[3]},
+                              float(3 * uiScale)});
+        }
+        mapRenderer.drawLines(windowPx, mapLines);
         mapDots.clear();
         const auto dotColor = toLinear(kDotColor);
         const bool single = map.singleMode();

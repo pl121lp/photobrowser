@@ -332,6 +332,19 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("on/off");
       }
+    } else if (key == "map.trip_path") {
+      if (auto b = parseBool(value)) {
+        c.mapTripPath = *b;
+      } else {
+        bad("on/off");
+      }
+    } else if (key == "map.trip_gap") {
+      if (auto d = parseNumber(value)) {
+        if (*d < 0.5 || *d > 720) warn(key + " must be between 0.5 and 720; clamped");
+        c.mapTripGapHours = std::clamp(*d, 0.5, 720.0);
+      } else {
+        bad("a number");
+      }
     } else if (section.starts_with("plugin.") && section.size() > 7) {
       c.pluginSettings[section.substr(7)][key.substr(section.size() + 1)] = std::string(value);
     } else if (section.starts_with("background.") && (key.ends_with(".color") || key.ends_with(".color2"))) {
@@ -455,6 +468,12 @@ std::string defaultConfigText() {
 # photo_zoom = 15
 # on = show the map at startup.
 # open = off
+# on = in the grid, join the visible photos in the order they were taken, coloured by
+# date from blue (earliest) through yellow to red (latest).
+# trip_path = off
+# Hours without photos after which the trip path breaks, so separate days or trips are
+# not joined (0.5 to 720).
+# trip_gap = 10
 
 [background]
 # The starting background; F6 steps through solid, every preset and your shader file.

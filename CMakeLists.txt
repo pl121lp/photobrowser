@@ -79,6 +79,7 @@ add_library(pb_core STATIC
   src/map/fly_path.cpp
   src/map/tile_set.cpp
   src/map/map_view.cpp
+  src/map/trip_path.cpp
 )
 target_include_directories(pb_core PUBLIC src)
 file(GLOB PB_BACKGROUND_SHADERS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/shaders/backgrounds/*.frag")
@@ -135,6 +136,7 @@ add_executable(pb_tests
   tests/test_fly_path.cpp
   tests/test_tile_set.cpp
   tests/test_map_view.cpp
+  tests/test_trip_path.cpp
   tests/test_iso6709.cpp
   tests/test_tonemap.cpp
 )
@@ -209,6 +211,8 @@ if(PB_HAVE_TURBOJPEG AND PB_HAVE_SDL3)
     "${CMAKE_SOURCE_DIR}/shaders/fullscreen.vert"
     "${CMAKE_SOURCE_DIR}/shaders/map_dot.vert"
     "${CMAKE_SOURCE_DIR}/shaders/map_dot.frag"
+    "${CMAKE_SOURCE_DIR}/shaders/map_line.vert"
+    "${CMAKE_SOURCE_DIR}/shaders/map_line.frag"
   )
   # Photo effects (keys 1-9 on the open photo), spliced into tile.frag; listed by number
   # in src/gfx/tile_renderer.cpp.
