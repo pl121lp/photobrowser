@@ -586,5 +586,32 @@ TEST_CASE("overlay: group headings shrink to the space above the group, down to 
   q.clear();
   const pb::GroupHeading tiny[] = {{{100, 200, 400, 500}, "2019", 2}};
   pb::buildGroupHeadings(tiny, kFont, 1.0, {1000, 800}, q);
-  CHECK(panels(q)[0].height() == doctest::Approx(full * 0.6 / 1.5));
+  CHECK(panels(q)[0].height() == doctest::Approx(full * 0.5 / 1.5));
+}
+
+TEST_CASE("overlay: a pinned heading that meets an earlier one moves below it") {
+  std::vector<pb::OverlayQuad> q;
+  // Zoomed into a month: its year column and the month both reach above the screen.
+  const pb::GroupHeading h[] = {{{-100, -900, 600, 2000}, "2019"}, {{-100, -300, 500, 900}, "June"}};
+  pb::buildGroupHeadings(h, kFont, 1.0, {1000, 800}, q);
+  const auto p = panels(q);
+  REQUIRE(p.size() == 2);
+  CHECK(p[0].y0 < 50);
+  CHECK(p[1].y0 >= p[0].y1);
+  CHECK(p[1].x0 == doctest::Approx(p[0].x0));
+}
+
+TEST_CASE("overlay: a year heading and its first month's heading both fit their bands") {
+  std::vector<pb::OverlayQuad> q;
+  // Zoomed out: 30 px bands; the year's rect starts one band above its first month.
+  const pb::GroupHeading h[] = {{{100, 70, 400, 700}, "2026", 30}, {{100, 100, 400, 300}, "March", 30}};
+  pb::buildGroupHeadings(h, kFont, 1.0, {1000, 800}, q);
+  REQUIRE(panels(q).size() == 2);
+}
+
+TEST_CASE("overlay: year and first-month headings fit 30 px bands on a 1.6x display") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::GroupHeading h[] = {{{100, 70, 400, 700}, "2026", 30}, {{100, 100, 400, 300}, "March", 30}};
+  pb::buildGroupHeadings(h, kFont, 1.6, {2400, 1500}, q);
+  CHECK(panels(q).size() == 2);
 }

@@ -89,8 +89,9 @@ struct GroupHeading {
 // Each heading in a small panel just above its group's top-left corner, shrunk to fit
 // the space there when zoomed out (never below a readable size). While the group
 // is on screen but that corner is not, the heading sticks to the screen's top/left edge,
-// staying within the group. Headings of off-screen groups, or that would overlap the
-// previous one drawn (`headings` go left to right), are left out.
+// staying within the group. `headings` are in priority order: a stuck heading that meets
+// an earlier one moves down below it (still within its group); otherwise a heading that
+// would overlap an earlier one, or whose group is off screen, is left out.
 void buildGroupHeadings(std::span<const GroupHeading> headings, const FontInfo& font, double scale,
                         Vec2d viewport, std::vector<OverlayQuad>& out);
 

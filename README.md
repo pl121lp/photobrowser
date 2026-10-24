@@ -51,7 +51,7 @@ build/linux-release/photobrowse [photo-folder]     # defaults to ./photos
 | `--config <file>` | settings file to use instead of the default location |
 | `--cache-dir <dir>` | thumbnail cache root (default: `[performance] cache_dir`, else `$XDG_CACHE_HOME` or `~/.cache`; `%LOCALAPPDATA%` on Windows) |
 | `--rebuild-cache` | discard this library's cache and re-index |
-| `--layout square\|group_year` | start layout (default `[view] layout`); `F4` cycles while running |
+| `--layout square\|group_year\|group_year_month` | start layout (default `[view] layout`); `F4` cycles while running |
 | `--windowed` | start in a window instead of fullscreen (overrides `[display] fullscreen`) |
 | `--stats` | start with the F3 stats display on |
 | `--bench` | fullscreen scripted pan/zoom tour; prints frame-time percentiles and exits |
@@ -79,7 +79,7 @@ recursive = off            # on = include photos in subfolders (off = only the f
 sort = oldest_first        # oldest_first | newest_first
 
 [view]
-layout = square            # square (one grid) | group_year (a grid per year, side by side); F4 cycles
+layout = square            # square (one grid) | group_year (a grid per year, side by side) | group_year_month (each year a column of month grids); F4 cycles
 gap = 0.03                 # space around photos, 0 = none, max 0.2
 start_at = center          # center | oldest | newest | random (Home returns there)
 start_focus = focus        # focus (photo + neighbours) | photo (opened whole; arrows step on) | full (all photos)
@@ -161,7 +161,7 @@ mistakes in the settings file are reported with the line number.
 | `F1` | help: show / hide a list of all keys and mouse actions |
 | `F2` | photo info (name, size, date taken, file size) while a photo is open in whole-photo view |
 | `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
-| `F4` | next layout: `square` (one grid) ↔ `group_year` (a grid per year, side by side, labelled); starts from `[view] layout` |
+| `F4` | next layout: `square` (one grid) → `group_year` (a grid per year, side by side, labelled) → `group_year_month` (each year a column of month grids); starts from `[view] layout` |
 | `F5` | screensaver: tours random photos (or in timeline order with `[screensaver] order = sequential`), flying between them; videos (with the plugin) play by themselves and the tour waits for them to end (any click, scroll or key stops it) |
 | `F6` | next background: solid, each built-in preset, your shader file, then solid again |
 | `M` | map: where the open photo was taken, or the visible photos (needs the `maptiles` plugin, see below) |

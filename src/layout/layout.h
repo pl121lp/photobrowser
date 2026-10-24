@@ -51,7 +51,8 @@ class Layout {
   virtual std::optional<uint32_t> hit(Vec2d world) const = 0;
   virtual uint32_t centerPosition() const = 0;
   virtual ContentMode contentMode() const = 0;
-  // Group headings, in left-to-right order; none for an ungrouped layout.
+  // Group headings, in priority order (where two would overlap on screen, the earlier one
+  // wins; e.g. a year before its months); none for an ungrouped layout.
   virtual std::span<const LayoutLabel> labels() const { return {}; }
 };
 

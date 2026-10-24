@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "layout/content.h"
-#include "layout/group_year.h"
+#include "layout/grouped_grid.h"
 #include "layout/square_grid.h"
 
 TEST_CASE("grid: 20 photos is 5x4, 10000 is 100x100") {
@@ -177,7 +177,7 @@ TEST_CASE("layouts: registry names, aliases and F4 cycling order") {
   CHECK(pb::canonicalLayoutName("group_year") == "group_year");
   CHECK(pb::canonicalLayoutName("spiral").empty());
   CHECK(pb::nextLayoutName("square") == "group_year");
-  CHECK(pb::nextLayoutName("group_year") == "square");  // wraps around
+  CHECK(pb::nextLayoutName(pb::layoutNames().back()) == "square");  // wraps around
   CHECK(pb::nextLayoutName("spiral") == "square");
   for (std::string_view n : pb::layoutNames()) CHECK(pb::makeLayout(n) != nullptr);
   CHECK(pb::makeLayout("spiral") == nullptr);
@@ -262,4 +262,45 @@ TEST_CASE("group_year: the centre position is a photo near the middle") {
   pb::GroupYearLayout g;
   g.build({uint32_t(taken.size()), taken});
   CHECK(g.centerPosition() == 2 * 9 + 4);  // middle of the middle year
+}
+
+TEST_CASE("group_year_month: a column per year, its months stacked with a heading band each") {
+  // 2019: 5 in March (3x2), 1 in July; 2020: 4 in January (2x2).
+  std::vector<int64_t> taken;
+  for (int i = 0; i < 5; ++i) taken.push_back(dayOf(2019, 3, 1 + i));
+  taken.push_back(dayOf(2019, 7));
+  for (int i = 0; i < 4; ++i) taken.push_back(dayOf(2020, 1, 1 + i));
+  pb::GroupYearMonthLayout g(0.0);
+  g.build({uint32_t(taken.size()), taken});
+  const double band = pb::GroupedGridLayout::kLabelBand, gap = pb::GroupedGridLayout::kGroupGap;
+  REQUIRE(band == 1.0);  // the numbers below assume it
+  CHECK(g.place(0).cell == pb::Rect{0, 0, 1, 1});
+  CHECK(g.place(4).cell == pb::Rect{1, 1, 2, 2});
+  CHECK(g.place(5).cell == pb::Rect{0, 3, 1, 4});  // July: below March and its own band
+  const double x2020 = 3 + gap;                     // 2019 is as wide as its widest month
+  CHECK(g.place(6).cell == pb::Rect{x2020, 0, x2020 + 1, 1});
+  CHECK(g.place(9).cell == pb::Rect{x2020 + 1, 1, x2020 + 2, 2});
+  CHECK(g.bounds() == pb::Rect{0, -2, x2020 + 2, 4});  // year band on top of the first month band
+
+  const auto labels = g.labels();
+  REQUIRE(labels.size() == 5);  // each year before its months: years win pinned headings
+  CHECK(labels[0].text == "2019");
+  CHECK(labels[0].group == pb::Rect{0, -1, 3, 4});
+  CHECK(labels[1].text == "March");
+  CHECK(labels[1].group == pb::Rect{0, 0, 3, 2});
+  CHECK(labels[2].text == "July");
+  CHECK(labels[2].group == pb::Rect{0, 3, 1, 4});
+  CHECK(labels[3].text == "2020");
+  CHECK(labels[4].text == "January");
+  for (const auto& l : labels) CHECK(l.space == band);
+
+  std::vector<uint32_t> v;
+  g.visible({0, 1.5, 1, 3.5}, v);
+  CHECK(v == std::vector<uint32_t>{3, 5});
+  CHECK_FALSE(g.hit({0.5, 2.5}));  // a month band
+  CHECK(g.hit({0.5, 3.5}).value() == 5);
+  CHECK(g.hit({x2020 + 1.5, 1.5}).value() == 9);
+  CHECK(pb::makeLayout("group_year_month") != nullptr);
+  CHECK(pb::nextLayoutName("group_year") == "group_year_month");
+  CHECK(pb::nextLayoutName("group_year_month") == "square");
 }

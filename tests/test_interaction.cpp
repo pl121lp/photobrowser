@@ -3,7 +3,7 @@
 #include <cmath>
 
 #include "layout/content.h"
-#include "layout/group_year.h"
+#include "layout/grouped_grid.h"
 #include "layout/square_grid.h"
 #include "view/camera.h"
 #include "view/interaction.h"
@@ -676,4 +676,17 @@ TEST_CASE("interaction: arrow keys cross the gap between year groups") {
   f.ui.onKey(pb::Key::Up, f.t);  // top row: stays
   f.run(1.0);
   CHECK(f.cam.center == years.place(1).cell.center());
+}
+
+TEST_CASE("interaction: down arrow crosses a month heading band") {
+  Fixture f;
+  std::vector<int64_t> taken(8, 0);
+  for (int i = 4; i < 8; ++i) taken[i] = 40LL * 86400;  // January 2x2, February 2x2
+  pb::GroupYearMonthLayout months;
+  months.build({8, taken});
+  f.ui.setLayout(months);
+  f.cam.center = months.place(2).cell.center();  // bottom row of January
+  f.ui.onKey(pb::Key::Down, f.t);
+  f.run(1.0);
+  CHECK(f.cam.center == months.place(4).cell.center());
 }

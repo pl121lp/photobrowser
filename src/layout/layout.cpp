@@ -3,14 +3,14 @@
 #include <algorithm>
 #include <array>
 
-#include "layout/group_year.h"
+#include "layout/grouped_grid.h"
 #include "layout/square_grid.h"
 
 namespace pb {
 
 namespace {
 // To add a layout: append its name here and construct it in makeLayout().
-constexpr std::array<std::string_view, 2> kNames = {"square", "group_year"};
+constexpr std::array<std::string_view, 3> kNames = {"square", "group_year", "group_year_month"};
 }  // namespace
 
 std::span<const std::string_view> layoutNames() { return kNames; }
@@ -31,6 +31,7 @@ std::unique_ptr<Layout> makeLayout(std::string_view name, double gap) {
   name = canonicalLayoutName(name);
   if (name == "square") return std::make_unique<SquareGridLayout>(gap);
   if (name == "group_year") return std::make_unique<GroupYearLayout>(gap);
+  if (name == "group_year_month") return std::make_unique<GroupYearMonthLayout>(gap);
   return nullptr;
 }
 

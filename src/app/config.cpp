@@ -173,7 +173,7 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       if (const std::string_view name = canonicalLayoutName(value); !name.empty()) {
         c.layout = std::string(name);
       } else {
-        bad("square or group_year");
+        bad("square, group_year or group_year_month");
       }
     } else if (key == "view.fit") {
       if (value == "fit" || value == "letterbox") {
@@ -403,8 +403,9 @@ std::string defaultConfigText() {
 
 [view]
 # How the photos are arranged at startup (F4 cycles through the layouts while running):
-#   square     : one square grid of all photos, in time order
-#   group_year : one square grid per year, the years side by side, each labelled
+#   square           : one square grid of all photos, in time order
+#   group_year       : one square grid per year, the years side by side, each labelled
+#   group_year_month : a column per year, side by side; in it a grid per month, stacked
 # layout = square
 # Space around each photo, as a fraction of a photo's size (0 to 0.2). 0 = no gaps.
 # gap = 0.03

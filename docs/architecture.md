@@ -44,7 +44,10 @@ src/
               registry     layoutNames() (F4 order), makeLayout(name); LayoutInput (count +
                            per-position takenAt, room for GPS etc.); labels() = group headings
               SquareGrid   `square`: one ceil(sqrt N) grid
-              GroupYear    `group_year`: one square grid per year, side by side
+              GroupedGrid  base: groups of consecutive positions, each a square grid placed
+                           by the subclass; shared place/visible/hit/labels
+              GroupYear    `group_year`: one grid per year, side by side
+              GroupYearMonth `group_year_month`: a column per year, a grid per month stacked
   library/    Catalog      ordered vector<PhotoRecord>; persisted to cache
               Scanner      folder walk (recursive if [library] recursive), change detection
               Exif         minimal EXIF reader

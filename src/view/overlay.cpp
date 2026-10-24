@@ -225,10 +225,15 @@ Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double 
 
 void buildGroupHeadings(std::span<const GroupHeading> headings, const FontInfo& font, double scale,
                         Vec2d viewport, std::vector<OverlayQuad>& out) {
-  constexpr double kTextScale = 1.5, kMinTextScale = 0.6, kPad = 5, kAbove = 6, kEdge = 8, kSpacing = 12;
+  constexpr double kTextScale = 1.5, kMinTextScale = 0.5, kPad = 5, kAbove = 6, kEdge = 8, kSpacing = 12;
   const double edge = kEdge * scale;
   const float white[4] = {0.95f, 0.95f, 0.95f, 1};
-  double lastX1 = -1e300;
+  std::vector<Rect> drawn;  // panels so far, plus spacing to the right
+  auto overlapping = [&](const Rect& p) -> const Rect* {
+    for (const Rect& d : drawn)
+      if (d.intersects(p)) return &d;
+    return nullptr;
+  };
   for (const GroupHeading& g : headings) {
     const Rect& r = g.rect;
     if (r.x1 <= 0 || r.x0 >= viewport.x || r.y1 <= 0 || r.y0 >= viewport.y) continue;
@@ -240,10 +245,16 @@ void buildGroupHeadings(std::span<const GroupHeading> headings, const FontInfo& 
     const double w = double(textColumns(g.text)) * font.cellW * textScale + 2 * pad;
     double x0 = std::max(r.x0, edge);
     if (x0 + w > r.x1) x0 = std::max(r.x0, r.x1 - w);
-    double y0 = std::max(r.y0 - kAbove * s * scale - h, edge);
-    y0 = std::min(y0, r.y1 - h);
-    if (x0 < lastX1 + kSpacing * scale) continue;
-    lastX1 = x0 + w;
+    const double natural = r.y0 - kAbove * s * scale - h;
+    double y0 = std::min(std::max(natural, edge), r.y1 - h);
+    const Rect* hit = overlapping({x0, y0, x0 + w, y0 + h});
+    while (hit && natural < edge) {  // stuck: try below the heading in the way
+      y0 = hit->y1 + kAbove * scale;
+      if (y0 + h > r.y1) break;
+      hit = overlapping({x0, y0, x0 + w, y0 + h});
+    }
+    if (hit) continue;
+    drawn.push_back({x0, y0, x0 + w + kSpacing * scale, y0 + h});
     out.push_back(solid(OverlayQuad::Kind::Panel, {x0, y0, x0 + w, y0 + h}, font, 0, 0, 0, 0.5f));
     layoutText(g.text, {x0 + pad, y0 + pad}, textScale, white, font, out);
   }
@@ -413,7 +424,7 @@ std::vector<HelpEntry> helpEntries() {
       {"F1", "show / hide this help"},
       {"F2", "photo info (in whole-photo view)"},
       {"F3", "performance stats"},
-      {"F4", "next layout (square grid, grouped by year)"},
+      {"F4", "next layout (one grid, by year, by year and month)"},
       {"F5", "screensaver on / off"},
       {"F6", "next background"},
       {"M", "map: where the photo(s) were taken (needs a map tile plugin)"},
