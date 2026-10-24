@@ -102,6 +102,12 @@ Pointer events over the map panel go to the map, everything else to the content:
   map flies to it as above.
 - Photo without GPS: the map keeps its last view, dimmed, with a centred message
   "No location for this item". The next photo with GPS flies from there.
+- **Trail** (added 2026-10-23; with `[map] trip_path = on`, see §3.5): stepping through
+  photos leaves the earlier photos' locations as gray dots (white ring, like the red
+  one) joined in the order shown by a 3 px gray line, under the red dot of the open
+  photo. Photos without GPS and repeats of the same spot add nothing; the line takes the
+  short way across the antimeridian. Opening a photo from the grid (or opening the map)
+  starts a new trail; going back to the grid clears it. At most the last 1000 points.
 
 ### 3.5 Grid view (multiple photos)
 - Dots (about 12 px) for every **visible** photo with GPS. Visible = its cell

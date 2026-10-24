@@ -35,6 +35,7 @@ class MapView {
  public:
   static constexpr double kSlideS = 0.35, kRestS = 0.3, kPulseS = 2.0, kGridMaxZoom = 16, kPadding = 0.1,
                           kOpenZoom = 4;
+  static constexpr size_t kTrailMax = 1000;  // trail points kept while stepping through photos
 
   // What the content shows this frame.
   struct Subject {
@@ -85,6 +86,11 @@ class MapView {
   // Grid with [map] trip_path on: the trip path in window px, on the copy of the world
   // nearest the view.
   std::vector<TripSegment> tripSegments() const;
+  // A photo open with [map] trip_path on: the locations of the photos stepped through
+  // since it was opened from the grid, joined in the order shown (window px), and the
+  // dots of all but the current one.
+  std::vector<TripSegment> trailSegments() const;
+  std::vector<Vec2d> trailDots() const;
   std::optional<double> pulse(double t) const;  // halo phase 0..1 while pulsing
   std::string_view status() const;              // "" or why there are no dots
   bool dimmed() const { return !status().empty(); }
@@ -117,6 +123,8 @@ class MapView {
   std::vector<Vec2d> dots_;
   std::vector<std::vector<uint32_t>> dotPhotos_;  // per dot (grid)
   std::vector<TripVertex> trip_;                  // grid, trip path on
+  std::vector<TripVertex> trail_;                 // single photo, trip path on
+  bool trailCurrent_ = false;                     // trail_.back() is the open photo
   std::optional<Vec2d> pointer_;                  // over the panel, not dragging
   std::optional<size_t> hoveredDot_, highlightedDot_;
   Vec2d pressAt_;

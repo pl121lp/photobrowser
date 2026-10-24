@@ -118,6 +118,7 @@ void scissor(const Rect& r, double windowHeight) {
 constexpr uint64_t kNoticeNs = 4'000'000'000ULL;  // map notices stay this long
 const Rgb8 kMapBackground{0x24, 0x24, 0x28};     // map panel where no tile is loaded yet
 const Rgb8 kDotColor{0xe8, 0x45, 0x2c};
+const Rgb8 kTrailColor{0x8c, 0x8c, 0x94};  // photos stepped through before the open one
 
 // Everything that exists once the library is loaded.
 struct Session {
@@ -750,8 +751,15 @@ int App::run(const Options& options) {
         renderer.draw(textures.mapTexture(), textures.mapTexture(), mapInstances);
         renderer.setCornerRadius(float(config.cornerRadius));
         renderer.setTransparentBars(config.letterbox && config.transparentBars);
-        // Trip path, under the dots.
+        // Trip path (grid) or the trail of photos stepped through (single photo), under the dots.
         mapLines.clear();
+        const auto trailColor = toLinear(kTrailColor);
+        for (const TripSegment& s : map.trailSegments()) {
+          mapLines.push_back({{float(s.a.x), float(s.a.y), float(s.b.x), float(s.b.y)},
+                              {trailColor[0], trailColor[1], trailColor[2], 1},
+                              {trailColor[0], trailColor[1], trailColor[2], 1},
+                              float(3 * uiScale)});
+        }
         for (const TripSegment& s : map.tripSegments()) {
           auto color = [](double date) {
             const auto t = tripColor(date);
@@ -771,6 +779,13 @@ int App::run(const Options& options) {
         const bool single = map.singleMode();
         const std::optional<double> pulse = map.pulse(seconds(now));
         const std::optional<size_t> highlightedDot = map.highlightedDot();
+        for (const Vec2d s : map.trailDots()) {
+          mapDots.push_back({{float(s.x), float(s.y)},
+                             float(4.5 * uiScale),
+                             float(1.5 * uiScale),
+                             {trailColor[0], trailColor[1], trailColor[2], 1},
+                             0.0f});
+        }
         for (size_t i = 0; i < map.dots().size(); ++i) {
           if (i == highlightedDot) continue;  // drawn last, on top
           const Vec2d s = map.dotScreen(i);

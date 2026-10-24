@@ -126,6 +126,29 @@ std::vector<TripSegment> MapView::tripSegments() const {
       trip_, [&](Vec2d w) { return cam_.worldToScreen({w.x - shift, w.y}) + Vec2d{p.x0, p.y0}; }, kTripMinPx * uiScale_);
 }
 
+namespace {
+// Window px of the trail's points, on the copy of the world nearest the view (around its
+// last point, so the trail stays unbroken).
+std::function<Vec2d(Vec2d)> trailToScreen(const MapCamera& cam, Vec2d last, Rect panel) {
+  const double shift = std::round(last.x - cam.center.x);
+  return [&cam, shift, panel](Vec2d w) { return cam.worldToScreen({w.x - shift, w.y}) + Vec2d{panel.x0, panel.y0}; };
+}
+}  // namespace
+
+std::vector<TripSegment> MapView::trailSegments() const {
+  if (!single_ || trail_.empty()) return {};
+  return pb::tripSegments(trail_, trailToScreen(cam_, trail_.back().world, panelRect(window_)), 0);
+}
+
+std::vector<Vec2d> MapView::trailDots() const {
+  std::vector<Vec2d> out;
+  if (!single_ || trail_.empty()) return out;
+  const auto toScreen = trailToScreen(cam_, trail_.back().world, panelRect(window_));
+  const size_t n = trail_.size() - (trailCurrent_ ? 1 : 0);
+  for (size_t i = 0; i < n; ++i) out.push_back(toScreen(trail_[i].world));
+  return out;
+}
+
 std::optional<size_t> MapView::dotAt(Vec2d px) const {
   if (single_ || !shown()) return std::nullopt;
   std::optional<size_t> best;
@@ -154,6 +177,18 @@ std::optional<MapCamera::View> MapView::fit() const {
 void MapView::updateSingle(double t, const Subject& s) {
   const std::optional<Vec2d> at = s.photoGps ? toWorld(*s.photoGps) : std::nullopt;
   const bool changed = !single_ || photo_ != s.photo || starting_;
+  // The trail: a new point whenever the open photo is somewhere else than the last one.
+  if (!settings_.tripPath || !single_ || starting_) trail_.clear();
+  if (settings_.tripPath && at) {
+    Vec2d w = *at;
+    if (!trail_.empty()) w.x -= std::round(w.x - trail_.back().world.x);  // the short way
+    if (trail_.empty() || trail_.back().world != w) trail_.push_back({w, 0, trail_.empty()});
+    if (trail_.size() > kTrailMax) {
+      trail_.erase(trail_.begin(), trail_.end() - kTrailMax);
+      trail_.front().breakBefore = true;
+    }
+  }
+  trailCurrent_ = at && !trail_.empty();
   single_ = true;
   photo_ = s.photo;
   dots_.clear();
@@ -175,6 +210,8 @@ void MapView::updateGrid(double t, const Subject& s) {
   single_ = false;
   photo_.reset();
   pulsePending_ = false;
+  trail_.clear();
+  trailCurrent_ = false;
   // One dot per position, remembering the photos taken there.
   std::vector<std::pair<Vec2d, uint32_t>> located;
   for (size_t i = 0; i < s.visibleGps.size(); ++i) {

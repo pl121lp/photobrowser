@@ -469,7 +469,8 @@ std::string defaultConfigText() {
 # on = show the map at startup.
 # open = off
 # on = in the grid, join the visible photos in the order they were taken, coloured by
-# date from blue (earliest) through yellow to red (latest).
+# date from blue (earliest) through yellow to red (latest). With a photo open, stepping
+# through photos leaves a gray trail of where the earlier ones were taken.
 # trip_path = off
 # Hours without photos after which the trip path breaks, so separate days or trips are
 # not joined (0.5 to 720).

@@ -536,3 +536,100 @@ TEST_CASE("map view: trip path needs the photos' times") {
   f.open();
   CHECK(f.map.tripSegments().empty());
 }
+
+namespace {
+struct TrailFixture : Fixture {
+  TrailFixture() : Fixture([] {
+    pb::MapSettings s;
+    s.tripPath = true;
+    return s;
+  }()) {}
+  void show(uint32_t photo, std::optional<pb::GeoPos> gps) {
+    subject.photo = photo;
+    subject.photoGps = gps;
+    step();
+  }
+  pb::Vec2d screen(const pb::GeoPos& g) const {
+    pb::Vec2d w = *pb::toWorld(g);
+    w.x -= std::round(w.x - map.camera().center.x);
+    return map.camera().worldToScreen(w) + pb::Vec2d{map.panelRect(window).x0, 0};
+  }
+};
+}  // namespace
+
+TEST_CASE("map view: stepping through photos leaves a gray trail, with trip path on") {
+  TrailFixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  CHECK(f.map.trailSegments().empty());
+  CHECK(f.map.trailDots().empty());
+  f.show(2, kBergen);
+  f.show(3, kRome);
+  CHECK(f.map.dots().size() == 1);  // the current photo, as before
+  const auto segs = f.map.trailSegments();
+  REQUIRE(segs.size() == 2);
+  CHECK(length(segs[0].a - f.screen(kOslo)) < 1e-6);
+  CHECK(length(segs[0].b - f.screen(kBergen)) < 1e-6);
+  CHECK(length(segs[1].b - f.screen(kRome)) < 1e-6);
+  const auto dots = f.map.trailDots();  // the photos before, not the current one
+  REQUIRE(dots.size() == 2);
+  CHECK(length(dots[0] - f.screen(kOslo)) < 1e-6);
+  CHECK(length(dots[1] - f.screen(kBergen)) < 1e-6);
+  CHECK(f.map.tripSegments().empty());  // the grid's trip path is not shown
+}
+
+TEST_CASE("map view: no trail with trip path off") {
+  Fixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.subject.photo = 2;
+  f.subject.photoGps = kBergen;
+  f.step();
+  CHECK(f.map.trailSegments().empty());
+  CHECK(f.map.trailDots().empty());
+}
+
+TEST_CASE("map view: the trail skips photos without GPS and repeats of one spot") {
+  TrailFixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.show(2, std::nullopt);
+  CHECK(f.map.trailDots().size() == 1);  // Oslo is no longer the current photo
+  CHECK(f.map.trailSegments().empty());
+  f.show(3, kBergen);
+  f.show(4, kBergen);
+  REQUIRE(f.map.trailSegments().size() == 1);
+  CHECK(length(f.map.trailSegments()[0].a - f.screen(kOslo)) < 1e-6);
+  CHECK(f.map.trailDots().size() == 1);
+}
+
+TEST_CASE("map view: back in the grid the trail is cleared; the next photo starts a new one") {
+  TrailFixture f;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.show(2, kBergen);
+  REQUIRE(f.map.trailSegments().size() == 1);
+  f.show(0, std::nullopt);
+  f.subject.photo.reset();
+  f.step();
+  CHECK(f.map.trailSegments().empty());
+  CHECK(f.map.trailDots().empty());
+  f.show(5, kRome);
+  CHECK(f.map.trailSegments().empty());
+  f.show(6, kOslo);
+  CHECK(f.map.trailSegments().size() == 1);
+}
+
+TEST_CASE("map view: the trail keeps the last 1000 photos") {
+  TrailFixture f;
+  f.subject.photo = 0;
+  f.subject.photoGps = pb::GeoPos{0, 0, {}};
+  f.open();
+  for (uint32_t i = 1; i < 1200; ++i) f.show(i, pb::GeoPos{0, i * 0.001, {}});
+  CHECK(f.map.trailSegments().size() == pb::MapView::kTrailMax - 1);
+  CHECK(f.map.trailDots().size() == pb::MapView::kTrailMax - 1);
+}
