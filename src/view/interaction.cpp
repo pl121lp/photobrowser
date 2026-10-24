@@ -19,7 +19,7 @@ constexpr double kFlyMinS = 2, kFlyMaxS = 6;  // flyTo duration: 1.5 s + 0.8 s p
 }  // namespace
 
 Interaction::Interaction(Camera& camera, const Layout& layout, double maxPhotoZoom)
-    : cam_(camera), layout_(layout), maxPhotoZoom_(std::max(1.0, maxPhotoZoom)) {
+    : cam_(camera), layout_(&layout), maxPhotoZoom_(std::max(1.0, maxPhotoZoom)) {
   computeLimits();
   resetView();
 }
@@ -28,7 +28,7 @@ void Interaction::computeLimits() {
   const Vec2d vp = cam_.viewport;
   const double shortSide = std::min(vp.x, vp.y);
   maxScale_ = shortSide;
-  const Rect b = layout_.bounds();
+  const Rect b = layout_->bounds();
   if (b.width() > 0 && b.height() > 0) {
     minScale_ = std::min(vp.x / b.width(), vp.y / b.height()) * kFitMargin;
   } else {
@@ -61,6 +61,20 @@ void Interaction::setViewport(Vec2d px) {
 
 void Interaction::layoutChanged() { computeLimits(); }
 
+void Interaction::setLayout(const Layout& layout) {
+  std::optional<uint32_t> anchor = focusTarget_ ? focused_ : nearestPosition(cam_.center);
+  const Vec2d offset = anchor && !focusTarget_ ? cam_.center - layout_->place(*anchor).cell.center() : Vec2d{};
+  layout_ = &layout;
+  computeLimits();
+  stopMotion();
+  if (anchor && *anchor >= layout_->count()) anchor.reset();
+  cam_.center = anchor ? layout_->place(*anchor).cell.center() + offset : layout_->bounds().center();
+  cam_.scale = std::clamp(cam_.scale, minScale_, maxScale_);
+  logZoom_.current = logZoom_.target = std::log(cam_.scale);
+  if (!anchor && focusTarget_) unfocus();
+  clampCenter();
+}
+
 uint32_t startPosition(StartAt at, uint32_t count, uint32_t centerPos, bool newestFirst, uint32_t randomValue) {
   if (count == 0) return 0;
   switch (at) {
@@ -73,18 +87,18 @@ uint32_t startPosition(StartAt at, uint32_t count, uint32_t centerPos, bool newe
 }
 
 uint32_t Interaction::startPos() const {
-  return start_ && *start_ < layout_.count() ? *start_ : layout_.centerPosition();
+  return start_ && *start_ < layout_->count() ? *start_ : layout_->centerPosition();
 }
 
 Vec2d Interaction::startCenter() const {
-  if (layout_.count() == 0 || startZoom_ == StartZoom::Full) return layout_.bounds().center();
-  return layout_.place(startPos()).cell.center();
+  if (layout_->count() == 0 || startZoom_ == StartZoom::Full) return layout_->bounds().center();
+  return layout_->place(startPos()).cell.center();
 }
 
 void Interaction::resetView() {
   stopMotion();
   cam_.center = startCenter();
-  if (startZoom_ == StartZoom::Photo && layout_.count() > 0) {
+  if (startZoom_ == StartZoom::Photo && layout_->count() > 0) {
     // Start in whole-photo view on the start photo, already open (no transition).
     focus(startPos(), now_);
     focusTween_ = {1, 1, now_, 0};
@@ -112,8 +126,8 @@ void Interaction::glideTo(Vec2d center, double scale, double t) {
 }
 
 void Interaction::flyTo(uint32_t pos, double t) {
-  if (pos >= layout_.count()) return;
-  const Vec2d dest = layout_.place(pos).cell.center();
+  if (pos >= layout_->count()) return;
+  const Vec2d dest = layout_->place(pos).cell.center();
   const double dist = length(dest - cam_.center);  // world units = cells
   const double duration = std::clamp(1.5 + 0.8 * std::log2(1 + dist), kFlyMinS, kFlyMaxS);
   glideTo(dest, maxScale_, t);
@@ -130,7 +144,7 @@ void Interaction::focus(uint32_t pos, double t) {
   focused_ = pos;
   focusTarget_ = true;
   focusTween_ = {focusProgress_, 1, t, kFocusS};
-  glideTo(layout_.place(pos).cell.center(), cam_.scale, t);
+  glideTo(layout_->place(pos).cell.center(), cam_.scale, t);
 }
 
 void Interaction::unfocus(bool smoothZoom) {
@@ -196,11 +210,30 @@ std::optional<uint32_t> Interaction::focused() const {
 
 std::optional<uint32_t> Interaction::nearestPosition(Vec2d world) const {
   std::vector<uint32_t> cand;
-  layout_.visible({world.x - 1, world.y - 1, world.x + 1, world.y + 1}, cand);
+  layout_->visible({world.x - 1, world.y - 1, world.x + 1, world.y + 1}, cand);
   std::optional<uint32_t> best;
   double bestD = std::numeric_limits<double>::max();
   for (uint32_t p : cand) {
-    const double d = length(layout_.place(p).cell.center() - world);
+    const double d = length(layout_->place(p).cell.center() - world);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+std::optional<uint32_t> Interaction::nextInDirection(Vec2d from, Vec2d dir) const {
+  constexpr double kReach = 1.5;  // from the target: crosses gaps up to about a cell
+  const Vec2d target = from + dir;
+  std::vector<uint32_t> cand;
+  layout_->visible({target.x - kReach, target.y - kReach, target.x + kReach, target.y + kReach}, cand);
+  std::optional<uint32_t> best;
+  double bestD = kReach;
+  for (uint32_t p : cand) {
+    const Vec2d c = layout_->place(p).cell.center();
+    if ((c.x - from.x) * dir.x + (c.y - from.y) * dir.y < 0.5) continue;  // not beyond `from`
+    const double d = length(c - target);
     if (d < bestD) {
       bestD = d;
       best = p;
@@ -210,15 +243,15 @@ std::optional<uint32_t> Interaction::nearestPosition(Vec2d world) const {
 }
 
 std::optional<uint32_t> Interaction::closestInRow(uint32_t pos, int dir) const {
-  const Rect cell = layout_.place(pos).cell;
+  const Rect cell = layout_->place(pos).cell;
   const double y = cell.center().y + dir * cell.height(), cx = cell.center().x;
-  const Rect b = layout_.bounds();
+  const Rect b = layout_->bounds();
   std::vector<uint32_t> cand;
-  layout_.visible({b.x0, y - cell.height() * 0.25, b.x1, y + cell.height() * 0.25}, cand);
+  layout_->visible({b.x0, y - cell.height() * 0.25, b.x1, y + cell.height() * 0.25}, cand);
   std::optional<uint32_t> best;
   double bestD = std::numeric_limits<double>::max();
   for (uint32_t p : cand) {
-    const double d = std::abs(layout_.place(p).cell.center().x - cx);
+    const double d = std::abs(layout_->place(p).cell.center().x - cx);
     if (d < bestD) {
       bestD = d;
       best = p;
@@ -231,12 +264,12 @@ void Interaction::showFocused(uint32_t pos, double t) {
   focused_ = pos;
   resetFocusZoom(true);
   focusRectValid_ = false;
-  glideTo(layout_.place(pos).cell.center(), cam_.scale, t);
+  glideTo(layout_->place(pos).cell.center(), cam_.scale, t);
 }
 
 void Interaction::clampCenter() {
-  if (layout_.count() == 0) return;
-  const Rect b = layout_.bounds();
+  if (layout_->count() == 0) return;
+  const Rect b = layout_->bounds();
   const Vec2d c = cam_.center;
   cam_.center = {std::clamp(c.x, b.x0, b.x1), std::clamp(c.y, b.y0, b.y1)};
   if (cam_.center.x != c.x) momentum_.velocity.x = 0;
@@ -304,7 +337,7 @@ void Interaction::handleClick(Vec2d px, double t) {
     }
     return;
   }
-  const auto hit = layout_.hit(cam_.screenToWorld(px));
+  const auto hit = layout_->hit(cam_.screenToWorld(px));
   if (!hit) {
     lastClickPos_.reset();
     return;
@@ -317,7 +350,7 @@ void Interaction::handleClick(Vec2d px, double t) {
   }
   lastClickPos_ = hit;
   lastClickTime_ = t;
-  glideTo(layout_.place(*hit).cell.center(), cam_.scale, t);
+  glideTo(layout_->place(*hit).cell.center(), cam_.scale, t);
 }
 
 void Interaction::onSecondaryClick() {
@@ -338,7 +371,7 @@ void Interaction::onWheel(Vec2d px, double notches) {
   }
   const double hi = std::log(maxScale_), lo = std::log(minScale_);
   if (notches > 0 && logZoom_.target >= hi - 1e-9) {
-    if (auto hit = layout_.hit(cam_.screenToWorld(px))) focus(*hit, now_);
+    if (auto hit = layout_->hit(cam_.screenToWorld(px))) focus(*hit, now_);
     return;
   }
   momentum_.stop();
@@ -361,7 +394,7 @@ bool Interaction::onKey(Key k, double t, int steps) {
       case Key::Left:
       case Key::Right: {
         const int64_t step = k == Key::Left ? -steps : steps;
-        showFocused(uint32_t(std::clamp<int64_t>(int64_t(*focused_) + step, 0, int64_t(layout_.count()) - 1)), t);
+        showFocused(uint32_t(std::clamp<int64_t>(int64_t(*focused_) + step, 0, int64_t(layout_->count()) - 1)), t);
         return true;
       }
       case Key::Up:
@@ -394,18 +427,18 @@ bool Interaction::onKey(Key k, double t, int steps) {
       Vec2d at = tween_.active ? Vec2d{tween_.x.to, tween_.y.to} : cam_.center;
       std::optional<uint32_t> to;
       for (int i = 0; i < steps; ++i) {
-        auto p = nearestPosition(at + dir);
+        auto p = nextInDirection(at, dir);
         if (!p) break;
         to = p;
-        at = layout_.place(*p).cell.center();
+        at = layout_->place(*p).cell.center();
       }
-      if (to) glideTo(layout_.place(*to).cell.center(), cam_.scale, t);
+      if (to) glideTo(layout_->place(*to).cell.center(), cam_.scale, t);
       return true;
     }
     case Key::ZoomIn: onWheel(screenMid, 1); return true;
     case Key::ZoomOut: onWheel(screenMid, -1); return true;
     case Key::Home:
-      if (startZoom_ == StartZoom::Photo && layout_.count() > 0) {
+      if (startZoom_ == StartZoom::Photo && layout_->count() > 0) {
         focus(startPos(), t);
         return true;
       }

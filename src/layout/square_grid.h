@@ -4,13 +4,17 @@
 
 namespace pb {
 
+// Columns of a square grid of `count` cells: ceil(sqrt(count)).
+uint32_t squareGridCols(uint32_t count);
+
 // Square grid, cols = ceil(sqrt(N)), filled left to right, row by row.
 // Each cell is 1x1 world units; the photo is inset by `gap` on every side.
 class SquareGridLayout final : public Layout {
  public:
   explicit SquareGridLayout(double gap = 0.03);
 
-  void build(uint32_t count) override;
+  using Layout::build;
+  void build(const LayoutInput& input) override;
   uint32_t count() const override { return count_; }
   Rect bounds() const override;
   Placement place(uint32_t pos) const override;

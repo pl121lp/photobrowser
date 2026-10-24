@@ -195,7 +195,7 @@ TEST_CASE("help: lists every key binding in printable ASCII") {
   auto has = [&](std::string_view key) {
     return std::any_of(entries.begin(), entries.end(), [&](const pb::HelpEntry& e) { return e.key == key; });
   };
-  for (auto key : {"F1", "F2", "F3", "F5", "F6", "F11 / F", "Arrows", "+ / -", "Home", "Enter", "Esc", "Q", "Drag",
+  for (auto key : {"F1", "F2", "F3", "F4", "F5", "F6", "F11 / F", "Arrows", "+ / -", "Home", "Enter", "Esc", "Q", "Drag",
                    "Wheel", "Double-click", "Right-click", "M", "On the map", "Map dot"}) {
     CHECK_MESSAGE(has(key), key);
   }
@@ -517,4 +517,74 @@ TEST_CASE("overlay: clock size follows the viewport height") {
   const pb::Rect b = pb::buildClock("08:00", clock, {3840, 2160}, big);
   CHECK(b.height() == doctest::Approx(3 * a.height()));
   CHECK(b.x1 == doctest::Approx(3840 - 3 * (1280 - a.x1)));
+}
+
+namespace {
+std::vector<pb::Rect> panels(const std::vector<pb::OverlayQuad>& q) {
+  std::vector<pb::Rect> r;
+  for (const auto& quad : q)
+    if (quad.kind == pb::OverlayQuad::Kind::Panel) r.push_back(quad.rect);
+  return r;
+}
+}  // namespace
+
+TEST_CASE("overlay: group headings sit above the group's top-left corner") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::GroupHeading h[] = {{{100, 200, 400, 500}, "2019"}};
+  pb::buildGroupHeadings(h, kFont, 1.0, {1000, 800}, q);
+  const auto p = panels(q);
+  REQUIRE(p.size() == 1);
+  CHECK(p[0].x0 == doctest::Approx(100));
+  CHECK(p[0].y1 <= 200);
+  CHECK(p[0].y0 > 100);
+  CHECK(q.size() == 1 + 4);  // panel + one quad per digit
+}
+
+TEST_CASE("overlay: a heading sticks to the screen edge while its group is on screen") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::GroupHeading h[] = {{{-500, -300, 300, 600}, "2019"}};
+  pb::buildGroupHeadings(h, kFont, 1.0, {1000, 800}, q);
+  auto p = panels(q);
+  REQUIRE(p.size() == 1);
+  CHECK(p[0].x0 > 0);
+  CHECK(p[0].y0 > 0);
+  CHECK(p[0].y0 < 50);
+  CHECK(p[0].x1 <= 300);
+  // ...but never past the group's right edge.
+  q.clear();
+  const pb::GroupHeading narrow[] = {{{-500, -300, 20, 600}, "2019"}};
+  pb::buildGroupHeadings(narrow, kFont, 1.0, {1000, 800}, q);
+  p = panels(q);
+  REQUIRE(p.size() == 1);
+  CHECK(p[0].x1 == doctest::Approx(20));
+}
+
+TEST_CASE("overlay: off-screen and crowded group headings are skipped") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::GroupHeading h[] = {{{1200, 100, 1500, 300}, "2018"},  // right of the screen
+                                {{100, 200, 110, 300}, "2019"},
+                                {{115, 200, 125, 300}, "2020"},  // would overlap 2019
+                                {{600, 200, 700, 300}, "2021"}};
+  pb::buildGroupHeadings(h, kFont, 1.0, {1000, 800}, q);
+  const auto p = panels(q);
+  REQUIRE(p.size() == 2);
+  CHECK(p[0].x0 == doctest::Approx(100));
+  CHECK(p[1].x0 == doctest::Approx(600));
+}
+
+TEST_CASE("overlay: group headings shrink to the space above the group, down to a minimum") {
+  std::vector<pb::OverlayQuad> q;
+  const pb::GroupHeading roomy[] = {{{100, 200, 400, 500}, "2019", 200}};
+  pb::buildGroupHeadings(roomy, kFont, 1.0, {1000, 800}, q);
+  const double full = panels(q)[0].height();
+  q.clear();
+  const pb::GroupHeading tight[] = {{{100, 200, 400, 500}, "2019", 30}};
+  pb::buildGroupHeadings(tight, kFont, 1.0, {1000, 800}, q);
+  auto p = panels(q);
+  CHECK(p[0].height() < 30);
+  CHECK(p[0].y0 >= 170);  // within the space
+  q.clear();
+  const pb::GroupHeading tiny[] = {{{100, 200, 400, 500}, "2019", 2}};
+  pb::buildGroupHeadings(tiny, kFont, 1.0, {1000, 800}, q);
+  CHECK(panels(q)[0].height() == doctest::Approx(full * 0.6 / 1.5));
 }

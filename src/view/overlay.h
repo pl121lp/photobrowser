@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -78,6 +79,20 @@ std::string photoEffectLabel(int effect);
 // One-line label panel in the top-right corner of a `viewport`-sized screen. Returns the panel rect.
 Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double scale, Vec2d viewport,
                            std::vector<OverlayQuad>& out);
+
+// A group heading (e.g. a year, from Layout::labels()) for the group's `rect` on screen.
+struct GroupHeading {
+  Rect rect;  // screen px
+  std::string_view text;
+  double space = 1e9;  // px free above the group: the heading shrinks (to a minimum) to fit
+};
+// Each heading in a small panel just above its group's top-left corner, shrunk to fit
+// the space there when zoomed out (never below a readable size). While the group
+// is on screen but that corner is not, the heading sticks to the screen's top/left edge,
+// staying within the group. Headings of off-screen groups, or that would overlap the
+// previous one drawn (`headings` go left to right), are left out.
+void buildGroupHeadings(std::span<const GroupHeading> headings, const FontInfo& font, double scale,
+                        Vec2d viewport, std::vector<OverlayQuad>& out);
 
 // Clock (screensaver): "HH:MM", 24-hour, zero-padded.
 std::string formatClock(int hour, int minute);

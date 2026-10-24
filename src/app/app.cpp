@@ -314,8 +314,14 @@ int App::run(const Options& options) {
     FrameHistory history;  // frame intervals for the fullscreen stats overlay
     std::vector<OverlayQuad> overlayQuads;
 
-    std::unique_ptr<Layout> layout = makeLayout(options.layout, config.gap);
+    // F4 cycles the layouts; all share the positions (Catalog::order), so switching keeps
+    // focus, streaming and the map in step.
+    std::string layoutName = config.layout;
+    std::unique_ptr<Layout> layout = makeLayout(layoutName, config.gap);
     layout->build(0);
+    std::vector<int64_t> layoutTakenAt;  // per position, for LayoutInput
+    auto layoutInput = [&] { return LayoutInput{uint32_t(layoutTakenAt.size()), layoutTakenAt}; };
+    std::vector<GroupHeading> groupHeadings;
     Camera camera;
     int pw = 0, ph = 0;
     SDL_GetWindowSizeInPixels(window, &pw, &ph);
@@ -344,7 +350,9 @@ int App::run(const Options& options) {
       std::erase_if(session.lib.catalog.order, [&](PhotoId id) {  // --filter: hidden, still cached
         return hasType(session.lib.catalog.photos[id].relPath, options.filterTypes);
       });
-      layout->build(uint32_t(session.lib.catalog.order.size()));
+      layoutTakenAt.clear();
+      for (PhotoId id : session.lib.catalog.order) layoutTakenAt.push_back(session.lib.catalog.photos[id].takenAt);
+      layout->build(layoutInput());
       ui.layoutChanged();
       ui.setStartPosition(startPosition(config.startAt, layout->count(), layout->centerPosition(),
                                         config.newestFirst, std::random_device{}()));
@@ -458,6 +466,17 @@ int App::run(const Options& options) {
               running = false;
             } else if (k == SDLK_F5) {
               setScreensaver(!screensaver.active());
+            } else if (k == SDLK_F4) {
+              setScreensaver(false);
+              layoutName = std::string(nextLayoutName(layoutName));
+              std::unique_ptr<Layout> next = makeLayout(layoutName, config.gap);
+              next->build(layoutInput());
+              ui.setLayout(*next);
+              layout = std::move(next);
+              notice = "Layout: " + layoutName;
+              noticeUntil = SDL_GetTicksNS() + kNoticeNs;
+              std::printf("layout: %s\n", layoutName.c_str());
+              std::fflush(stdout);
             } else if (k == SDLK_F6) {
               setBackground(nextBackground(backgroundChoices, backgroundName));
             } else if (k == SDLK_F1) {
@@ -729,6 +748,18 @@ int App::run(const Options& options) {
           i = j;
         }
         overlay.draw(windowPx, highlightFrames);
+        // Group headings (e.g. years), in the grid only.
+        if (!ui.focused() && !layout->labels().empty()) {
+          groupHeadings.clear();
+          for (const LayoutLabel& l : layout->labels()) {
+            const Vec2d a = camera.worldToScreen({l.group.x0, l.group.y0});
+            const Vec2d b = camera.worldToScreen({l.group.x1, l.group.y1});
+            groupHeadings.push_back({{a.x, a.y, b.x, b.y}, l.text, l.space * camera.scale});
+          }
+          overlayQuads.clear();
+          buildGroupHeadings(groupHeadings, overlayFont, uiScale, camera.viewport, overlayQuads);
+          overlay.draw(windowPx, overlayQuads);
+        }
         if (focusedTile) {
           const uint64_t key = focusedTile->first;
           renderer.draw(GLuint(key >> 32), GLuint(key & 0xffffffffu), std::span(&focusedTile->second, 1),

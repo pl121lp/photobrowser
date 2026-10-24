@@ -41,7 +41,10 @@ src/
               Input        drag/click/double-click detection -> Camera commands
               Screensaver  random photo tour: flyTo (pull-back arc) -> open -> hold -> next
   layout/     Layout       interface: cell rect + content placement per photo index
-              SquareGrid   v1 implementation (square-crop)
+              registry     layoutNames() (F4 order), makeLayout(name); LayoutInput (count +
+                           per-position takenAt, room for GPS etc.); labels() = group headings
+              SquareGrid   `square`: one ceil(sqrt N) grid
+              GroupYear    `group_year`: one square grid per year, side by side
   library/    Catalog      ordered vector<PhotoRecord>; persisted to cache
               Scanner      folder walk (recursive if [library] recursive), change detection
               Exif         minimal EXIF reader
@@ -233,8 +236,11 @@ prefetch destination L1/L2. During flight: motion-blur post-effect scaled by
 screen-space camera velocity; L0 is always resident, so nothing is ever empty — the
 blur hides its low resolution. Result highlighting = per-instance shader parameter.
 
-**Layouts.** New `Layout` implementations + `ContentMode`s; selection via CLI now,
-settings/UI later. Non-grid layouts implement `visible()` with a spatial index
+**Layouts.** New `Layout` implementations + `ContentMode`s, registered by name in
+`layout/layout.cpp` (`[view] layout`, `--layout`, F4 cycles; the app rebuilds the new
+layout and `Interaction::setLayout()` keeps the centre photo in place). A layout gets
+what it arranges by through `LayoutInput` (extend it, e.g. GPS for a cluster layout) and
+may return group headings from `labels()`, which the app draws as screen-space text. Non-grid layouts implement `visible()` with a spatial index
 (uniform grid buckets).
 
 **Shader effects.** FBO + post chain (§7); effect parameters exposed as uniforms; the

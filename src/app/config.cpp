@@ -9,6 +9,7 @@
 
 #include "app/background_presets.h"
 #include "app/options.h"
+#include "layout/layout.h"
 #include "platform/paths.h"
 
 namespace pb {
@@ -167,6 +168,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
         c.startZoom = it->second;
       } else {
         bad("focus, photo or full");
+      }
+    } else if (key == "view.layout") {
+      if (const std::string_view name = canonicalLayoutName(value); !name.empty()) {
+        c.layout = std::string(name);
+      } else {
+        bad("square or group_year");
       }
     } else if (key == "view.fit") {
       if (value == "fit" || value == "letterbox") {
@@ -395,6 +402,10 @@ std::string defaultConfigText() {
 # sort = oldest_first
 
 [view]
+# How the photos are arranged at startup (F4 cycles through the layouts while running):
+#   square     : one square grid of all photos, in time order
+#   group_year : one square grid per year, the years side by side, each labelled
+# layout = square
 # Space around each photo, as a fraction of a photo's size (0 to 0.2). 0 = no gaps.
 # gap = 0.03
 # Which photo the view starts on (Home goes back to it):
@@ -610,6 +621,7 @@ void applyOptions(Config& config, const Options& options) {
   if (options.stats) config.stats = true;
   if (options.windowed) config.fullscreen = false;
   if (options.cacheDir) config.cacheDir = *options.cacheDir;
+  if (options.layout) config.layout = *options.layout;
 }
 
 }  // namespace pb

@@ -18,13 +18,15 @@ TEST_CASE("options: defaults") {
   CHECK_FALSE(o.photoDir);
   CHECK_FALSE(o.cacheDir);
   CHECK_FALSE(o.rebuildCache);
-  CHECK(o.layout == "square-crop");
+  CHECK_FALSE(o.layout);  // the config file decides
   CHECK_FALSE(o.bench);
   CHECK_FALSE(o.help);
 }
 
 TEST_CASE("options: folder and flags") {
   auto r = parse({"/data/pics", "--cache-dir", "/tmp/c", "--rebuild-cache", "--layout", "square-crop", "--bench"});
+  REQUIRE(std::holds_alternative<pb::Options>(r));
+  CHECK(*std::get<pb::Options>(r).layout == "square");  // canonical name
   REQUIRE(std::holds_alternative<pb::Options>(r));
   auto& o = std::get<pb::Options>(r);
   CHECK(*o.photoDir == "/data/pics");

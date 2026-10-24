@@ -51,6 +51,7 @@ struct Config {
   double gap = 0.03;  // per side, as a fraction of a photo; 0 = photos touch
   bool recursive = false;    // [library] recursive: include photos in subfolders
   bool newestFirst = false;  // [library] sort: oldest_first (default) | newest_first
+  std::string layout = "square";  // [view] layout: start layout (canonical name; F4 cycles)
   StartAt startAt = StartAt::Center;
   StartZoom startZoom = StartZoom::Focus;  // [view] start_focus: focus | photo | full  // [view] start_at: photo the start view centres on
   bool autoplay = false;     // [view] autoplay: live content (videos) starts once opened

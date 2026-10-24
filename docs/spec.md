@@ -50,7 +50,11 @@ the primary requirement; features come second.
   Ties broken by file name.
 - **Default layout mode: square crop** — each photo is center-cropped to fill its
   square cell. There is a small gap between cells and a dark background.
-- Layout is a **selectable mode** (see §5). Future modes include square cells with
+- Layout is a **selectable mode**: `[view] layout` (or `--layout`) picks the start
+  layout, `F4` cycles through them while running. `square` (the default) is the single
+  grid above; `group_year` gives each year its own square grid (filled the same way), the
+  years side by side left to right in time order, top-aligned, one cell apart, each with
+  its year as a heading above its top-left corner. Future modes include square cells with
   whole photos letterboxed in black frames, full-rectangle photos, and creative
   layouts. Switching modes must not require rebuilding the thumbnail cache.
 - On launch, the camera is centered on the **center photo** — the occupied cell
@@ -77,6 +81,7 @@ the primary requirement; features come second.
 | `F1` | Toggle **help**: a centered panel listing every key and mouse binding (shrinks to fit small windows). `Esc` also closes it. Off by default. |
 | `F2` | Toggle photo info: while a photo is fully open in whole-photo view, a bottom-left panel shows its file name, its folder within the library (photos in subfolders), width × height (megapixels), date taken (EXIF; file modification date if none), file size and, when the EXIF has one, the GPS position (decimal degrees N/S, E/W, and altitude in metres if recorded). GPS is read at indexing time and kept in the catalog (format version 4; an older catalog is re-indexed once). Off by default. |
 | `F3` | Toggle performance stats: on-screen overlay in fullscreen (fps, frame time, p99, loads, GPU memory, frame-time graph); window title otherwise. |
+| `F4` | Next **layout**: `square` → `group_year` → `square`. Starts from `[view] layout`; not saved. The photo at the screen centre (or the open photo) stays where it is; a notice names the new layout. Stops the screensaver. |
 | `F5` | Toggle **screensaver mode**: fly to a random photo and open it in the whole-photo view, hold it for `[screensaver] hold` seconds (30 by default), then travel to another random photo. Each journey is eased and pulls back (zooms out) mid-way, then zooms in on arrival; longer distances take longer (2–6 s). Repeats until turned off; any click, scroll or key (other than F2/F3/F5/F11/F) also stops it. The cursor is hidden while it runs. Off by default; `[screensaver] enabled = on` starts the app in it. Options: `slow_zoom` (e.g. 1.15) slowly zooms into each photo during the hold, at a steady rate, reaching that zoom at the end and easing back to fit as it leaves; `photo_only = on` fades the other photos out while a photo is shown, leaving just the photo on the background (they return for the journey); `order = sequential` tours the photos in timeline (layout) order instead of at random, starting after the open photo (or at the first photo when none is open) and starting over after the last; `clock = on` shows the local time (24-hour `HH:MM`, no am/pm) large in the bottom-right corner while it runs. Items with live content (videos, via a plugin) start playing by themselves once open, and the tour stays until they finish (or `hold`, if longer). |
 | `F6` | Cycle the **background**: solid → each built-in preset (gradient, vignette, grain, …, warp) → the `[background] shader` file if one is set and readable → solid. Starts from the configured background; not saved. The configured background, solid and the shader file use `color`/`color2`; every other preset uses its own built-in colours, overridable per preset with `[background.<preset>] color` / `color2`. |
 | `0`–`9` | **Photo effect** on the open photo in whole-photo view (top-row or keypad digits): `1` sharpen, `2` Sobel edges, `3` boosted saturation, `4` black & white (red-filter film look), `5` posterize, `6` pencil sketch, `7` oil paint (Kuwahara), `8` tilt-shift miniature, `9` FSR upscale (AMD FidelityFX Super Resolution 1: edge-adaptive upscaling when zoomed past 1:1, contrast-limited sharpening otherwise), `0` none (the default). While an effect is on, its name (e.g. "2: Sobel edges") shows in the top-right corner. Only the open photo is affected; stepping to another photo with the arrows keeps the effect, and leaving whole-photo view resets it to `0`. Ignored in the grid. The shaders are `shaders/photo/*.frag`, spliced into `tile.frag`. |
@@ -127,7 +132,7 @@ way to see one photo whole:
 
 ### 3.6 Running it
 `photobrowse [photo-folder]` — defaults to `./photos`.
-Options: `--cache-dir <dir>`, `--rebuild-cache`, `--layout square-crop`,
+Options: `--cache-dir <dir>`, `--rebuild-cache`, `--layout square|group_year`,
 `--plugin <name|path>` (repeatable), `--filter <types>` (hide file types, e.g. `png,mp4`).
 
 ### 3.7 Plugins
@@ -228,6 +233,16 @@ Calls made by Claude (open to change):
   time zone (EXIF times are local wall-clock).
 - Screensaver: `F5`, off by default (`[screensaver] enabled`), hold time measured from
   when the photo is fully open; user input stops it rather than fighting it.
+- Layouts (added 2026-10-23): `[view] layout = square | group_year` (default square;
+  the old CLI name `square-crop` still means square), `F4` cycles. Layout positions are
+  `Catalog::order` indices in every layout, so focus, streaming, the map and the
+  screensaver carry over a switch; only world rects change. `group_year`: years from
+  `takenAt` (naive, so the photo's local year), 1-cell gap between years and a 1-cell
+  band above them for the headings (inside the layout bounds, so the whole-library view
+  leaves room). Headings are screen-space text that shrinks with the band when zoomed out
+  (to 40% of full size), sticks to the screen's top-left while its year fills the view,
+  and is dropped where it would overlap the previous one; hidden in whole-photo view.
+  Arrow keys reach across the gap between years.
 - `[library] sort = oldest_first | newest_first` (default oldest first): the layout
   order only; the cached catalog stays oldest first, so switching needs no re-index.
 - `[view] start_at = center | oldest | newest | random` (default center): the photo

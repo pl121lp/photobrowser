@@ -6,14 +6,20 @@
 
 namespace pb {
 
+uint32_t squareGridCols(uint32_t count) {
+  uint32_t cols = count == 0 ? 0 : static_cast<uint32_t>(std::ceil(std::sqrt(static_cast<double>(count))));
+  // Guard against floating point: smallest cols with cols*cols >= count.
+  while (cols > 0 && uint64_t(cols - 1) * (cols - 1) >= count) --cols;
+  while (uint64_t(cols) * cols < count) ++cols;
+  return cols;
+}
+
 SquareGridLayout::SquareGridLayout(double gap) : gap_(gap) {}
 
-void SquareGridLayout::build(uint32_t count) {
+void SquareGridLayout::build(const LayoutInput& input) {
+  const uint32_t count = input.count;
   count_ = count;
-  cols_ = count == 0 ? 0 : static_cast<uint32_t>(std::ceil(std::sqrt(static_cast<double>(count))));
-  // Guard against floating point: smallest cols with cols*cols >= count.
-  while (cols_ > 0 && uint64_t(cols_ - 1) * (cols_ - 1) >= count) --cols_;
-  while (uint64_t(cols_) * cols_ < count) ++cols_;
+  cols_ = squareGridCols(count);
   rows_ = cols_ == 0 ? 0 : (count + cols_ - 1) / cols_;
 
   center_ = 0;
@@ -60,11 +66,6 @@ std::optional<uint32_t> SquareGridLayout::hit(Vec2d world) const {
   const uint32_t pos = uint32_t(world.y) * cols_ + uint32_t(world.x);
   if (pos >= count_ || !place(pos).photo.contains(world)) return std::nullopt;
   return pos;
-}
-
-std::unique_ptr<Layout> makeLayout(std::string_view name, double gap) {
-  if (name == "square-crop") return std::make_unique<SquareGridLayout>(gap);
-  return nullptr;
 }
 
 }  // namespace pb

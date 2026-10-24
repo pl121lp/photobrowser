@@ -30,6 +30,10 @@ class Interaction {
 
   void setViewport(Vec2d px);
   void layoutChanged();  // call after Layout::build(); recomputes zoom limits
+  // Switches to another (built) layout with the same positions, at once: the photo at the
+  // screen centre (or the open one) stays where it is on screen, at the same zoom if the
+  // new layout allows it. `layout` must outlive this (or the next setLayout).
+  void setLayout(const Layout& layout);
   void resetView();      // jump to the start view (the start position, default the centre photo)
   // Photo the start view and Home centre on; nullopt or out of range = centre photo.
   void setStartPosition(std::optional<uint32_t> pos) { start_ = pos; }
@@ -99,6 +103,9 @@ class Interaction {
   void clampFocusPan();
   void beginDrag();
   std::optional<uint32_t> nearestPosition(Vec2d world) const;
+  // The photo nearest `from + dir` (dir: a unit axis step) that lies at least half a cell
+  // beyond `from` in that direction; reaches across gaps between groups.
+  std::optional<uint32_t> nextInDirection(Vec2d from, Vec2d dir) const;
   // The photo in the row above (dir -1) or below (+1) `pos` closest to it horizontally.
   std::optional<uint32_t> closestInRow(uint32_t pos, int dir) const;
   void showFocused(uint32_t pos, double t);  // switch the whole-photo view to `pos`
@@ -106,7 +113,7 @@ class Interaction {
   void clampCenter();  // keeps the view centered over the library
 
   Camera& cam_;
-  const Layout& layout_;
+  const Layout* layout_;
   double minScale_ = 1, maxScale_ = 1;
   std::optional<uint32_t> start_;
   StartZoom startZoom_ = StartZoom::Focus;

@@ -473,3 +473,21 @@ TEST_CASE("config: plugin sections keep raw values without warnings") {
   CHECK(r.config.pluginSettings["video"]["foo"] == "Bar");
   CHECK(pb::Config{}.pluginSettings.empty());
 }
+
+TEST_CASE("config: start layout") {
+  CHECK(pb::Config{}.layout == "square");
+  auto r = pb::parseConfig("[view]\nlayout = group_year\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.layout == "group_year");
+  CHECK(pb::parseConfig("[view]\nlayout = square-crop\n").config.layout == "square");  // old name
+  auto bad = pb::parseConfig("[view]\nlayout = spiral\n");
+  CHECK(bad.config.layout == "square");
+  CHECK(hasWarning(bad, "line 2"));
+  CHECK(pb::defaultConfigText().find("# layout = square\n") != std::string::npos);
+  pb::Options o;
+  o.layout = "group_year";  // --layout wins over the file
+  pb::Config c = r.config;
+  c.layout = "square";
+  pb::applyOptions(c, o);
+  CHECK(c.layout == "group_year");
+}

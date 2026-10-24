@@ -18,7 +18,8 @@ std::string usage() {
          "                        created with documented defaults on first run)\n"
          "  --cache-dir <dir>     thumbnail cache root (default: per-user cache directory)\n"
          "  --rebuild-cache       discard this library's cache and re-index\n"
-         "  --layout <name>       layout mode: square-crop (default)\n"
+         "  --layout <name>       start layout: square or group_year (default: [view] layout,\n"
+         "                        else square); F4 cycles the layouts\n"
          "  --windowed            start in a window instead of fullscreen\n"
          "  --stats               start with the stats display on (same as pressing F3)\n"
          "  --bench               run a scripted pan/zoom benchmark, print frame times, exit\n"
@@ -64,8 +65,9 @@ std::variant<Options, std::string> parseOptions(int argc, char** argv) {
     } else if (a == "--layout") {
       auto v = value();
       if (!v) return std::string("--layout needs a name");
-      if (!makeLayout(*v)) return "unknown layout '" + *v + "' (available: square-crop)";
-      o.layout = *v;
+      const std::string_view name = canonicalLayoutName(*v);
+      if (name.empty()) return "unknown layout '" + *v + "' (available: square, group_year)";
+      o.layout = std::string(name);
     } else if (a == "--snapshot") {
       auto v = value();
       if (!v) return std::string("--snapshot needs a file name");

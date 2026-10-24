@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "layout/content.h"
+#include "layout/group_year.h"
 #include "layout/square_grid.h"
 #include "view/camera.h"
 #include "view/interaction.h"
@@ -635,4 +636,44 @@ TEST_CASE("interaction: flightEnd tells when a flyTo lands") {
   CHECK(f.t >= end);
   CHECK(f.t < end + 0.02);
   CHECK_FALSE(f.ui.flightEnd());
+}
+
+TEST_CASE("interaction: switching layouts keeps the centred photo centred") {
+  Fixture f;  // 20 photos, square grid
+  f.cam.center = f.layout.place(7).cell.center() + pb::Vec2d{0.2, -0.1};
+  std::vector<int64_t> taken(20, 0);
+  for (int i = 10; i < 20; ++i) taken[i] = 400LL * 86400;  // 1971: a second group
+  pb::GroupYearLayout years;
+  years.build({20, taken});
+  f.ui.setLayout(years);
+  CHECK(f.cam.center.x == doctest::Approx(years.place(7).cell.center().x + 0.2));
+  CHECK(f.cam.center.y == doctest::Approx(years.place(7).cell.center().y - 0.1));
+  CHECK(f.ui.minScale() < 1000 * 0.95 / 4);  // limits follow the wider layout
+  // The open photo stays open on its new cell.
+  f.ui.openPhoto(15, f.t);
+  f.run(0.5);
+  f.ui.setLayout(f.layout);
+  CHECK(*f.ui.focused() == 15);
+  CHECK(f.cam.center == f.layout.place(15).cell.center());
+  f.run(0.5);
+  CHECK(f.cam.center == f.layout.place(15).cell.center());
+}
+
+TEST_CASE("interaction: arrow keys cross the gap between year groups") {
+  Fixture f;
+  std::vector<int64_t> taken(8, 0);
+  for (int i = 4; i < 8; ++i) taken[i] = 400LL * 86400;  // two 2x2 groups
+  pb::GroupYearLayout years;
+  years.build({8, taken});
+  f.ui.setLayout(years);
+  f.cam.center = years.place(1).cell.center();  // right column of the first group
+  f.ui.onKey(pb::Key::Right, f.t);
+  f.run(1.0);
+  CHECK(f.cam.center == years.place(4).cell.center());
+  f.ui.onKey(pb::Key::Left, f.t);
+  f.run(1.0);
+  CHECK(f.cam.center == years.place(1).cell.center());
+  f.ui.onKey(pb::Key::Up, f.t);  // top row: stays
+  f.run(1.0);
+  CHECK(f.cam.center == years.place(1).cell.center());
 }

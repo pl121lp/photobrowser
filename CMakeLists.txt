@@ -73,6 +73,8 @@ add_library(pb_core STATIC
   src/app/options.cpp
   src/app/config.cpp
   src/app/background_presets.cpp
+  src/layout/group_year.cpp
+  src/layout/layout.cpp
   src/layout/square_grid.cpp
   src/map/mercator.cpp
   src/map/map_camera.cpp

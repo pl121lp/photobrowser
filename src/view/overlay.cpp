@@ -223,6 +223,32 @@ Rect buildPhotoEffectLabel(std::string_view label, const FontInfo& font, double 
   return panel;
 }
 
+void buildGroupHeadings(std::span<const GroupHeading> headings, const FontInfo& font, double scale,
+                        Vec2d viewport, std::vector<OverlayQuad>& out) {
+  constexpr double kTextScale = 1.5, kMinTextScale = 0.6, kPad = 5, kAbove = 6, kEdge = 8, kSpacing = 12;
+  const double edge = kEdge * scale;
+  const float white[4] = {0.95f, 0.95f, 0.95f, 1};
+  double lastX1 = -1e300;
+  for (const GroupHeading& g : headings) {
+    const Rect& r = g.rect;
+    if (r.x1 <= 0 || r.x0 >= viewport.x || r.y1 <= 0 || r.y0 >= viewport.y) continue;
+    // Panel height = text * (cellH + 2 kPad/cellH) + kAbove: fit that in 90% of the space.
+    const double fit = (0.9 * g.space / scale - kAbove) / (font.cellH + 2 * kPad);
+    const double s = std::clamp(fit, kMinTextScale, kTextScale) / kTextScale;  // 1 = full size
+    const double textScale = kTextScale * s * scale, pad = kPad * s * scale;
+    const double h = font.cellH * textScale + 2 * pad;
+    const double w = double(textColumns(g.text)) * font.cellW * textScale + 2 * pad;
+    double x0 = std::max(r.x0, edge);
+    if (x0 + w > r.x1) x0 = std::max(r.x0, r.x1 - w);
+    double y0 = std::max(r.y0 - kAbove * s * scale - h, edge);
+    y0 = std::min(y0, r.y1 - h);
+    if (x0 < lastX1 + kSpacing * scale) continue;
+    lastX1 = x0 + w;
+    out.push_back(solid(OverlayQuad::Kind::Panel, {x0, y0, x0 + w, y0 + h}, font, 0, 0, 0, 0.5f));
+    layoutText(g.text, {x0 + pad, y0 + pad}, textScale, white, font, out);
+  }
+}
+
 std::string formatClock(int hour, int minute) {
   char t[8];
   std::snprintf(t, sizeof t, "%02d:%02d", ((hour % 24) + 24) % 24, ((minute % 60) + 60) % 60);
@@ -387,6 +413,7 @@ std::vector<HelpEntry> helpEntries() {
       {"F1", "show / hide this help"},
       {"F2", "photo info (in whole-photo view)"},
       {"F3", "performance stats"},
+      {"F4", "next layout (square grid, grouped by year)"},
       {"F5", "screensaver on / off"},
       {"F6", "next background"},
       {"M", "map: where the photo(s) were taken (needs a map tile plugin)"},

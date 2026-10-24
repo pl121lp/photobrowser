@@ -13,7 +13,7 @@ struct Options {
   std::optional<std::filesystem::path> configFile;  // instead of the default location
   std::optional<std::filesystem::path> cacheDir;
   bool rebuildCache = false;
-  std::string layout = "square-crop";
+  std::optional<std::string> layout;  // canonical layout name; overrides [view] layout
   bool bench = false;
   bool stats = false;  // start with the F3 stats display on
   bool windowed = false;  // start in a window despite [display] fullscreen
