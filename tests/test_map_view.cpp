@@ -633,3 +633,18 @@ TEST_CASE("map view: the trail keeps the last 1000 photos") {
   CHECK(f.map.trailSegments().size() == pb::MapView::kTrailMax - 1);
   CHECK(f.map.trailDots().size() == pb::MapView::kTrailMax - 1);
 }
+
+TEST_CASE("map view: no trail when the content asks for none (random screensaver)") {
+  TrailFixture f;
+  f.subject.trail = false;
+  f.subject.photo = 1;
+  f.subject.photoGps = kOslo;
+  f.open();
+  f.show(2, kBergen);
+  CHECK(f.map.trailSegments().empty());
+  CHECK(f.map.trailDots().empty());
+  f.subject.trail = true;
+  f.show(3, kRome);
+  f.show(4, kOslo);
+  CHECK(f.map.trailSegments().size() == 1);  // a new trail from Rome
+}

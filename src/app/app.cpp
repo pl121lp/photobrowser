@@ -568,6 +568,8 @@ int App::run(const Options& options) {
           }
         }
         subject.gridMoving = !ui.idle();
+        // A trail only for photos stepped through in order (not a random screensaver).
+        subject.trail = !screensaver.active() || config.screensaverOrder == ScreensaverOrder::Sequential;
         // Screensaver between photos: the map stays on the last one until the next opens.
         subject.frozen = screensaver.active() && !subject.photo;
         map.update(seconds(now), dt, windowPx, uiScale, subject, mapTiles ? mapTiles->pending() : 0);

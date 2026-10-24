@@ -47,6 +47,8 @@ class MapView {
     std::optional<uint32_t> hoveredPhoto;  // grid: the photo under the pointer (highlights its dot)
     bool gridMoving = false;             // the content is moving
     bool frozen = false;                 // keep showing what was shown (screensaver between photos)
+    bool trail = true;                   // a photo open: keep a trail of the photos stepped through
+                                         // (with trip path on; off for a random screensaver)
   };
 
   explicit MapView(MapSettings s = {});

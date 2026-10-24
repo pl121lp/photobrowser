@@ -108,6 +108,8 @@ Pointer events over the map panel go to the map, everything else to the content:
   photo. Photos without GPS and repeats of the same spot add nothing; the line takes the
   short way across the antimeridian. Opening a photo from the grid (or opening the map)
   starts a new trail; going back to the grid clears it. At most the last 1000 points.
+  The screensaver draws the trail only with `[screensaver] order = sequential` (a random
+  tour's trail would just criss-cross the map).
 
 ### 3.5 Grid view (multiple photos)
 - Dots (about 12 px) for every **visible** photo with GPS. Visible = its cell

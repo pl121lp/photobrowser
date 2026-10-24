@@ -178,8 +178,9 @@ void MapView::updateSingle(double t, const Subject& s) {
   const std::optional<Vec2d> at = s.photoGps ? toWorld(*s.photoGps) : std::nullopt;
   const bool changed = !single_ || photo_ != s.photo || starting_;
   // The trail: a new point whenever the open photo is somewhere else than the last one.
-  if (!settings_.tripPath || !single_ || starting_) trail_.clear();
-  if (settings_.tripPath && at) {
+  const bool trail = settings_.tripPath && s.trail;
+  if (!trail || !single_ || starting_) trail_.clear();
+  if (trail && at) {
     Vec2d w = *at;
     if (!trail_.empty()) w.x -= std::round(w.x - trail_.back().world.x);  // the short way
     if (trail_.empty() || trail_.back().world != w) trail_.push_back({w, 0, trail_.empty()});
