@@ -108,6 +108,7 @@ enabled = off              # on = start in screensaver mode (F5 toggles)
 hold = 30                  # seconds on each photo
 slow_zoom = 1              # slow zoom into each photo while shown: 1 = off, 1.15 = gentle, max 2
 photo_only = off           # on = hide the other photos while one is shown
+order = random             # random | sequential (next in the timeline, from the open photo or the first)
 
 [background]
 mode = shader              # solid | gradient | vignette | shader
@@ -159,7 +160,7 @@ mistakes in the settings file are reported with the line number.
 | `F1` | help: show / hide a list of all keys and mouse actions |
 | `F2` | photo info (name, size, date taken, file size) while a photo is open in whole-photo view |
 | `F3` | stats: an on-screen panel in fullscreen (fps, frame times, p99, loads, GPU memory, and a 4-second frame-time graph — green on time, yellow late, red dropped); the title bar in a window |
-| `F5` | screensaver: tours random photos, flying between them; videos (with the plugin) play by themselves and the tour waits for them to end (any click, scroll or key stops it) |
+| `F5` | screensaver: tours random photos (or in timeline order with `[screensaver] order = sequential`), flying between them; videos (with the plugin) play by themselves and the tour waits for them to end (any click, scroll or key stops it) |
 | `F6` | next background: solid, each built-in preset, your shader file, then solid again |
 | `M` | map: where the open photo was taken, or the visible photos (needs the `maptiles` plugin, see below) |
 | `Q` | quit |

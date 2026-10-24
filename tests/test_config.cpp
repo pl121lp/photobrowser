@@ -240,6 +240,18 @@ TEST_CASE("config: screensaver") {
   CHECK(text.find("hold = 30") != std::string::npos);
 }
 
+TEST_CASE("config: screensaver order") {
+  CHECK(pb::Config{}.screensaverOrder == pb::ScreensaverOrder::Random);
+  auto r = pb::parseConfig("[screensaver]\norder = sequential\n");
+  CHECK(r.warnings.empty());
+  CHECK(r.config.screensaverOrder == pb::ScreensaverOrder::Sequential);
+  CHECK(pb::parseConfig("[screensaver]\norder = random\n").config.screensaverOrder == pb::ScreensaverOrder::Random);
+  auto bad = pb::parseConfig("[screensaver]\norder = shuffle\n");
+  CHECK(bad.config.screensaverOrder == pb::ScreensaverOrder::Random);
+  CHECK(hasWarning(bad, "shuffle"));
+  CHECK(pb::defaultConfigText().find("# order = random\n") != std::string::npos);
+}
+
 TEST_CASE("config: screensaver slow zoom and photo only") {
   CHECK(pb::Config{}.screensaverSlowZoom == doctest::Approx(1));
   CHECK_FALSE(pb::Config{}.screensaverPhotoOnly);

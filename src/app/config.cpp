@@ -306,6 +306,12 @@ ConfigResult parseConfig(std::string_view text, std::string_view sourceName) {
       } else {
         bad("a number");
       }
+    } else if (key == "screensaver.order") {
+      if (value == "random" || value == "sequential") {
+        c.screensaverOrder = value == "random" ? ScreensaverOrder::Random : ScreensaverOrder::Sequential;
+      } else {
+        bad("random or sequential");
+      }
     } else if (key == "screensaver.photo_only") {
       if (auto b = parseBool(value)) {
         c.screensaverPhotoOnly = *b;
@@ -451,6 +457,11 @@ std::string defaultConfigText() {
 # Screensaver mode (F5 toggles; any click, scroll or key stops it): flies to a random
 # photo, shows it whole, then travels on to the next. on = start in this mode.
 # enabled = off
+# Which photo comes next:
+#   random     : any other photo
+#   sequential : the next one in the timeline, starting after the open photo (or at the
+#                first photo when none is open) and starting over after the last
+# order = random
 # Seconds to stay on each photo.
 # hold = 30
 # Slow zoom into each photo while it is shown, for a "Ken Burns" effect: the zoom

@@ -9,7 +9,11 @@
 
 namespace pb {
 
-// Screensaver mode: flies to a random photo, opens it in the whole-photo view,
+// Which photo comes next: any other at random, or the next in the layout (timeline)
+// order, wrapping around at the end.
+enum class ScreensaverOrder { Random, Sequential };
+
+// Screensaver mode: flies to a random (or the next) photo, opens it in the whole-photo view,
 // holds it for `holdSeconds`, then flies on to another one, until stopped.
 // Pure logic driving an Interaction; times are seconds from any monotonic clock.
 class Screensaver {
@@ -18,6 +22,8 @@ class Screensaver {
 
   // Zoom reached at the end of each hold (1 = none): a slow, steady push into the photo.
   void setSlowZoom(double zoom) { slowZoom_ = zoom; }
+  // Sequential starts after the photo open when started, else at the first photo.
+  void setOrder(ScreensaverOrder order) { order_ = order; }
   void start();
   void stop() { phase_ = Phase::Off; }
   bool active() const { return phase_ != Phase::Off; }
@@ -32,10 +38,11 @@ class Screensaver {
 
  private:
   enum class Phase { Off, Starting, Flying, Opening, Holding };
-  uint32_t pick(uint32_t count);
+  uint32_t pick(uint32_t count, std::optional<uint32_t> open);
 
   double hold_;
   double slowZoom_ = 1;
+  ScreensaverOrder order_ = ScreensaverOrder::Random;
   std::mt19937 rng_;
   Phase phase_ = Phase::Off;
   std::optional<uint32_t> target_;

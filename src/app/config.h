@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "view/interaction.h"
+#include "view/screensaver.h"
 
 namespace pb {
 
@@ -79,6 +80,7 @@ struct Config {
   double screensaverHold = 30;   // seconds on each photo (1..3600)
   double screensaverSlowZoom = 1;  // zoom reached by the end of each hold (1 = off, max 2)
   bool screensaverPhotoOnly = false;  // hide the other photos while one is shown
+  ScreensaverOrder screensaverOrder = ScreensaverOrder::Random;  // which photo comes next
 
   // [map]
   double mapWidth = 0.4;     // fraction of the window the map panel takes (0.2..0.8)

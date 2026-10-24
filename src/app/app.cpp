@@ -323,6 +323,7 @@ int App::run(const Options& options) {
     Interaction ui(camera, *layout, config.maxPhotoZoom);
     Screensaver screensaver(config.screensaverHold);
     screensaver.setSlowZoom(config.screensaverSlowZoom);
+    screensaver.setOrder(config.screensaverOrder);
     auto setScreensaver = [&](bool on) {
       if (on == screensaver.active()) return;
       if (on) {

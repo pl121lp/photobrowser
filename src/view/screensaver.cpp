@@ -13,7 +13,11 @@ void Screensaver::start() {
   target_.reset();
 }
 
-uint32_t Screensaver::pick(uint32_t count) {
+uint32_t Screensaver::pick(uint32_t count, std::optional<uint32_t> open) {
+  if (order_ == ScreensaverOrder::Sequential) {
+    const std::optional<uint32_t> from = target_ ? target_ : open;
+    return from && *from + 1 < count ? *from + 1 : 0;
+  }
   if (!target_ || *target_ >= count || count < 2) return std::uniform_int_distribution<uint32_t>(0, count - 1)(rng_);
   const uint32_t r = std::uniform_int_distribution<uint32_t>(0, count - 2)(rng_);
   return r >= *target_ ? r + 1 : r;  // never the photo we are leaving
@@ -28,7 +32,7 @@ void Screensaver::update(Interaction& ui, uint32_t count, double t, bool busy) {
       [[fallthrough]];
     case Phase::Starting:
       if (count == 0) return;
-      target_ = pick(count);
+      target_ = pick(count, ui.focused());
       ui.closePhoto();
       ui.flyTo(*target_, t);
       phase_ = Phase::Flying;

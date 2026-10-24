@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <set>
+#include <vector>
 
 #include "layout/square_grid.h"
 #include "view/camera.h"
@@ -181,4 +182,39 @@ TEST_CASE("screensaver: stays while the item is still playing, then moves on") {
   CHECK_FALSE(f.ui.flying());
   runBusy(0.1, false);  // finished playing
   CHECK(f.ui.flying());
+}
+
+TEST_CASE("screensaver: sequential order starts at the first photo and steps through the timeline") {
+  Fixture f(5, 1);
+  f.saver.setOrder(pb::ScreensaverOrder::Sequential);
+  f.saver.start();
+  CHECK(f.untilOpen() == 0);
+  std::vector<uint32_t> seen;
+  for (int i = 0; i < 5; ++i) {
+    f.run(1.1);
+    seen.push_back(f.untilOpen());
+  }
+  CHECK(seen == std::vector<uint32_t>{1, 2, 3, 4, 0});  // wraps around at the end
+}
+
+TEST_CASE("screensaver: sequential order starts after the open photo") {
+  Fixture f(10, 1);
+  f.ui.openPhoto(6, f.t);
+  f.run(1);
+  f.saver.setOrder(pb::ScreensaverOrder::Sequential);
+  f.saver.start();
+  CHECK(f.untilOpen() == 7);
+}
+
+TEST_CASE("screensaver: random order is the default") {
+  Fixture f(100, 1);
+  f.saver.start();
+  std::vector<uint32_t> seen{f.untilOpen()};
+  for (int i = 0; i < 4; ++i) {
+    f.run(1.1);
+    seen.push_back(f.untilOpen());
+  }
+  bool consecutive = true;
+  for (size_t i = 1; i < seen.size(); ++i) consecutive = consecutive && seen[i] == seen[i - 1] + 1;
+  CHECK_FALSE(consecutive);
 }
