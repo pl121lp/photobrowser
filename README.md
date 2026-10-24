@@ -31,7 +31,8 @@ Linux:
 cmake --preset linux-release
 cmake --build --preset linux-release
 ```
-(`linux-debug` and `linux-asan` presets also exist; output goes to `build/<preset>/`.)
+(`linux-debug` and `linux-asan` presets also exist, plus Clang builds as `linux-clang-debug`,
+`linux-clang-release` and `linux-clang-asan`; output goes to `build/<preset>/`.)
 
 Windows (from a "x64 Native Tools" prompt, with `VCPKG_ROOT` set):
 ```bat

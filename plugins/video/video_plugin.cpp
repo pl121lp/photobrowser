@@ -53,10 +53,15 @@ void logMsg(int level, const std::string& msg) {
   if (g_host && g_host->log) g_host->log(g_host->ctx, level, msg.c_str());
 }
 
-// Player threads still running (they outlive player_close so it never blocks).
+// Player threads, joined by destroy() (they outlive player_close so it never blocks).
+// Joined rather than counted: a thread still runs plugin code (unlocking, freeing its
+// PlayState) after it could signal "done", so only a join makes dlclose safe.
+struct DecodeThread {
+  std::thread thread;
+  std::shared_ptr<std::atomic<bool>> done;
+};
 std::mutex g_threadsMutex;
-std::condition_variable g_threadsDone;
-int g_threads = 0;
+std::vector<DecodeThread> g_threads;
 
 // ---- Time ------------------------------------------------------------------------
 
@@ -680,16 +685,18 @@ void playerEvent(PbPlayer* p, int event) {
   if (event != PB_EVENT_ACTIVATE) return;
   if (!p->started) {
     p->started = true;
-    {
-      std::lock_guard lock(g_threadsMutex);
-      ++g_threads;
-    }
-    std::thread([st = p->st] {
-      playLoop(st);
-      std::lock_guard lock(g_threadsMutex);
-      --g_threads;
-      g_threadsDone.notify_all();
-    }).detach();
+    std::lock_guard lock(g_threadsMutex);
+    std::erase_if(g_threads, [](DecodeThread& t) {  // reap finished ones; joins at once
+      if (!*t.done) return false;
+      t.thread.join();
+      return true;
+    });
+    auto done = std::make_shared<std::atomic<bool>>(false);
+    g_threads.push_back({std::thread([st = p->st, done] {
+                           playLoop(st);
+                           *done = true;
+                         }),
+                         done});
     return;
   }
   {
@@ -760,8 +767,12 @@ int playerProgress(PbPlayer* p, double* position, double* duration) {
 }
 
 void destroy(void*) {
-  std::unique_lock lock(g_threadsMutex);
-  g_threadsDone.wait(lock, [] { return g_threads == 0; });
+  std::vector<DecodeThread> threads;
+  {
+    std::lock_guard lock(g_threadsMutex);
+    threads.swap(g_threads);
+  }
+  for (auto& t : threads) t.thread.join();
 }
 
 const char* const kExtensions[] = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".3gp", nullptr};

@@ -31,6 +31,34 @@
       }
     },
     {
+      "name": "clang",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_C_COMPILER": "clang", "CMAKE_CXX_COMPILER": "clang++" }
+    },
+    {
+      "name": "linux-clang-debug",
+      "inherits": "clang",
+      "displayName": "Linux Clang Debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "linux-clang-release",
+      "inherits": "clang",
+      "displayName": "Linux Clang Release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "linux-clang-asan",
+      "inherits": "clang",
+      "displayName": "Linux Clang Debug + ASan/UBSan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
       "name": "windows-msvc-release",
       "inherits": "base",
       "displayName": "Windows MSVC Release (vcpkg)",
@@ -47,6 +75,9 @@
     { "name": "linux-debug", "configurePreset": "linux-debug" },
     { "name": "linux-release", "configurePreset": "linux-release" },
     { "name": "linux-asan", "configurePreset": "linux-asan" },
+    { "name": "linux-clang-debug", "configurePreset": "linux-clang-debug" },
+    { "name": "linux-clang-release", "configurePreset": "linux-clang-release" },
+    { "name": "linux-clang-asan", "configurePreset": "linux-clang-asan" },
     { "name": "windows-msvc-release", "configurePreset": "windows-msvc-release" }
   ]
 }
